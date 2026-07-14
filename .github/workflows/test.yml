@@ -1,0 +1,20 @@
+name: test
+
+# BeanProfile 자동 테스트 (Linux 러너 — sqlite3 기본 포함).
+# 규약: docs/testing.md
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - run: dart run build_runner build --delete-conflicting-outputs
+      - run: flutter analyze
+      - run: flutter test

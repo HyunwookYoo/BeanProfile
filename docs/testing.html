@@ -1,0 +1,154 @@
+<title>BeanProfile 테스트 규약</title>
+<style>
+*{box-sizing:border-box}
+:root{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+  --font-sans:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Consolas,"Malgun Gothic",monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}}
+:root[data-theme="light"]{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+}
+:root[data-theme="dark"]{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-sans);line-height:1.7;-webkit-font-smoothing:antialiased}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.doc{max-width:880px;margin:0 auto;padding:44px 24px 96px}
+.crumb{font-family:var(--font-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:16px}
+h1{font-size:clamp(26px,4vw,38px);font-weight:800;letter-spacing:-.025em;line-height:1.2;margin:.1em 0 .5em;text-wrap:balance}
+h2{font-size:22px;font-weight:700;margin:2em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line);letter-spacing:-.01em;text-wrap:balance}
+h3{font-size:16.5px;font-weight:700;color:var(--accent-ink);margin:1.7em 0 .5em}
+h4{font-size:14px;font-weight:700;margin:1.3em 0 .4em}
+p{margin:.7em 0}
+a{color:var(--accent);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+strong{font-weight:700;color:var(--fg)}
+hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+code.ic{font-family:var(--font-mono);font-size:.85em;background:var(--ic-bg);color:var(--ic-fg);padding:1.5px 6px;border-radius:6px}
+pre.code{position:relative;background:var(--code-bg);color:var(--code-fg);border-radius:12px;padding:16px 18px;margin:1em 0;overflow-x:auto;border:1px solid rgba(0,0,0,.28)}
+pre.code code{font-family:var(--font-mono);font-size:12.75px;line-height:1.6;white-space:pre;color:inherit;background:none;padding:0}
+pre.code[data-lang]::before{content:attr(data-lang);position:absolute;top:9px;right:13px;font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(236,227,211,.42)}
+.tablewrap{overflow-x:auto;margin:1.1em 0}
+table{border-collapse:collapse;width:100%;font-size:13.75px}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--th);font-weight:700}
+tbody tr:nth-child(even){background:var(--surface)}
+blockquote{margin:1.1em 0;padding:11px 16px;border-left:3px solid var(--accent);background:var(--surface);border-radius:0 10px 10px 0;color:var(--muted)}
+blockquote strong{color:var(--fg)}
+ul,ol{margin:.7em 0;padding-left:1.4em}
+li{margin:.32em 0}
+ul.tasklist{list-style:none;padding-left:.15em}
+ul.tasklist li.task{position:relative;padding-left:30px;margin:.5em 0}
+ul.tasklist li.task::before{content:"";position:absolute;left:0;top:.18em;width:17px;height:17px;border:2px solid var(--accent);border-radius:5px;background:transparent}
+ul.tasklist li.task.done::before{content:"\2713";background:var(--accent);color:#fff;font-size:12px;font-weight:800;text-align:center;line-height:15px}
+</style>
+<article class="doc"><div class="crumb">BeanProfile · docs</div>
+<h1>BeanProfile 테스트 규약</h1>
+<p>목표: <strong>기능을 추가할 때 <code class="ic">flutter test</code> 한 번으로 기존 기능이 깨졌는지 즉시 확인</strong>한다. 모든 마일스톤(M1~M5)이 이 규약을 따른다. 관련: 로드맵 <a href="plans/roadmap.md"><code class="ic">plans/roadmap.md</code></a> · M1 <a href="plans/milestone-1-foundation.md"><code class="ic">plans/milestone-1-foundation.md</code></a></p>
+<hr>
+<h2>1. 3계층 전략</h2>
+<div class="tablewrap"><table><thead><tr><th>계층</th><th>대상</th><th>방식</th><th>속도</th></tr></thead><tbody><tr><td><strong>유닛/데이터</strong></td><td>컨버터·DB·저장소·분석 쿼리</td><td><strong>인메모리 drift DB</strong> (<code class="ic">NativeDatabase.memory()</code>)</td><td>매우 빠름</td></tr><tr><td><strong>위젯/UI</strong></td><td>화면·위젯</td><td><code class="ic">flutter_test</code> + <strong>Riverpod provider override</strong></td><td>빠름</td></tr><tr><td><strong>스모크</strong></td><td>앱 부팅</td><td>최소 pump</td><td>즉시</td></tr></tbody></table></div>
+<p>원칙: <strong>TDD</strong>(실패 테스트 → 최소 구현 → 통과 → 커밋) · 기기/네트워크 없이 호스트에서 실행 · 커밋 전 <code class="ic">flutter analyze &amp;&amp; flutter test</code> 초록불.</p>
+<hr>
+<h2>2. 공유 헬퍼 — <code class="ic">test/helpers.dart</code></h2>
+<p>각 테스트가 인메모리 DB·샘플 데이터를 반복하지 않도록 공통 헬퍼로 모은다. <strong>M2부터는 기본 사용</strong>하고, M1의 반복 셋업도 이걸로 대체할 수 있다.</p>
+<pre class="code" data-lang="dart"><code>import 'package:beanprofile/data/bean_repository.dart';
+import 'package:beanprofile/data/database.dart';
+import 'package:beanprofile/data/enums.dart';
+import 'package:beanprofile/data/models.dart';
+import 'package:beanprofile/providers.dart';
+import 'package:beanprofile/theme.dart';
+import 'package:drift/native.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+/// 인메모리 테스트 DB (FK on). 반드시 addTearDown(db.close).
+AppDatabase testDatabase() =&gt; AppDatabase.forTesting(NativeDatabase.memory());
+
+/// DB를 주입한 저장소.
+BeanRepository testRepository(AppDatabase db) =&gt; BeanRepository(db);
+
+/// DB를 override한 ProviderContainer. addTearDown(container.dispose).
+ProviderContainer testContainer(AppDatabase db) =&gt;
+    ProviderContainer(overrides: [databaseProvider.overrideWithValue(db)]);
+
+/// 위젯 테스트용: 테마 + (선택) DB override로 화면을 감싼다.
+Widget wrapApp(Widget child, {AppDatabase? db}) =&gt; ProviderScope(
+      overrides: [if (db != null) databaseProvider.overrideWithValue(db)],
+      child: MaterialApp(theme: AppTheme.light, home: child),
+    );
+
+/// 샘플 싱글 오리진.
+BeanInput sampleSingle({String name = '예가체프 코체레', String country = 'Ethiopia'}) =&gt;
+    BeanInput(
+      name: name, roaster: '프릳츠', type: BeanType.singleOrigin,
+      roastLevel: RoastLevel.lightMedium, roastDate: null,
+      cupNotes: const ['블루베리', '자스민'], memo: null,
+      components: [ComponentInput(country: country, process: Process.washed)],
+    );
+
+/// 샘플 블렌드 (구성 2개 + 비율).
+BeanInput sampleBlend({String name = '하우스 블렌드'}) =&gt; BeanInput(
+      name: name, roaster: '테라로사', type: BeanType.blend,
+      roastLevel: RoastLevel.medium, roastDate: null,
+      cupNotes: const ['다크초콜릿'], memo: null,
+      components: const [
+        ComponentInput(country: 'Brazil', process: Process.natural, ratioPercent: 60),
+        ComponentInput(country: 'Ethiopia', process: Process.washed, ratioPercent: 40),
+      ],
+    );</code></pre>
+<h3>사용 예 (반복 → 헬퍼)</h3>
+<pre class="code" data-lang="dart"><code>// 유닛 테스트
+final db = testDatabase();
+addTearDown(db.close);
+final repo = testRepository(db);
+final id = await repo.createBean(sampleSingle());
+expect((await repo.getBeanDetail(id))!.bean.name, '예가체프 코체레');
+
+// 위젯 테스트
+await tester.pumpWidget(wrapApp(const BeanListScreen(), db: testDatabase()));
+await tester.pumpAndSettle();
+expect(find.byType(BeanCard), findsWidgets);</code></pre>
+<blockquote><code class="ic">sampleXxx()</code> 팩토리는 새 기능이 생길 때마다 여기 추가한다(예: <code class="ic">sampleTasting()</code>). 그러면 M2~M5 테스트를 빠르게 작성·유지할 수 있다.</blockquote>
+<hr>
+<h2>3. Windows에서 <code class="ic">flutter test</code> 초록불 (sqlite3)</h2>
+<p><code class="ic">flutter test</code>는 기기가 아니라 <strong>호스트(Dart VM)</strong> 에서 돈다 → <code class="ic">NativeDatabase.memory()</code>가 <strong>sqlite3 네이티브 라이브러리</strong>를 필요로 한다.</p>
+<ul><li><strong>Linux / macOS:</strong> 대개 시스템에 이미 있음 → 별도 작업 불필요. (CI를 Linux에서 돌리는 이유)</li><li><strong>Windows:</strong> 기본 미포함. 아래 중 하나로 해결.</li><li>https://sqlite.org/download.html → *Precompiled Binaries for Windows* 의 <code class="ic">sqlite-dll-win-x64-*.zip</code> 다운로드 → <code class="ic">sqlite3.dll</code> 추출.</li><li><code class="ic">sqlite3.dll</code>을 <strong>프로젝트 루트</strong>(=<code class="ic">flutter test</code> 실행 위치)에 두거나 시스템 <strong>PATH</strong>에 추가.</li><li>확인: <code class="ic">flutter test</code> 재실행 → drift 관련 테스트 통과.</li><li><strong>기기/에뮬레이터 실행</strong>(<code class="ic">flutter run</code>, integration_test)에는 <code class="ic">sqlite3_flutter_libs</code>가 네이티브를 제공하므로 DLL 불필요. (drift_flutter 사용 시 앱 런타임은 이미 처리됨.)</li><li><strong>가장 깔끔한 회피:</strong> CI를 <strong>Linux</strong>에서 돌리면 이 문제 자체가 없다(§4). 로컬 Windows에서 위 셋업이 번거로우면, 로컬은 위젯/유닛 일부만 돌리고 전체 회귀는 CI에 맡겨도 된다.</li></ul>
+<hr>
+<h2>4. CI — GitHub Actions (<code class="ic">.github/workflows/test.yml</code>)</h2>
+<p>push / PR마다 <strong>Linux 러너</strong>에서 <code class="ic">analyze</code> + <code class="ic">test</code>를 자동 실행한다(리눅스라 sqlite3 문제 없음). 개인·오프라인 앱이지만 GitHub에 올려 두면 회귀 안전망이 된다.</p>
+<pre class="code" data-lang="yaml"><code>name: test
+on:
+  push:
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest   # Linux엔 sqlite3 기본 존재 → 인메모리 테스트 OK
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - run: dart run build_runner build --delete-conflicting-outputs
+      - run: flutter analyze
+      - run: flutter test</code></pre>
+<blockquote>GitHub 원격을 안 쓰면 이 파일은 그대로 잠자며 아무 영향 없다. 원격에 push하는 순간부터 동작한다.</blockquote>
+<hr>
+<h2>5. 실행 명령</h2>
+<pre class="code" data-lang="bash"><code>flutter test                                   # 전체
+flutter test test/data/bean_repository_test.dart   # 특정 파일
+flutter test --name '외 N'                      # 이름으로 필터
+flutter analyze                                # 정적 분석
+flutter test --coverage                        # (선택) coverage/lcov.info 생성</code></pre>
+<hr>
+<h2>6. 새 기능 추가 시 체크리스트</h2>
+<ul class="tasklist"><li class="task">데이터 로직이면 <strong>유닛 테스트</strong>(인메모리 DB + <code class="ic">testDatabase()</code>), 화면이면 <strong>위젯 테스트</strong>(<code class="ic">wrapApp</code>).</li><li class="task">필요한 샘플은 <code class="ic">test/helpers.dart</code>에 <code class="ic">sampleXxx()</code>로 추가(재사용).</li><li class="task">실패 → 구현 → 통과 순서(TDD).</li><li class="task">커밋 전 <code class="ic">flutter analyze &amp;&amp; flutter test</code> 초록불 확인.</li></ul>
+</article>

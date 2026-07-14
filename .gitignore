@@ -1,0 +1,24 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.iml
+
+# Dart / Flutter (프로젝트 생성 후 사용)
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+build/
+.pub-cache/
+.pub/
+coverage/
+
+# 플랫폼 로컬 설정
+**/android/local.properties
+**/ios/Pods/
+**/ios/.symlinks/
+*.log
+
+# Windows 호스트 테스트용 네이티브 라이브러리 (기기마다 각자 배치 — docs/testing.md 참고)
+sqlite3.dll

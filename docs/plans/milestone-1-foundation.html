@@ -1,0 +1,1478 @@
+<title>M1 — 기반 &amp; 원두 추가/조회 Implementation Plan</title>
+<style>
+*{box-sizing:border-box}
+:root{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+  --font-sans:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Consolas,"Malgun Gothic",monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}}
+:root[data-theme="light"]{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+}
+:root[data-theme="dark"]{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-sans);line-height:1.7;-webkit-font-smoothing:antialiased}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.doc{max-width:880px;margin:0 auto;padding:44px 24px 96px}
+.crumb{font-family:var(--font-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:16px}
+h1{font-size:clamp(26px,4vw,38px);font-weight:800;letter-spacing:-.025em;line-height:1.2;margin:.1em 0 .5em;text-wrap:balance}
+h2{font-size:22px;font-weight:700;margin:2em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line);letter-spacing:-.01em;text-wrap:balance}
+h3{font-size:16.5px;font-weight:700;color:var(--accent-ink);margin:1.7em 0 .5em}
+h4{font-size:14px;font-weight:700;margin:1.3em 0 .4em}
+p{margin:.7em 0}
+a{color:var(--accent);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+strong{font-weight:700;color:var(--fg)}
+hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+code.ic{font-family:var(--font-mono);font-size:.85em;background:var(--ic-bg);color:var(--ic-fg);padding:1.5px 6px;border-radius:6px}
+pre.code{position:relative;background:var(--code-bg);color:var(--code-fg);border-radius:12px;padding:16px 18px;margin:1em 0;overflow-x:auto;border:1px solid rgba(0,0,0,.28)}
+pre.code code{font-family:var(--font-mono);font-size:12.75px;line-height:1.6;white-space:pre;color:inherit;background:none;padding:0}
+pre.code[data-lang]::before{content:attr(data-lang);position:absolute;top:9px;right:13px;font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(236,227,211,.42)}
+.tablewrap{overflow-x:auto;margin:1.1em 0}
+table{border-collapse:collapse;width:100%;font-size:13.75px}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--th);font-weight:700}
+tbody tr:nth-child(even){background:var(--surface)}
+blockquote{margin:1.1em 0;padding:11px 16px;border-left:3px solid var(--accent);background:var(--surface);border-radius:0 10px 10px 0;color:var(--muted)}
+blockquote strong{color:var(--fg)}
+ul,ol{margin:.7em 0;padding-left:1.4em}
+li{margin:.32em 0}
+ul.tasklist{list-style:none;padding-left:.15em}
+ul.tasklist li.task{position:relative;padding-left:30px;margin:.5em 0}
+ul.tasklist li.task::before{content:"";position:absolute;left:0;top:.18em;width:17px;height:17px;border:2px solid var(--accent);border-radius:5px;background:transparent}
+ul.tasklist li.task.done::before{content:"\2713";background:var(--accent);color:#fff;font-size:12px;font-weight:800;text-align:center;line-height:15px}
+</style>
+<article class="doc"><div class="crumb">BeanProfile · docs/plans</div>
+<h1>M1 — 기반 &amp; 원두 추가/조회 Implementation Plan</h1>
+<blockquote><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code class="ic">- [ ]</code>) syntax for tracking.</blockquote>
+<p><strong>Goal:</strong> Flutter 앱 골격 위에서 원두를 <strong>수동으로 추가 → 리스트로 조회 → 상세(읽기)</strong> 까지 되는, 로컬 저장 기반의 동작하는 첫 증분을 만든다.</p>
+<p><strong>Architecture:</strong> feature-first 폴더 구조. 데이터는 drift(SQLite) 3테이블(Beans/OriginComponents/Tastings)에 저장하고 <code class="ic">BeanRepository</code>가 CRUD를 캡슐화한다. UI는 Riverpod provider로 DB 스트림을 구독한다. M1은 시음/OCR/대시보드/편집·삭제를 제외한 <strong>추가·리스트·상세(읽기)</strong> 만 다룬다.</p>
+<p><strong>Tech Stack:</strong> Flutter(stable, Dart 3) · drift + drift_flutter(SQLite) · flutter_riverpod · intl · (dev) drift_dev, build_runner.</p>
+<blockquote>코드는 검증된 참고 구현이다. 패키지 최신 API에 맞춰 사소한 조정이 필요할 수 있다. 각 코드 스텝은 그대로 실행 가능한 것을 목표로 한다.</blockquote>
+<h2>Global Constraints</h2>
+<ul><li>Flutter stable / Dart 3, null-safety. 상태관리는 flutter_riverpod, DB는 drift.</li><li><strong>오프라인·로컬 전용:</strong> 네트워크 사용 안 함. DB 파일명 <code class="ic">beanprofile</code>.</li><li><strong>한국어:</strong> 모든 사용자 노출 문자열은 한국어.</li><li><strong>디자인 토큰(목업 확정값):</strong> oat <code class="ic">#ECE6DB</code> · cup <code class="ic">#FCFBF8</code> · espresso <code class="ic">#2B2019</code> · crema <code class="ic">#B67B2E</code> · cremaInk <code class="ic">#8A5A18</code> · appMuted <code class="ic">#8C8172</code> · appLine <code class="ic">#E4DED2</code> · cherry <code class="ic">#9E3B2D</code>. 데이터(날짜·고도·비율·평점)는 모노스페이스.</li><li><strong>데이터 모델:</strong> <code class="ic">Bean 1—N OriginComponent</code>(싱글=1, 블렌드=N), <code class="ic">Bean 1—N Tasting</code>. 평가 강도 4축 1~5 + overall 1~5 + comment.</li><li><strong>평가/시음 UI는 M2</strong>, OCR은 M3. M1의 원두 추가는 <strong>수동 입력</strong>이다.</li></ul>
+<hr>
+<h2>테스트 전략</h2>
+<p>자동화 테스트로 <strong>기능 추가 시 빠른 회귀 확인</strong>을 보장한다. 상세 규약·공유 헬퍼 전체 코드·CI·Windows sqlite3 셋업은 <a href="../testing.md"><code class="ic">../testing.md</code></a> 참조.</p>
+<ul><li><strong>3계층:</strong> 유닛/데이터(인메모리 drift DB) · 위젯/UI(Riverpod override) · 스모크.</li><li><strong>공유 헬퍼</strong> <code class="ic">test/helpers.dart</code>: <code class="ic">testDatabase()</code> · <code class="ic">testRepository(db)</code> · <code class="ic">testContainer(db)</code> · <code class="ic">wrapApp(widget, db:)</code> · <code class="ic">sampleSingle()/sampleBlend()</code>. 아래 태스크의 반복 셋업을 이 헬퍼로 대체할 수 있고, M2부터는 기본 사용한다.</li><li><strong>Windows sqlite3:</strong> 호스트 <code class="ic">flutter test</code>엔 <code class="ic">sqlite3.dll</code>이 필요 — testing.md의 셋업을 따른다. (Linux/CI는 불필요.)</li><li><strong>CI:</strong> <code class="ic">.github/workflows/test.yml</code>(Linux)이 push마다 <code class="ic">flutter analyze</code> + <code class="ic">flutter test</code> 자동 실행.</li><li><strong>커밋 전:</strong> <code class="ic">flutter analyze &amp;&amp; flutter test</code> 초록불.</li></ul>
+<hr>
+<h2>File Structure</h2>
+<pre class="code"><code>lib/
+  main.dart                       # ProviderScope + BeanProfileApp
+  app.dart                        # MaterialApp, HomeShell(3탭)
+  theme.dart                      # AppTheme.light, AppColors(ThemeExtension), monoStyle
+  providers.dart                  # databaseProvider, beanRepositoryProvider, beanListProvider, beanDetailProvider
+  data/
+    enums.dart                    # BeanType, RoastLevel, Process + 한글 label
+    converters.dart               # StringListConverter (컵노트 List&lt;String&gt; ↔ JSON)
+    tables.dart                   # Beans, OriginComponents, Tastings
+    database.dart (+ .g.dart)     # AppDatabase
+    models.dart                   # BeanSummary, BeanDetail (뷰 모델)
+    bean_repository.dart          # createBean / watchBeanSummaries / watchBeanDetail
+  features/
+    beans/
+      bean_list_screen.dart
+      bean_form_screen.dart       # 원두 추가(수동)
+      bean_detail_screen.dart     # 읽기 전용
+      widgets/
+        bean_card.dart
+        star_rating.dart
+    profile/profile_screen.dart   # M1 자리표시(취향 탭)
+    settings/settings_screen.dart # M1 자리표시(설정 탭)
+test/
+  helpers.dart                  # 공유 헬퍼 (testDatabase/wrapApp/sample*) — testing.md
+  data/converters_test.dart
+  data/database_test.dart
+  data/bean_repository_test.dart
+  providers_test.dart
+  widget/app_shell_test.dart
+  widget/bean_list_test.dart
+  widget/bean_form_test.dart
+  widget/bean_detail_test.dart
+.github/workflows/test.yml        # CI: analyze + test (Linux)</code></pre>
+<hr>
+<h3>Task 1: 프로젝트 스캐폴드 &amp; 의존성</h3>
+<p><strong>Files:</strong></p>
+<ul><li>Create: 프로젝트 전체(<code class="ic">flutter create</code>), <code class="ic">pubspec.yaml</code>(수정), <code class="ic">lib/main.dart</code>(교체)</li><li>Test: <code class="ic">test/smoke_test.dart</code></li><li>Delete: <code class="ic">test/widget_test.dart</code>(기본 생성물)</li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 1: Flutter 프로젝트 생성</strong> (이미 <code class="ic">C:\BeanProfile</code>에 <code class="ic">docs/</code>, <code class="ic">CLAUDE.md</code> 존재 — 비어있지 않은 폴더에 생성)</li></ul>
+<p>Run:</p>
+<pre class="code" data-lang="bash"><code>flutter create --org com.beanprofile --project-name beanprofile --platforms=android,ios .</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 2: 의존성 추가</strong></li></ul>
+<p>Run:</p>
+<pre class="code" data-lang="bash"><code>flutter pub add drift drift_flutter flutter_riverpod intl
+dart pub add --dev drift_dev build_runner</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 3: 폴더 생성</strong></li></ul>
+<p>Run:</p>
+<pre class="code" data-lang="bash"><code>mkdir -p lib/data lib/features/beans/widgets lib/features/profile lib/features/settings test/data test/widget</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 4: <code class="ic">lib/main.dart</code> 최소 앱으로 교체</strong></li></ul>
+<pre class="code" data-lang="dart"><code>import 'package:flutter/material.dart';
+
+void main() =&gt; runApp(const _Boot());
+
+class _Boot extends StatelessWidget {
+  const _Boot();
+  @override
+  Widget build(BuildContext context) =&gt; const MaterialApp(
+        home: Scaffold(body: Center(child: Text('BeanProfile'))),
+      );
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 5: 기본 위젯 테스트 삭제 후 스모크 테스트 작성</strong></li></ul>
+<p>Run: <code class="ic">rm test/widget_test.dart</code></p>
+<p><code class="ic">test/smoke_test.dart</code>:</p>
+<pre class="code" data-lang="dart"><code>import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  testWidgets('boots and shows app name', (tester) async {
+    await tester.pumpWidget(const MaterialApp(
+      home: Scaffold(body: Center(child: Text('BeanProfile'))),
+    ));
+    expect(find.text('BeanProfile'), findsOneWidget);
+  });
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 6: 분석 &amp; 테스트 통과 확인</strong></li></ul>
+<p>Run: <code class="ic">flutter analyze &amp;&amp; flutter test</code> Expected: analyze 0 issues, 1 test PASS.</p>
+<ul class="tasklist"><li class="task"><strong>Step 7: 커밋</strong></li></ul>
+<pre class="code" data-lang="bash"><code>git init
+git add -A
+git commit -m "chore: scaffold Flutter project and dependencies"</code></pre>
+<hr>
+<h3>Task 2: 열거형 &amp; 컵노트 컨버터</h3>
+<p><strong>Files:</strong></p>
+<ul><li>Create: <code class="ic">lib/data/enums.dart</code>, <code class="ic">lib/data/converters.dart</code></li><li>Test: <code class="ic">test/data/converters_test.dart</code></li></ul>
+<p><strong>Interfaces:</strong></p>
+<ul><li>Produces: <code class="ic">enum BeanType { singleOrigin, blend }</code>, <code class="ic">enum RoastLevel { light, lightMedium, medium, mediumDark, dark }</code>, <code class="ic">enum Process { washed, natural, honey, anaerobic, other }</code>, 각 <code class="ic">.label</code> (String) 확장. <code class="ic">class StringListConverter extends TypeConverter&lt;List&lt;String&gt;, String&gt;</code>.</li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 1: 실패 테스트 작성</strong></li></ul>
+<p><code class="ic">test/data/converters_test.dart</code>:</p>
+<pre class="code" data-lang="dart"><code>import 'package:beanprofile/data/converters.dart';
+import 'package:beanprofile/data/enums.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  const conv = StringListConverter();
+
+  test('round-trips a list of strings', () {
+    const notes = ['블루베리', '자스민', '홍차'];
+    final sql = conv.toSql(notes);
+    expect(conv.fromSql(sql), notes);
+  });
+
+  test('empty list round-trips', () {
+    expect(conv.fromSql(conv.toSql(const [])), isEmpty);
+  });
+
+  test('enum labels are Korean', () {
+    expect(BeanType.blend.label, '블렌드');
+    expect(Process.natural.label, '내추럴');
+    expect(RoastLevel.mediumDark.label, '미디엄다크');
+  });
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 2: 테스트 실패 확인</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/data/converters_test.dart</code> Expected: FAIL — <code class="ic">enums.dart</code>/<code class="ic">converters.dart</code> 없음(컴파일 에러).</p>
+<ul class="tasklist"><li class="task"><strong>Step 3: enums 구현</strong></li></ul>
+<p><code class="ic">lib/data/enums.dart</code>:</p>
+<pre class="code" data-lang="dart"><code>enum BeanType { singleOrigin, blend }
+
+enum RoastLevel { light, lightMedium, medium, mediumDark, dark }
+
+enum Process { washed, natural, honey, anaerobic, other }
+
+extension BeanTypeLabel on BeanType {
+  String get label =&gt; switch (this) {
+        BeanType.singleOrigin =&gt; '싱글 오리진',
+        BeanType.blend =&gt; '블렌드',
+      };
+}
+
+extension RoastLevelLabel on RoastLevel {
+  String get label =&gt; switch (this) {
+        RoastLevel.light =&gt; '라이트',
+        RoastLevel.lightMedium =&gt; '라이트미디엄',
+        RoastLevel.medium =&gt; '미디엄',
+        RoastLevel.mediumDark =&gt; '미디엄다크',
+        RoastLevel.dark =&gt; '다크',
+      };
+}
+
+extension ProcessLabel on Process {
+  String get label =&gt; switch (this) {
+        Process.washed =&gt; '워시드',
+        Process.natural =&gt; '내추럴',
+        Process.honey =&gt; '허니',
+        Process.anaerobic =&gt; '무산소',
+        Process.other =&gt; '기타',
+      };
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 4: converter 구현</strong></li></ul>
+<p><code class="ic">lib/data/converters.dart</code>:</p>
+<pre class="code" data-lang="dart"><code>import 'dart:convert';
+import 'package:drift/drift.dart';
+
+class StringListConverter extends TypeConverter&lt;List&lt;String&gt;, String&gt; {
+  const StringListConverter();
+
+  @override
+  List&lt;String&gt; fromSql(String fromDb) =&gt;
+      (json.decode(fromDb) as List&lt;dynamic&gt;).cast&lt;String&gt;();
+
+  @override
+  String toSql(List&lt;String&gt; value) =&gt; json.encode(value);
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 5: 테스트 통과 &amp; 커밋</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/data/converters_test.dart</code> → PASS</p>
+<pre class="code" data-lang="bash"><code>git add -A &amp;&amp; git commit -m "feat(data): add enums and cup-notes converter"</code></pre>
+<hr>
+<h3>Task 3: drift 테이블 &amp; 데이터베이스</h3>
+<p><strong>Files:</strong></p>
+<ul><li>Create: <code class="ic">lib/data/tables.dart</code>, <code class="ic">lib/data/database.dart</code></li><li>Generated: <code class="ic">lib/data/database.g.dart</code> (build_runner)</li><li>Test: <code class="ic">test/data/database_test.dart</code></li></ul>
+<p><strong>Interfaces:</strong></p>
+<ul><li>Produces: <code class="ic">class AppDatabase</code>(<code class="ic">.forTesting(QueryExecutor)</code> 생성자 포함), drift 생성 행 클래스 <code class="ic">Bean</code>, <code class="ic">OriginComponent</code>, <code class="ic">Tasting</code> 및 companion <code class="ic">BeansCompanion</code>, <code class="ic">OriginComponentsCompanion</code>, <code class="ic">TastingsCompanion</code>, 테이블 접근자 <code class="ic">db.beans</code>, <code class="ic">db.originComponents</code>, <code class="ic">db.tastings</code>. FK는 <code class="ic">PRAGMA foreign_keys = ON</code>으로 cascade 삭제.</li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 1: 실패 테스트 작성</strong></li></ul>
+<p><code class="ic">test/data/database_test.dart</code>:</p>
+<pre class="code" data-lang="dart"><code>import 'package:beanprofile/data/database.dart';
+import 'package:beanprofile/data/enums.dart';
+import 'package:drift/drift.dart';
+import 'package:drift/native.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  late AppDatabase db;
+  setUp(() =&gt; db = AppDatabase.forTesting(NativeDatabase.memory()));
+  tearDown(() =&gt; db.close());
+
+  test('inserts and reads back a bean with cup notes', () async {
+    final id = await db.into(db.beans).insert(BeansCompanion.insert(
+          name: '예가체프 코체레',
+          type: BeanType.singleOrigin,
+          cupNotes: const Value(['블루베리', '자스민']),
+          createdAt: DateTime(2026, 7, 14),
+        ));
+    final bean = await (db.select(db.beans)..where((b) =&gt; b.id.equals(id)))
+        .getSingle();
+    expect(bean.name, '예가체프 코체레');
+    expect(bean.type, BeanType.singleOrigin);
+    expect(bean.cupNotes, ['블루베리', '자스민']);
+  });
+
+  test('deleting a bean cascades to its components', () async {
+    final beanId = await db.into(db.beans).insert(BeansCompanion.insert(
+          name: '테스트', type: BeanType.blend, createdAt: DateTime(2026)));
+    await db.into(db.originComponents).insert(
+        OriginComponentsCompanion.insert(beanId: beanId, country: 'Ethiopia'));
+
+    await (db.delete(db.beans)..where((b) =&gt; b.id.equals(beanId))).go();
+
+    final comps = await db.select(db.originComponents).get();
+    expect(comps, isEmpty);
+  });
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 2: 테이블 정의</strong></li></ul>
+<p><code class="ic">lib/data/tables.dart</code>:</p>
+<pre class="code" data-lang="dart"><code>import 'package:drift/drift.dart';
+import 'converters.dart';
+import 'enums.dart';
+
+class Beans extends Table {
+  IntColumn get id =&gt; integer().autoIncrement()();
+  TextColumn get name =&gt; text().withLength(min: 1, max: 120)();
+  TextColumn get roaster =&gt; text().withDefault(const Constant(''))();
+  IntColumn get type =&gt; intEnum&lt;BeanType&gt;()();
+  IntColumn get roastLevel =&gt; intEnum&lt;RoastLevel&gt;().nullable()();
+  DateTimeColumn get roastDate =&gt; dateTime().nullable()();
+  TextColumn get cupNotes =&gt;
+      text().map(const StringListConverter()).withDefault(const Constant('[]'))();
+  TextColumn get photoPath =&gt; text().nullable()();
+  RealColumn get scaScore =&gt; real().nullable()();
+  IntColumn get weightGrams =&gt; integer().nullable()();
+  IntColumn get price =&gt; integer().nullable()();
+  TextColumn get shop =&gt; text().nullable()();
+  TextColumn get memo =&gt; text().nullable()();
+  DateTimeColumn get createdAt =&gt; dateTime()();
+}
+
+class OriginComponents extends Table {
+  IntColumn get id =&gt; integer().autoIncrement()();
+  IntColumn get beanId =&gt;
+      integer().references(Beans, #id, onDelete: KeyAction.cascade)();
+  TextColumn get country =&gt; text()();
+  TextColumn get region =&gt; text().nullable()();
+  TextColumn get farm =&gt; text().nullable()();
+  TextColumn get variety =&gt; text().nullable()();
+  IntColumn get process =&gt; intEnum&lt;Process&gt;().withDefault(const Constant(0))();
+  TextColumn get altitude =&gt; text().nullable()();
+  IntColumn get ratioPercent =&gt; integer().nullable()();
+}
+
+class Tastings extends Table {
+  IntColumn get id =&gt; integer().autoIncrement()();
+  IntColumn get beanId =&gt;
+      integer().references(Beans, #id, onDelete: KeyAction.cascade)();
+  DateTimeColumn get date =&gt; dateTime()();
+  IntColumn get acidity =&gt; integer()();
+  IntColumn get sweetness =&gt; integer()();
+  IntColumn get body =&gt; integer()();
+  IntColumn get bitterness =&gt; integer()();
+  IntColumn get overall =&gt; integer()();
+  TextColumn get comment =&gt; text().nullable()();
+  DateTimeColumn get createdAt =&gt; dateTime()();
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 3: 데이터베이스 정의</strong></li></ul>
+<p><code class="ic">lib/data/database.dart</code>:</p>
+<pre class="code" data-lang="dart"><code>import 'package:drift/drift.dart';
+import 'package:drift_flutter/drift_flutter.dart';
+import 'tables.dart';
+
+part 'database.g.dart';
+
+@DriftDatabase(tables: [Beans, OriginComponents, Tastings])
+class AppDatabase extends _$AppDatabase {
+  AppDatabase() : super(driftDatabase(name: 'beanprofile'));
+  AppDatabase.forTesting(QueryExecutor executor) : super(executor);
+
+  @override
+  int get schemaVersion =&gt; 1;
+
+  @override
+  MigrationStrategy get migration =&gt; MigrationStrategy(
+        beforeOpen: (details) async {
+          await customStatement('PRAGMA foreign_keys = ON');
+        },
+      );
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 4: 코드 생성</strong></li></ul>
+<p>Run: <code class="ic">dart run build_runner build --delete-conflicting-outputs</code> Expected: <code class="ic">lib/data/database.g.dart</code> 생성, 에러 없음.</p>
+<ul class="tasklist"><li class="task"><strong>Step 5: 테스트 통과 확인</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/data/database_test.dart</code> Expected: 2 tests PASS.</p>
+<blockquote>Windows에서 <code class="ic">NativeDatabase.memory()</code> 실행 시 sqlite3 네이티브 라이브러리가 필요하다. 에러가 나면 dev 의존성 <code class="ic">sqlite3_flutter_libs</code>가 앱에 포함돼 있는지 확인하고, 호스트 테스트용으로 <code class="ic">sqlite3</code> DLL이 PATH에 있어야 한다.</blockquote>
+<ul class="tasklist"><li class="task"><strong>Step 6: 커밋</strong></li></ul>
+<pre class="code" data-lang="bash"><code>git add -A &amp;&amp; git commit -m "feat(data): add drift schema and database"</code></pre>
+<hr>
+<h3>Task 4: 뷰 모델 &amp; 저장소(생성·조회)</h3>
+<p><strong>Files:</strong></p>
+<ul><li>Create: <code class="ic">lib/data/models.dart</code>, <code class="ic">lib/data/bean_repository.dart</code></li><li>Test: <code class="ic">test/data/bean_repository_test.dart</code></li></ul>
+<p><strong>Interfaces:</strong></p>
+<ul><li>Consumes: <code class="ic">AppDatabase</code>(Task 3).</li><li>Produces:</li><li><code class="ic">class BeanInput { String name; String roaster; BeanType type; RoastLevel? roastLevel; DateTime? roastDate; List&lt;String&gt; cupNotes; String? memo; List&lt;ComponentInput&gt; components; }</code></li><li><code class="ic">class ComponentInput { String country; String? region; String? farm; String? variety; Process process; String? altitude; int? ratioPercent; }</code></li><li><code class="ic">class BeanSummary { Bean bean; String? originLabel; double? avgRating; int tastingCount; }</code></li><li><code class="ic">class BeanDetail { Bean bean; List&lt;OriginComponent&gt; components; List&lt;Tasting&gt; tastings; }</code></li><li><code class="ic">class BeanRepository { Future&lt;int&gt; createBean(BeanInput); Stream&lt;List&lt;BeanSummary&gt;&gt; watchBeanSummaries(); Stream&lt;BeanDetail?&gt; watchBeanDetail(int id); Future&lt;BeanDetail?&gt; getBeanDetail(int id); }</code></li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 1: 실패 테스트 작성</strong></li></ul>
+<p><code class="ic">test/data/bean_repository_test.dart</code>:</p>
+<pre class="code" data-lang="dart"><code>import 'package:beanprofile/data/bean_repository.dart';
+import 'package:beanprofile/data/database.dart';
+import 'package:beanprofile/data/enums.dart';
+import 'package:drift/native.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  late AppDatabase db;
+  late BeanRepository repo;
+  setUp(() {
+    db = AppDatabase.forTesting(NativeDatabase.memory());
+    repo = BeanRepository(db);
+  });
+  tearDown(() =&gt; db.close());
+
+  BeanInput sampleSingle() =&gt; const BeanInput(
+        name: '예가체프 코체레',
+        roaster: '프릳츠',
+        type: BeanType.singleOrigin,
+        roastLevel: RoastLevel.lightMedium,
+        roastDate: null,
+        cupNotes: ['블루베리', '자스민'],
+        memo: null,
+        components: [ComponentInput(country: 'Ethiopia', process: Process.washed)],
+      );
+
+  test('createBean persists bean + components and detail reads them', () async {
+    final id = await repo.createBean(sampleSingle());
+    final detail = await repo.getBeanDetail(id);
+    expect(detail, isNotNull);
+    expect(detail!.bean.name, '예가체프 코체레');
+    expect(detail.components, hasLength(1));
+    expect(detail.components.first.country, 'Ethiopia');
+    expect(detail.tastings, isEmpty);
+  });
+
+  test('summary shows null rating and 0 count when no tastings', () async {
+    await repo.createBean(sampleSingle());
+    final list = await repo.watchBeanSummaries().first;
+    expect(list, hasLength(1));
+    expect(list.first.avgRating, isNull);
+    expect(list.first.tastingCount, 0);
+    expect(list.first.originLabel, 'Ethiopia');
+  });
+
+  test('blend originLabel shows "외 N"', () async {
+    await repo.createBean(const BeanInput(
+      name: '하우스 블렌드', roaster: '테라로사', type: BeanType.blend,
+      roastLevel: null, roastDate: null, cupNotes: [], memo: null,
+      components: [
+        ComponentInput(country: 'Brazil', ratioPercent: 60),
+        ComponentInput(country: 'Ethiopia', ratioPercent: 40),
+      ],
+    ));
+    final list = await repo.watchBeanSummaries().first;
+    expect(list.first.originLabel, 'Brazil 외 1');
+  });
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 2: 테스트 실패 확인</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/data/bean_repository_test.dart</code> Expected: FAIL — <code class="ic">models.dart</code>/<code class="ic">bean_repository.dart</code> 없음.</p>
+<ul class="tasklist"><li class="task"><strong>Step 3: 뷰 모델 구현</strong></li></ul>
+<p><code class="ic">lib/data/models.dart</code>:</p>
+<pre class="code" data-lang="dart"><code>import 'database.dart';
+
+class ComponentInput {
+  final String country;
+  final String? region;
+  final String? farm;
+  final String? variety;
+  final Object process; // Process — Object로 두면 순환 import 방지 불필요; 아래 주석 참고
+  final String? altitude;
+  final int? ratioPercent;
+  const ComponentInput({
+    required this.country,
+    this.region,
+    this.farm,
+    this.variety,
+    required this.process,
+    this.altitude,
+    this.ratioPercent,
+  });
+}
+
+class BeanInput {
+  final String name;
+  final String roaster;
+  final Object type; // BeanType
+  final Object? roastLevel; // RoastLevel?
+  final DateTime? roastDate;
+  final List&lt;String&gt; cupNotes;
+  final String? memo;
+  final List&lt;ComponentInput&gt; components;
+  const BeanInput({
+    required this.name,
+    required this.roaster,
+    required this.type,
+    required this.roastLevel,
+    required this.roastDate,
+    required this.cupNotes,
+    required this.memo,
+    required this.components,
+  });
+}
+
+class BeanSummary {
+  final Bean bean;
+  final String? originLabel;
+  final double? avgRating;
+  final int tastingCount;
+  const BeanSummary({
+    required this.bean,
+    required this.originLabel,
+    required this.avgRating,
+    required this.tastingCount,
+  });
+}
+
+class BeanDetail {
+  final Bean bean;
+  final List&lt;OriginComponent&gt; components;
+  final List&lt;Tasting&gt; tastings;
+  const BeanDetail({
+    required this.bean,
+    required this.components,
+    required this.tastings,
+  });
+}</code></pre>
+<blockquote>참고: <code class="ic">ComponentInput.process</code>/<code class="ic">BeanInput.type</code>을 <code class="ic">Object</code>로 둔 것은 예시 단순화용이 아니라 <strong>명시적으로 enum 타입을 쓰도록</strong> 아래처럼 교체한다 — <code class="ic">models.dart</code> 상단에 <code class="ic">import 'enums.dart';</code> 추가하고 <code class="ic">Object process</code> → <code class="ic">Process process</code>, <code class="ic">Object type</code> → <code class="ic">BeanType type</code>, <code class="ic">Object? roastLevel</code> → <code class="ic">RoastLevel? roastLevel</code>로 바꾼다. (enum과 모델이 같은 <code class="ic">data/</code>에 있어 순환 import 문제 없음.)</blockquote>
+<ul class="tasklist"><li class="task"><strong>Step 4: 저장소 구현</strong></li></ul>
+<p><code class="ic">lib/data/bean_repository.dart</code>:</p>
+<pre class="code" data-lang="dart"><code>import 'package:drift/drift.dart';
+import 'database.dart';
+import 'enums.dart';
+import 'models.dart';
+
+class BeanRepository {
+  BeanRepository(this.db);
+  final AppDatabase db;
+
+  Future&lt;int&gt; createBean(BeanInput input) {
+    return db.transaction(() async {
+      final beanId = await db.into(db.beans).insert(BeansCompanion.insert(
+            name: input.name,
+            roaster: Value(input.roaster),
+            type: input.type as BeanType,
+            roastLevel: Value(input.roastLevel as RoastLevel?),
+            roastDate: Value(input.roastDate),
+            cupNotes: Value(input.cupNotes),
+            memo: Value(input.memo),
+            createdAt: DateTime.now(),
+          ));
+      for (final c in input.components) {
+        await db.into(db.originComponents).insert(
+              OriginComponentsCompanion.insert(
+                beanId: beanId,
+                country: c.country,
+                region: Value(c.region),
+                farm: Value(c.farm),
+                variety: Value(c.variety),
+                process: Value(c.process as Process),
+                altitude: Value(c.altitude),
+                ratioPercent: Value(c.ratioPercent),
+              ),
+            );
+      }
+      return beanId;
+    });
+  }
+
+  Stream&lt;List&lt;BeanSummary&gt;&gt; watchBeanSummaries() {
+    final avg = db.tastings.overall.avg();
+    final cnt = db.tastings.id.count();
+    final query = db.select(db.beans).join([
+      leftOuterJoin(db.tastings, db.tastings.beanId.equalsExp(db.beans.id)),
+    ])
+      ..addColumns([avg, cnt])
+      ..groupBy([db.beans.id])
+      ..orderBy([OrderingTerm.desc(db.beans.createdAt)]);
+
+    return query.watch().asyncMap((rows) async {
+      final result = &lt;BeanSummary&gt;[];
+      for (final row in rows) {
+        final bean = row.readTable(db.beans);
+        final comps = await (db.select(db.originComponents)
+              ..where((c) =&gt; c.beanId.equals(bean.id)))
+            .get();
+        result.add(BeanSummary(
+          bean: bean,
+          originLabel: _originLabel(comps),
+          avgRating: row.read(avg),
+          tastingCount: row.read(cnt) ?? 0,
+        ));
+      }
+      return result;
+    });
+  }
+
+  String? _originLabel(List&lt;OriginComponent&gt; comps) {
+    if (comps.isEmpty) return null;
+    final first = comps.first.country;
+    return comps.length == 1 ? first : '$first 외 ${comps.length - 1}';
+  }
+
+  Future&lt;BeanDetail?&gt; getBeanDetail(int beanId) async {
+    final bean = await (db.select(db.beans)..where((b) =&gt; b.id.equals(beanId)))
+        .getSingleOrNull();
+    if (bean == null) return null;
+    final comps = await (db.select(db.originComponents)
+          ..where((c) =&gt; c.beanId.equals(beanId)))
+        .get();
+    final tastings = await (db.select(db.tastings)
+          ..where((t) =&gt; t.beanId.equals(beanId))
+          ..orderBy([(t) =&gt; OrderingTerm.desc(t.date)]))
+        .get();
+    return BeanDetail(bean: bean, components: comps, tastings: tastings);
+  }
+
+  Stream&lt;BeanDetail?&gt; watchBeanDetail(int beanId) {
+    return (db.select(db.beans)..where((b) =&gt; b.id.equals(beanId)))
+        .watchSingleOrNull()
+        .asyncMap((_) =&gt; getBeanDetail(beanId));
+  }
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 5: 테스트 통과 &amp; 커밋</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/data/bean_repository_test.dart</code> → 3 PASS</p>
+<pre class="code" data-lang="bash"><code>git add -A &amp;&amp; git commit -m "feat(data): bean repository create/read + view models"</code></pre>
+<hr>
+<h3>Task 5: Riverpod providers</h3>
+<p><strong>Files:</strong></p>
+<ul><li>Create: <code class="ic">lib/providers.dart</code></li><li>Test: <code class="ic">test/providers_test.dart</code></li></ul>
+<p><strong>Interfaces:</strong></p>
+<ul><li>Produces: <code class="ic">databaseProvider</code> (<code class="ic">Provider&lt;AppDatabase&gt;</code>), <code class="ic">beanRepositoryProvider</code> (<code class="ic">Provider&lt;BeanRepository&gt;</code>), <code class="ic">beanListProvider</code> (<code class="ic">StreamProvider&lt;List&lt;BeanSummary&gt;&gt;</code>), <code class="ic">beanDetailProvider</code> (<code class="ic">StreamProvider.family&lt;BeanDetail?, int&gt;</code>).</li><li>테스트/위젯에서 <code class="ic">databaseProvider.overrideWithValue(AppDatabase.forTesting(...))</code>로 대체.</li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 1: 실패 테스트 작성</strong></li></ul>
+<p><code class="ic">test/providers_test.dart</code>:</p>
+<pre class="code" data-lang="dart"><code>import 'package:beanprofile/data/bean_repository.dart';
+import 'package:beanprofile/data/database.dart';
+import 'package:beanprofile/data/enums.dart';
+import 'package:beanprofile/data/models.dart';
+import 'package:beanprofile/providers.dart';
+import 'package:drift/native.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  test('beanListProvider emits inserted beans', () async {
+    final db = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final container = ProviderContainer(
+      overrides: [databaseProvider.overrideWithValue(db)],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(beanRepositoryProvider).createBean(const BeanInput(
+          name: '케냐 니에리 AA', roaster: '리브레', type: BeanType.singleOrigin,
+          roastLevel: null, roastDate: null, cupNotes: [], memo: null,
+          components: [ComponentInput(country: 'Kenya', process: Process.washed)],
+        ));
+
+    final list = await container.read(beanListProvider.future);
+    expect(list, hasLength(1));
+    expect(list.first.bean.name, '케냐 니에리 AA');
+  });
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 2: 실패 확인</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/providers_test.dart</code> → FAIL(<code class="ic">providers.dart</code> 없음)</p>
+<ul class="tasklist"><li class="task"><strong>Step 3: providers 구현</strong></li></ul>
+<p><code class="ic">lib/providers.dart</code>:</p>
+<pre class="code" data-lang="dart"><code>import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'data/bean_repository.dart';
+import 'data/database.dart';
+import 'data/models.dart';
+
+final databaseProvider = Provider&lt;AppDatabase&gt;((ref) {
+  final db = AppDatabase();
+  ref.onDispose(db.close);
+  return db;
+});
+
+final beanRepositoryProvider = Provider&lt;BeanRepository&gt;(
+  (ref) =&gt; BeanRepository(ref.watch(databaseProvider)),
+);
+
+final beanListProvider = StreamProvider&lt;List&lt;BeanSummary&gt;&gt;(
+  (ref) =&gt; ref.watch(beanRepositoryProvider).watchBeanSummaries(),
+);
+
+final beanDetailProvider = StreamProvider.family&lt;BeanDetail?, int&gt;(
+  (ref, beanId) =&gt; ref.watch(beanRepositoryProvider).watchBeanDetail(beanId),
+);</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 4: 통과 &amp; 커밋</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/providers_test.dart</code> → PASS</p>
+<pre class="code" data-lang="bash"><code>git add -A &amp;&amp; git commit -m "feat: riverpod providers for db and bean lists"</code></pre>
+<hr>
+<h3>Task 6: 테마 &amp; 앱 셸(3탭)</h3>
+<p><strong>Files:</strong></p>
+<ul><li>Create: <code class="ic">lib/theme.dart</code>, <code class="ic">lib/app.dart</code>, <code class="ic">lib/features/profile/profile_screen.dart</code>, <code class="ic">lib/features/settings/settings_screen.dart</code></li><li>Modify: <code class="ic">lib/main.dart</code></li><li>Test: <code class="ic">test/widget/app_shell_test.dart</code></li></ul>
+<p><strong>Interfaces:</strong></p>
+<ul><li>Produces: <code class="ic">AppTheme.light</code> (<code class="ic">ThemeData</code>), <code class="ic">AppColors</code> (<code class="ic">ThemeExtension&lt;AppColors&gt;</code> — <code class="ic">oat/cup/espresso/crema/cremaInk/appMuted/appLine/cherry</code>), <code class="ic">monoStyle(...)</code> 헬퍼, <code class="ic">BeanProfileApp</code> (루트), <code class="ic">HomeShell</code> (하단 3탭). <code class="ic">context.colors</code> 확장으로 토큰 접근.</li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 1: 실패 위젯 테스트 작성</strong></li></ul>
+<p><code class="ic">test/widget/app_shell_test.dart</code>:</p>
+<pre class="code" data-lang="dart"><code>import 'package:beanprofile/app.dart';
+import 'package:beanprofile/data/database.dart';
+import 'package:beanprofile/providers.dart';
+import 'package:drift/native.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  testWidgets('shows 3 tabs and switches to 취향', (tester) async {
+    final db = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    await tester.pumpWidget(ProviderScope(
+      overrides: [databaseProvider.overrideWithValue(db)],
+      child: const BeanProfileApp(),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('원두'), findsWidgets);
+    expect(find.text('취향'), findsWidgets);
+    expect(find.text('설정'), findsWidgets);
+
+    await tester.tap(find.text('취향'));
+    await tester.pumpAndSettle();
+    expect(find.text('취향 분석은 곧 추가됩니다'), findsOneWidget);
+  });
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 2: 실패 확인</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/widget/app_shell_test.dart</code> → FAIL</p>
+<ul class="tasklist"><li class="task"><strong>Step 3: 테마 구현</strong></li></ul>
+<p><code class="ic">lib/theme.dart</code>:</p>
+<pre class="code" data-lang="dart"><code>import 'dart:ui' show FontFeature;
+import 'package:flutter/material.dart';
+
+class AppColors extends ThemeExtension&lt;AppColors&gt; {
+  final Color oat, cup, espresso, crema, cremaInk, appMuted, appLine, cherry;
+  const AppColors({
+    required this.oat,
+    required this.cup,
+    required this.espresso,
+    required this.crema,
+    required this.cremaInk,
+    required this.appMuted,
+    required this.appLine,
+    required this.cherry,
+  });
+
+  static const light = AppColors(
+    oat: Color(0xFFECE6DB),
+    cup: Color(0xFFFCFBF8),
+    espresso: Color(0xFF2B2019),
+    crema: Color(0xFFB67B2E),
+    cremaInk: Color(0xFF8A5A18),
+    appMuted: Color(0xFF8C8172),
+    appLine: Color(0xFFE4DED2),
+    cherry: Color(0xFF9E3B2D),
+  );
+
+  @override
+  AppColors copyWith({Color? oat, Color? cup, Color? espresso, Color? crema,
+      Color? cremaInk, Color? appMuted, Color? appLine, Color? cherry}) =&gt;
+      AppColors(
+        oat: oat ?? this.oat, cup: cup ?? this.cup,
+        espresso: espresso ?? this.espresso, crema: crema ?? this.crema,
+        cremaInk: cremaInk ?? this.cremaInk, appMuted: appMuted ?? this.appMuted,
+        appLine: appLine ?? this.appLine, cherry: cherry ?? this.cherry,
+      );
+
+  @override
+  AppColors lerp(ThemeExtension&lt;AppColors&gt;? other, double t) {
+    if (other is! AppColors) return this;
+    return AppColors(
+      oat: Color.lerp(oat, other.oat, t)!,
+      cup: Color.lerp(cup, other.cup, t)!,
+      espresso: Color.lerp(espresso, other.espresso, t)!,
+      crema: Color.lerp(crema, other.crema, t)!,
+      cremaInk: Color.lerp(cremaInk, other.cremaInk, t)!,
+      appMuted: Color.lerp(appMuted, other.appMuted, t)!,
+      appLine: Color.lerp(appLine, other.appLine, t)!,
+      cherry: Color.lerp(cherry, other.cherry, t)!,
+    );
+  }
+}
+
+extension AppColorsX on BuildContext {
+  AppColors get colors =&gt; Theme.of(this).extension&lt;AppColors&gt;()!;
+}
+
+TextStyle monoStyle({double size = 12, FontWeight weight = FontWeight.w600, Color? color}) =&gt;
+    TextStyle(
+      fontFamily: 'monospace',
+      fontFamilyFallback: const ['SF Mono', 'Menlo', 'Roboto Mono', 'Consolas'],
+      fontSize: size,
+      fontWeight: weight,
+      color: color,
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
+
+class AppTheme {
+  static ThemeData get light {
+    const c = AppColors.light;
+    final scheme = ColorScheme.fromSeed(
+      seedColor: c.crema,
+      brightness: Brightness.light,
+    ).copyWith(surface: c.cup, primary: c.crema);
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: scheme,
+      scaffoldBackgroundColor: c.oat,
+      extensions: const [c],
+      appBarTheme: const AppBarTheme(
+        backgroundColor: c.oat,
+        foregroundColor: c.espresso,
+        elevation: 0,
+        centerTitle: false,
+      ),
+    );
+  }
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 4: 자리표시 탭 화면</strong></li></ul>
+<p><code class="ic">lib/features/profile/profile_screen.dart</code>:</p>
+<pre class="code" data-lang="dart"><code>import 'package:flutter/material.dart';
+
+class ProfileScreen extends StatelessWidget {
+  const ProfileScreen({super.key});
+  @override
+  Widget build(BuildContext context) =&gt; const Scaffold(
+        body: Center(child: Text('취향 분석은 곧 추가됩니다')),
+      );
+}</code></pre>
+<p><code class="ic">lib/features/settings/settings_screen.dart</code>:</p>
+<pre class="code" data-lang="dart"><code>import 'package:flutter/material.dart';
+
+class SettingsScreen extends StatelessWidget {
+  const SettingsScreen({super.key});
+  @override
+  Widget build(BuildContext context) =&gt; const Scaffold(
+        body: Center(child: Text('설정은 곧 추가됩니다')),
+      );
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 5: 앱 &amp; 셸</strong></li></ul>
+<p><code class="ic">lib/app.dart</code>:</p>
+<pre class="code" data-lang="dart"><code>import 'package:flutter/material.dart';
+import 'features/beans/bean_list_screen.dart';
+import 'features/profile/profile_screen.dart';
+import 'features/settings/settings_screen.dart';
+import 'theme.dart';
+
+class BeanProfileApp extends StatelessWidget {
+  const BeanProfileApp({super.key});
+  @override
+  Widget build(BuildContext context) =&gt; MaterialApp(
+        title: 'BeanProfile',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light,
+        home: const HomeShell(),
+      );
+}
+
+class HomeShell extends StatefulWidget {
+  const HomeShell({super.key});
+  @override
+  State&lt;HomeShell&gt; createState() =&gt; _HomeShellState();
+}
+
+class _HomeShellState extends State&lt;HomeShell&gt; {
+  int _index = 0;
+  static const _tabs = [BeanListScreen(), ProfileScreen(), SettingsScreen()];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: IndexedStack(index: _index, children: _tabs),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _index,
+        onDestinationSelected: (i) =&gt; setState(() =&gt; _index = i),
+        destinations: const [
+          NavigationDestination(icon: Icon(Icons.coffee_outlined), selectedIcon: Icon(Icons.coffee), label: '원두'),
+          NavigationDestination(icon: Icon(Icons.insights_outlined), selectedIcon: Icon(Icons.insights), label: '취향'),
+          NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: '설정'),
+        ],
+      ),
+    );
+  }
+}</code></pre>
+<p><code class="ic">lib/main.dart</code> (교체):</p>
+<pre class="code" data-lang="dart"><code>import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'app.dart';
+
+void main() =&gt; runApp(const ProviderScope(child: BeanProfileApp()));</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 6: 통과 &amp; 커밋</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/widget/app_shell_test.dart</code> → PASS</p>
+<blockquote><code class="ic">BeanListScreen</code>은 Task 7에서 구현한다. 이 태스크에서 셸 테스트를 먼저 통과시키려면 <code class="ic">bean_list_screen.dart</code>에 임시 <code class="ic">class BeanListScreen extends StatelessWidget { ... Scaffold(body: Center(child: Text('원두'))) }</code>를 두고, Task 7에서 실제 구현으로 교체한다.</blockquote>
+<pre class="code" data-lang="bash"><code>git add -A &amp;&amp; git commit -m "feat(ui): theme tokens and 3-tab app shell"</code></pre>
+<hr>
+<h3>Task 7: 원두 리스트 화면</h3>
+<p><strong>Files:</strong></p>
+<ul><li>Create: <code class="ic">lib/features/beans/widgets/star_rating.dart</code>, <code class="ic">lib/features/beans/widgets/bean_card.dart</code>, <code class="ic">lib/features/beans/bean_list_screen.dart</code>(교체)</li><li>Test: <code class="ic">test/widget/bean_list_test.dart</code></li></ul>
+<p><strong>Interfaces:</strong></p>
+<ul><li>Consumes: <code class="ic">beanListProvider</code>(Task 5), <code class="ic">BeanSummary</code>, <code class="ic">context.colors</code>, <code class="ic">monoStyle</code>.</li><li>Produces: <code class="ic">BeanListScreen</code>(원두 탭 본문), <code class="ic">BeanCard({required BeanSummary summary, VoidCallback? onTap})</code>, <code class="ic">StarRating({double? value, double size})</code>.</li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 1: 실패 위젯 테스트</strong></li></ul>
+<p><code class="ic">test/widget/bean_list_test.dart</code>:</p>
+<pre class="code" data-lang="dart"><code>import 'package:beanprofile/data/database.dart';
+import 'package:beanprofile/data/enums.dart';
+import 'package:beanprofile/data/models.dart';
+import 'package:beanprofile/features/beans/bean_list_screen.dart';
+import 'package:beanprofile/providers.dart';
+import 'package:beanprofile/theme.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+Bean _bean(String name) =&gt; Bean(
+      id: 1, name: name, roaster: '프릳츠', type: BeanType.singleOrigin,
+      roastLevel: null, roastDate: null, cupNotes: const ['블루베리'],
+      photoPath: null, scaScore: null, weightGrams: null, price: null,
+      shop: null, memo: null, createdAt: DateTime(2026));
+
+Widget _host(List&lt;BeanSummary&gt; data) =&gt; ProviderScope(
+      overrides: [
+        beanListProvider.overrideWith((ref) =&gt; Stream.value(data)),
+      ],
+      child: MaterialApp(theme: AppTheme.light, home: const BeanListScreen()),
+    );
+
+void main() {
+  testWidgets('renders bean cards', (tester) async {
+    await tester.pumpWidget(_host([
+      BeanSummary(bean: _bean('예가체프 코체레'), originLabel: 'Ethiopia', avgRating: 4.5, tastingCount: 6),
+    ]));
+    await tester.pumpAndSettle();
+    expect(find.text('예가체프 코체레'), findsOneWidget);
+    expect(find.text('블루베리'), findsOneWidget);
+  });
+
+  testWidgets('shows empty state', (tester) async {
+    await tester.pumpWidget(_host(const []));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('아직 기록한 원두가 없어요'), findsOneWidget);
+  });
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 2: 실패 확인</strong> — Run: <code class="ic">flutter test test/widget/bean_list_test.dart</code> → FAIL</li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 3: StarRating 위젯</strong></li></ul>
+<p><code class="ic">lib/features/beans/widgets/star_rating.dart</code>:</p>
+<pre class="code" data-lang="dart"><code>import 'package:flutter/material.dart';
+import '../../../theme.dart';
+
+class StarRating extends StatelessWidget {
+  const StarRating({super.key, required this.value, this.size = 15});
+  final double? value; // null = 평가 없음
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final crema = context.colors.crema;
+    if (value == null) {
+      return Text('평가 없음',
+          style: TextStyle(fontSize: size * 0.8, color: context.colors.appMuted));
+    }
+    final v = value!;
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      for (var i = 1; i &lt;= 5; i++)
+        Icon(
+          v &gt;= i ? Icons.star : (v &gt;= i - 0.5 ? Icons.star_half : Icons.star_border),
+          size: size, color: crema,
+        ),
+      const SizedBox(width: 4),
+      Text(v.toStringAsFixed(1), style: monoStyle(size: size * 0.8, color: context.colors.espresso)),
+    ]);
+  }
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 4: BeanCard 위젯</strong></li></ul>
+<p><code class="ic">lib/features/beans/widgets/bean_card.dart</code>:</p>
+<pre class="code" data-lang="dart"><code>import 'package:flutter/material.dart';
+import '../../../data/enums.dart';
+import '../../../data/models.dart';
+import '../../../theme.dart';
+import 'star_rating.dart';
+
+class BeanCard extends StatelessWidget {
+  const BeanCard({super.key, required this.summary, this.onTap});
+  final BeanSummary summary;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final bean = summary.bean;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: c.cup,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: c.appLine),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(bean.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+          const SizedBox(height: 2),
+          Text([bean.roaster, summary.originLabel].where((e) =&gt; e != null &amp;&amp; e.isNotEmpty).join(' · '),
+              style: TextStyle(fontSize: 12, color: c.appMuted)),
+          const SizedBox(height: 8),
+          Row(children: [
+            if (bean.type == BeanType.blend) ...[
+              _Badge(text: 'BLEND', color: c.cremaInk),
+              const SizedBox(width: 8),
+            ],
+            StarRating(value: summary.avgRating),
+            const Spacer(),
+            Text('시음 ${summary.tastingCount}', style: monoStyle(size: 11, color: c.appMuted)),
+          ]),
+          if (bean.cupNotes.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(spacing: 5, runSpacing: 5, children: [
+              for (final n in bean.cupNotes.take(4)) _Note(text: n, color: c),
+            ]),
+          ],
+        ]),
+      ),
+    );
+  }
+}
+
+class _Badge extends StatelessWidget {
+  const _Badge({required this.text, required this.color});
+  final String text; final Color color;
+  @override
+  Widget build(BuildContext context) =&gt; Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+        decoration: BoxDecoration(color: color.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(6)),
+        child: Text(text, style: monoStyle(size: 10, color: color)),
+      );
+}
+
+class _Note extends StatelessWidget {
+  const _Note({required this.text, required this.color});
+  final String text; final AppColors color;
+  @override
+  Widget build(BuildContext context) =&gt; Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        decoration: BoxDecoration(
+          color: color.oat,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: color.appLine),
+        ),
+        child: Text(text, style: TextStyle(fontSize: 10.5, color: color.espresso)),
+      );
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 5: 리스트 화면</strong></li></ul>
+<p><code class="ic">lib/features/beans/bean_list_screen.dart</code> (교체):</p>
+<pre class="code" data-lang="dart"><code>import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../providers.dart';
+import '../../theme.dart';
+import 'bean_detail_screen.dart';
+import 'bean_form_screen.dart';
+import 'widgets/bean_card.dart';
+
+class BeanListScreen extends ConsumerWidget {
+  const BeanListScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final beans = ref.watch(beanListProvider);
+    return Scaffold(
+      appBar: AppBar(title: const Text('내 원두', style: TextStyle(fontWeight: FontWeight.w800))),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () =&gt; Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) =&gt; const BeanFormScreen())),
+        backgroundColor: context.colors.crema,
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
+      body: beans.when(
+        loading: () =&gt; const Center(child: CircularProgressIndicator()),
+        error: (e, _) =&gt; Center(child: Text('불러오기 오류: $e')),
+        data: (list) {
+          if (list.isEmpty) {
+            return Center(
+              child: Text('아직 기록한 원두가 없어요\n＋ 로 첫 원두를 추가해 보세요',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: context.colors.appMuted)),
+            );
+          }
+          return ListView.separated(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+            itemCount: list.length,
+            separatorBuilder: (_, __) =&gt; const SizedBox(height: 10),
+            itemBuilder: (_, i) {
+              final s = list[i];
+              return BeanCard(
+                summary: s,
+                onTap: () =&gt; Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) =&gt; BeanDetailScreen(beanId: s.bean.id))),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 6: 통과 &amp; 커밋</strong> (BeanFormScreen/BeanDetailScreen은 Task 8/9에서 구현 — 그 전까지 이 태스크 테스트만 돌리려면 두 파일에 최소 스텁 클래스를 먼저 만들어 둔다.)</li></ul>
+<p>Run: <code class="ic">flutter test test/widget/bean_list_test.dart</code> → PASS</p>
+<pre class="code" data-lang="bash"><code>git add -A &amp;&amp; git commit -m "feat(ui): bean list screen with cards and empty state"</code></pre>
+<hr>
+<h3>Task 8: 원두 추가(수동) 폼</h3>
+<p><strong>Files:</strong></p>
+<ul><li>Create: <code class="ic">lib/features/beans/bean_form_screen.dart</code>(교체)</li><li>Test: <code class="ic">test/widget/bean_form_test.dart</code></li></ul>
+<p><strong>Interfaces:</strong></p>
+<ul><li>Consumes: <code class="ic">beanRepositoryProvider</code>(create), <code class="ic">BeanInput</code>/<code class="ic">ComponentInput</code>, enums, <code class="ic">context.colors</code>.</li><li>Produces: <code class="ic">BeanFormScreen</code>(원두 추가 화면). 저장 성공 시 <code class="ic">Navigator.pop</code>.</li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 1: 실패 위젯 테스트</strong></li></ul>
+<p><code class="ic">test/widget/bean_form_test.dart</code>:</p>
+<pre class="code" data-lang="dart"><code>import 'package:beanprofile/data/database.dart';
+import 'package:beanprofile/features/beans/bean_form_screen.dart';
+import 'package:beanprofile/providers.dart';
+import 'package:beanprofile/theme.dart';
+import 'package:drift/native.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  testWidgets('entering name + country and saving persists a bean', (tester) async {
+    final db = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final repo = () {
+      final container = ProviderContainer(overrides: [databaseProvider.overrideWithValue(db)]);
+      addTearDown(container.dispose);
+      return container.read(beanRepositoryProvider);
+    }();
+
+    await tester.pumpWidget(ProviderScope(
+      overrides: [databaseProvider.overrideWithValue(db)],
+      child: MaterialApp(theme: AppTheme.light, home: const BeanFormScreen()),
+    ));
+
+    await tester.enterText(find.byKey(const Key('field-name')), '수프리모');
+    await tester.enterText(find.byKey(const Key('field-country-0')), 'Colombia');
+    await tester.tap(find.byKey(const Key('save-bean')));
+    await tester.pumpAndSettle();
+
+    final list = await repo.watchBeanSummaries().first;
+    expect(list, hasLength(1));
+    expect(list.first.bean.name, '수프리모');
+    expect(list.first.originLabel, 'Colombia');
+  });
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 2: 실패 확인</strong> — Run: <code class="ic">flutter test test/widget/bean_form_test.dart</code> → FAIL</li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 3: 폼 구현</strong></li></ul>
+<p><code class="ic">lib/features/beans/bean_form_screen.dart</code> (교체):</p>
+<pre class="code" data-lang="dart"><code>import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../data/enums.dart';
+import '../../data/models.dart';
+import '../../providers.dart';
+import '../../theme.dart';
+
+class BeanFormScreen extends ConsumerStatefulWidget {
+  const BeanFormScreen({super.key});
+  @override
+  ConsumerState&lt;BeanFormScreen&gt; createState() =&gt; _BeanFormScreenState();
+}
+
+class _ComponentDraft {
+  final country = TextEditingController();
+  final region = TextEditingController();
+  Process process = Process.washed;
+  final ratio = TextEditingController();
+  void dispose() { country.dispose(); region.dispose(); ratio.dispose(); }
+}
+
+class _BeanFormScreenState extends ConsumerState&lt;BeanFormScreen&gt; {
+  final _name = TextEditingController();
+  final _roaster = TextEditingController();
+  final _cupNotes = TextEditingController();
+  final _memo = TextEditingController();
+  BeanType _type = BeanType.singleOrigin;
+  RoastLevel? _roast;
+  DateTime? _roastDate;
+  final _components = [_ComponentDraft()];
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _name.dispose(); _roaster.dispose(); _cupNotes.dispose(); _memo.dispose();
+    for (final c in _components) { c.dispose(); }
+    super.dispose();
+  }
+
+  List&lt;String&gt; _parseNotes() =&gt; _cupNotes.text
+      .split(RegExp(r'[,\n]'))
+      .map((e) =&gt; e.trim())
+      .where((e) =&gt; e.isNotEmpty)
+      .toList();
+
+  Future&lt;void&gt; _save() async {
+    if (_name.text.trim().isEmpty || _components.first.country.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('제품명과 첫 원산지 국가는 필수예요')));
+      return;
+    }
+    setState(() =&gt; _saving = true);
+    final input = BeanInput(
+      name: _name.text.trim(),
+      roaster: _roaster.text.trim(),
+      type: _type,
+      roastLevel: _roast,
+      roastDate: _roastDate,
+      cupNotes: _parseNotes(),
+      memo: _memo.text.trim().isEmpty ? null : _memo.text.trim(),
+      components: [
+        for (final c in _components)
+          if (c.country.text.trim().isNotEmpty)
+            ComponentInput(
+              country: c.country.text.trim(),
+              region: c.region.text.trim().isEmpty ? null : c.region.text.trim(),
+              process: c.process,
+              ratioPercent: int.tryParse(c.ratio.text.trim()),
+            ),
+      ],
+    );
+    await ref.read(beanRepositoryProvider).createBean(input);
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Scaffold(
+      appBar: AppBar(title: const Text('원두 추가')),
+      body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
+        TextField(key: const Key('field-name'), controller: _name,
+            decoration: const InputDecoration(labelText: '제품명 *')),
+        const SizedBox(height: 10),
+        TextField(controller: _roaster, decoration: const InputDecoration(labelText: '로스터리')),
+        const SizedBox(height: 14),
+        SegmentedButton&lt;BeanType&gt;(
+          segments: const [
+            ButtonSegment(value: BeanType.singleOrigin, label: Text('싱글')),
+            ButtonSegment(value: BeanType.blend, label: Text('블렌드')),
+          ],
+          selected: {_type},
+          onSelectionChanged: (s) =&gt; setState(() =&gt; _type = s.first),
+        ),
+        const SizedBox(height: 14),
+        Text('원산지 구성', style: TextStyle(fontWeight: FontWeight.w700, color: c.espresso)),
+        for (var i = 0; i &lt; _components.length; i++) _componentEditor(i),
+        if (_type == BeanType.blend)
+          TextButton.icon(
+            onPressed: () =&gt; setState(() =&gt; _components.add(_ComponentDraft())),
+            icon: const Icon(Icons.add), label: const Text('구성 원두 추가'),
+          ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField&lt;RoastLevel&gt;(
+          initialValue: _roast,
+          decoration: const InputDecoration(labelText: '로스팅 단계'),
+          items: [for (final r in RoastLevel.values) DropdownMenuItem(value: r, child: Text(r.label))],
+          onChanged: (v) =&gt; setState(() =&gt; _roast = v),
+        ),
+        const SizedBox(height: 10),
+        Row(children: [
+          Expanded(child: Text(_roastDate == null ? '로스팅 날짜 없음'
+              : '로스팅 ${_roastDate!.toIso8601String().substring(0, 10)}')),
+          TextButton(
+            onPressed: () async {
+              final picked = await showDatePicker(context: context,
+                  firstDate: DateTime(2015), lastDate: DateTime(2100),
+                  initialDate: DateTime.now());
+              if (picked != null) setState(() =&gt; _roastDate = picked);
+            },
+            child: const Text('날짜 선택'),
+          ),
+        ]),
+        const SizedBox(height: 10),
+        TextField(controller: _cupNotes,
+            decoration: const InputDecoration(labelText: '컵노트 (쉼표로 구분)', hintText: '블루베리, 자스민, 홍차')),
+        const SizedBox(height: 10),
+        TextField(controller: _memo, maxLines: 3, decoration: const InputDecoration(labelText: '메모')),
+        const SizedBox(height: 20),
+        FilledButton(
+          key: const Key('save-bean'),
+          onPressed: _saving ? null : _save,
+          style: FilledButton.styleFrom(backgroundColor: c.espresso, foregroundColor: c.oat,
+              minimumSize: const Size.fromHeight(48)),
+          child: Text(_saving ? '저장 중…' : '저장'),
+        ),
+      ]),
+    );
+  }
+
+  Widget _componentEditor(int i) {
+    final comp = _components[i];
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Column(children: [
+        Row(children: [
+          Expanded(
+            child: TextField(
+              key: Key('field-country-$i'),
+              controller: comp.country,
+              decoration: InputDecoration(labelText: i == 0 ? '원산지 국가 *' : '국가'),
+            ),
+          ),
+          if (_type == BeanType.blend &amp;&amp; _components.length &gt; 1)
+            IconButton(
+              onPressed: () =&gt; setState(() { _components.removeAt(i).dispose(); }),
+              icon: const Icon(Icons.remove_circle_outline),
+            ),
+        ]),
+        Row(children: [
+          Expanded(child: TextField(controller: comp.region,
+              decoration: const InputDecoration(labelText: '지역'))),
+          const SizedBox(width: 10),
+          Expanded(
+            child: DropdownButtonFormField&lt;Process&gt;(
+              initialValue: comp.process,
+              decoration: const InputDecoration(labelText: '가공'),
+              items: [for (final p in Process.values) DropdownMenuItem(value: p, child: Text(p.label))],
+              onChanged: (v) =&gt; setState(() =&gt; comp.process = v ?? Process.washed),
+            ),
+          ),
+          if (_type == BeanType.blend) ...[
+            const SizedBox(width: 10),
+            SizedBox(width: 64, child: TextField(controller: comp.ratio,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: '%'))),
+          ],
+        ]),
+      ]),
+    );
+  }
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 4: 통과 &amp; 커밋</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/widget/bean_form_test.dart</code> → PASS</p>
+<pre class="code" data-lang="bash"><code>git add -A &amp;&amp; git commit -m "feat(ui): manual add-bean form with origin components"</code></pre>
+<hr>
+<h3>Task 9: 원두 상세(읽기 전용)</h3>
+<p><strong>Files:</strong></p>
+<ul><li>Create: <code class="ic">lib/features/beans/bean_detail_screen.dart</code>(교체)</li><li>Test: <code class="ic">test/widget/bean_detail_test.dart</code></li></ul>
+<p><strong>Interfaces:</strong></p>
+<ul><li>Consumes: <code class="ic">beanDetailProvider(beanId)</code>, <code class="ic">BeanDetail</code>, enums, <code class="ic">context.colors</code>, <code class="ic">monoStyle</code>.</li><li>Produces: <code class="ic">BeanDetailScreen({required int beanId})</code>. 시음 섹션은 빈 상태(추가 버튼 M2).</li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 1: 실패 위젯 테스트</strong></li></ul>
+<p><code class="ic">test/widget/bean_detail_test.dart</code>:</p>
+<pre class="code" data-lang="dart"><code>import 'package:beanprofile/data/database.dart';
+import 'package:beanprofile/data/enums.dart';
+import 'package:beanprofile/data/models.dart';
+import 'package:beanprofile/features/beans/bean_detail_screen.dart';
+import 'package:beanprofile/providers.dart';
+import 'package:beanprofile/theme.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  testWidgets('shows profile spec and empty tasting state', (tester) async {
+    final bean = Bean(
+      id: 7, name: '예가체프 코체레', roaster: '프릳츠', type: BeanType.singleOrigin,
+      roastLevel: RoastLevel.lightMedium, roastDate: null, cupNotes: const ['블루베리'],
+      photoPath: null, scaScore: null, weightGrams: null, price: null,
+      shop: null, memo: null, createdAt: DateTime(2026));
+    final comp = OriginComponent(
+      id: 1, beanId: 7, country: 'Ethiopia', region: 'Yirgacheffe',
+      farm: null, variety: 'Heirloom', process: Process.washed,
+      altitude: '1900m', ratioPercent: null);
+    final detail = BeanDetail(bean: bean, components: [comp], tastings: const []);
+
+    await tester.pumpWidget(ProviderScope(
+      overrides: [beanDetailProvider(7).overrideWith((ref) =&gt; Stream.value(detail))],
+      child: MaterialApp(theme: AppTheme.light, home: const BeanDetailScreen(beanId: 7)),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('예가체프 코체레'), findsOneWidget);
+    expect(find.textContaining('Ethiopia'), findsWidgets);
+    expect(find.textContaining('아직 시음 기록이 없어요'), findsOneWidget);
+  });
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 2: 실패 확인</strong> — Run: <code class="ic">flutter test test/widget/bean_detail_test.dart</code> → FAIL</li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 3: 상세 화면 구현</strong></li></ul>
+<p><code class="ic">lib/features/beans/bean_detail_screen.dart</code> (교체):</p>
+<pre class="code" data-lang="dart"><code>import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../data/database.dart';
+import '../../data/enums.dart';
+import '../../data/models.dart';
+import '../../providers.dart';
+import '../../theme.dart';
+
+class BeanDetailScreen extends ConsumerWidget {
+  const BeanDetailScreen({super.key, required this.beanId});
+  final int beanId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(beanDetailProvider(beanId));
+    return Scaffold(
+      appBar: AppBar(title: const Text('원두 상세')),
+      body: async.when(
+        loading: () =&gt; const Center(child: CircularProgressIndicator()),
+        error: (e, _) =&gt; Center(child: Text('오류: $e')),
+        data: (d) =&gt; d == null
+            ? const Center(child: Text('삭제된 원두예요'))
+            : _DetailBody(detail: d),
+      ),
+    );
+  }
+}
+
+class _DetailBody extends StatelessWidget {
+  const _DetailBody({required this.detail});
+  final BeanDetail detail;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final bean = detail.bean;
+    return ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 24), children: [
+      Text(bean.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+      const SizedBox(height: 2),
+      Text([bean.roaster, bean.type.label].where((e) =&gt; e.isNotEmpty).join(' · '),
+          style: TextStyle(color: c.appMuted)),
+      const SizedBox(height: 14),
+      for (final comp in detail.components) _componentBlock(context, comp),
+      if (bean.roastLevel != null || bean.roastDate != null)
+        _specRow(context, '로스팅',
+            [bean.roastDate?.toIso8601String().substring(0, 10), bean.roastLevel?.label]
+                .where((e) =&gt; e != null).join(' · ')),
+      if (bean.cupNotes.isNotEmpty) ...[
+        const SizedBox(height: 12),
+        Wrap(spacing: 6, runSpacing: 6, children: [
+          for (final n in bean.cupNotes)
+            Chip(label: Text(n), backgroundColor: c.oat, side: BorderSide(color: c.appLine)),
+        ]),
+      ],
+      if (bean.memo != null &amp;&amp; bean.memo!.isNotEmpty) ...[
+        const SizedBox(height: 12),
+        Text(bean.memo!, style: TextStyle(color: c.espresso)),
+      ],
+      const Divider(height: 32),
+      Text('시음 기록 ${detail.tastings.length}', style: const TextStyle(fontWeight: FontWeight.w700)),
+      const SizedBox(height: 10),
+      if (detail.tastings.isEmpty)
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: c.cup, borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: c.appLine),
+          ),
+          child: Text('아직 시음 기록이 없어요\n(시음 입력은 다음 단계에서 추가됩니다)',
+              textAlign: TextAlign.center, style: TextStyle(color: c.appMuted)),
+        )
+      else
+        for (final t in detail.tastings) _tastingRow(context, t),
+    ]);
+  }
+
+  Widget _componentBlock(BuildContext context, OriginComponent comp) {
+    final parts = &lt;String&gt;[
+      comp.country,
+      if (comp.region != null) comp.region!,
+      if (comp.variety != null) comp.variety!,
+      comp.process.label,
+      if (comp.altitude != null) comp.altitude!,
+      if (comp.ratioPercent != null) '${comp.ratioPercent}%',
+    ];
+    return _specRow(context, '원산지', parts.join(' · '));
+  }
+
+  Widget _specRow(BuildContext context, String k, String v) {
+    final c = context.colors;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: c.cup, borderRadius: BorderRadius.circular(12), border: Border.all(color: c.appLine)),
+      child: Row(children: [
+        SizedBox(width: 64, child: Text(k, style: TextStyle(color: c.appMuted, fontSize: 12))),
+        Expanded(child: Text(v, style: monoStyle(size: 12, color: c.espresso))),
+      ]),
+    );
+  }
+
+  Widget _tastingRow(BuildContext context, Tasting t) {
+    final c = context.colors;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: c.cup, borderRadius: BorderRadius.circular(12), border: Border.all(color: c.appLine)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(t.date.toIso8601String().substring(0, 10), style: monoStyle(size: 11, color: c.appMuted)),
+        const SizedBox(height: 4),
+        Text('산미 ${t.acidity} · 단맛 ${t.sweetness} · 바디 ${t.body} · 쓴맛 ${t.bitterness} · 종합 ${t.overall}',
+            style: monoStyle(size: 11, color: c.espresso)),
+        if (t.comment != null &amp;&amp; t.comment!.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(t.comment!, style: TextStyle(fontSize: 12, color: c.espresso)),
+        ],
+      ]),
+    );
+  }
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 4: 전체 테스트 &amp; 커밋</strong></li></ul>
+<p>Run: <code class="ic">flutter test</code> (전체) → 모두 PASS · <code class="ic">flutter analyze</code> → 0 issues</p>
+<pre class="code" data-lang="bash"><code>git add -A &amp;&amp; git commit -m "feat(ui): read-only bean detail screen"</code></pre>
+<hr>
+<h2>Self-Review</h2>
+<p><strong>스펙 커버리지 (M1 범위):</strong> 프로젝트 셋업 ✅(T1) · 데이터 모델 3테이블 ✅(T3) · 컵노트 태그 ✅(T2,T4) · 블렌드 구성별 구조화 ✅(T4,T8) · 로컬 저장 ✅(T3) · 원두 추가/리스트/상세 ✅(T7,T8,T9) · 테마 토큰/3탭 ✅(T6). 시음·OCR·대시보드·편집/삭제·백업 = <strong>M2~M5로 의도적 이월</strong>(로드맵 명시).</p>
+<p><strong>플레이스홀더 스캔:</strong> <code class="ic">models.dart</code>의 <code class="ic">Object</code> 필드는 Task 4 Step 3에서 enum 타입으로 교체하도록 명시(임시 아님). Task 6/7의 상호 의존은 "최소 스텁 후 교체"로 순서 명시. TODO/미정 없음.</p>
+<p><strong>타입 일관성:</strong> <code class="ic">BeanInput</code>/<code class="ic">ComponentInput</code>/<code class="ic">BeanSummary</code>/<code class="ic">BeanDetail</code> 필드가 T4 정의와 T7/T8/T9 사용처에서 일치. <code class="ic">createBean</code>·<code class="ic">watchBeanSummaries</code>·<code class="ic">watchBeanDetail</code>·<code class="ic">getBeanDetail</code> 시그니처가 provider(T5)와 화면(T7~T9)에서 동일하게 사용됨. drift 생성 클래스명 <code class="ic">Bean</code>/<code class="ic">OriginComponent</code>/<code class="ic">Tasting</code>을 테스트/화면에서 일관 사용.</p>
+<h2>실행 참고</h2>
+<ul><li>M1 완료 = <strong>앱 실행 → 원두 추가 → 리스트에 표시 → 탭하면 상세</strong> 가 실제 기기/에뮬레이터에서 동작.</li><li>실기기 실행: <code class="ic">flutter run</code> (Android 에뮬레이터 또는 iOS 시뮬레이터 필요).</li><li>다음: M2 상세 계획(원두 편집/삭제 + 시음 기록) 작성.</li></ul>
+</article>

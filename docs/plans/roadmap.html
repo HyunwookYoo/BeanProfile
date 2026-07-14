@@ -1,0 +1,60 @@
+<title>BeanProfile 구현 로드맵 (v1)</title>
+<style>
+*{box-sizing:border-box}
+:root{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+  --font-sans:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Consolas,"Malgun Gothic",monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}}
+:root[data-theme="light"]{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+}
+:root[data-theme="dark"]{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-sans);line-height:1.7;-webkit-font-smoothing:antialiased}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.doc{max-width:880px;margin:0 auto;padding:44px 24px 96px}
+.crumb{font-family:var(--font-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:16px}
+h1{font-size:clamp(26px,4vw,38px);font-weight:800;letter-spacing:-.025em;line-height:1.2;margin:.1em 0 .5em;text-wrap:balance}
+h2{font-size:22px;font-weight:700;margin:2em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line);letter-spacing:-.01em;text-wrap:balance}
+h3{font-size:16.5px;font-weight:700;color:var(--accent-ink);margin:1.7em 0 .5em}
+h4{font-size:14px;font-weight:700;margin:1.3em 0 .4em}
+p{margin:.7em 0}
+a{color:var(--accent);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+strong{font-weight:700;color:var(--fg)}
+hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+code.ic{font-family:var(--font-mono);font-size:.85em;background:var(--ic-bg);color:var(--ic-fg);padding:1.5px 6px;border-radius:6px}
+pre.code{position:relative;background:var(--code-bg);color:var(--code-fg);border-radius:12px;padding:16px 18px;margin:1em 0;overflow-x:auto;border:1px solid rgba(0,0,0,.28)}
+pre.code code{font-family:var(--font-mono);font-size:12.75px;line-height:1.6;white-space:pre;color:inherit;background:none;padding:0}
+pre.code[data-lang]::before{content:attr(data-lang);position:absolute;top:9px;right:13px;font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(236,227,211,.42)}
+.tablewrap{overflow-x:auto;margin:1.1em 0}
+table{border-collapse:collapse;width:100%;font-size:13.75px}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--th);font-weight:700}
+tbody tr:nth-child(even){background:var(--surface)}
+blockquote{margin:1.1em 0;padding:11px 16px;border-left:3px solid var(--accent);background:var(--surface);border-radius:0 10px 10px 0;color:var(--muted)}
+blockquote strong{color:var(--fg)}
+ul,ol{margin:.7em 0;padding-left:1.4em}
+li{margin:.32em 0}
+ul.tasklist{list-style:none;padding-left:.15em}
+ul.tasklist li.task{position:relative;padding-left:30px;margin:.5em 0}
+ul.tasklist li.task::before{content:"";position:absolute;left:0;top:.18em;width:17px;height:17px;border:2px solid var(--accent);border-radius:5px;background:transparent}
+ul.tasklist li.task.done::before{content:"\2713";background:var(--accent);color:#fff;font-size:12px;font-weight:800;text-align:center;line-height:15px}
+</style>
+<article class="doc"><div class="crumb">BeanProfile · docs/plans</div>
+<h1>BeanProfile 구현 로드맵 (v1)</h1>
+<p>각 마일스톤은 <strong>그 자체로 동작하고 검증 가능한 증분</strong>이다. 앞 단계가 확정된 뒤 다음 단계를 상세화한다. 관련 문서: 설계 <a href="../design.md"><code class="ic">../design.md</code></a> · 목업 <a href="../mockups/ui-mockup-v1.html"><code class="ic">../mockups/ui-mockup-v1.html</code></a></p>
+<div class="tablewrap"><table><thead><tr><th>#</th><th>마일스톤</th><th>완료 시 동작하는 것</th><th>상세 계획</th></tr></thead><tbody><tr><td><strong>M1</strong></td><td>기반 &amp; 원두 추가/조회</td><td>Flutter 프로젝트 · 테마/3탭 셸 · drift DB(3테이블) · 원두 <strong>수동 추가 → 리스트 → 상세(읽기)</strong></td><td><a href="milestone-1-foundation.md"><code class="ic">milestone-1-foundation.md</code></a> ✅ 작성됨</td></tr><tr><td><strong>M2</strong></td><td>원두 편집/삭제 &amp; 시음 기록</td><td>원두 편집·삭제 · <strong>시음 입력</strong>(강도 4축 + 종합 별점 + 코멘트) · 상세에 시음 리스트 · 평균 별점 계산</td><td>착수 직전 작성</td></tr><tr><td><strong>M3</strong></td><td>사진 &amp; OCR 리뷰</td><td>촬영/갤러리 · ML Kit 온디바이스 인식 · <strong>OCR 리뷰 화면</strong>(자동 필드 + 배정 칩) · 추가 플로우에 연결</td><td>착수 직전 작성</td></tr><tr><td><strong>M4</strong></td><td>취향 대시보드</td><td>분석 쿼리 · <strong>선호 강도 레이더 + 원산지·컵노트·가공방식 막대</strong>(취향 탭)</td><td>착수 직전 작성</td></tr><tr><td><strong>M5</strong></td><td>백업 &amp; 마무리</td><td><strong>JSON 내보내기/가져오기</strong> · 설정 화면 · 원두 검색/정렬 · 빈 상태 · 앱 아이콘</td><td>착수 직전 작성</td></tr></tbody></table></div>
+<h2>원칙</h2>
+<ul><li><strong>TDD:</strong> 각 태스크는 실패하는 테스트 → 최소 구현 → 통과 → 커밋.</li><li><strong>DRY / YAGNI:</strong> v1 스코프(설계 §8) 밖 기능은 만들지 않는다.</li><li><strong>잦은 커밋:</strong> 태스크 단위로 커밋.</li><li><strong>오프라인·로컬 전용:</strong> 네트워크 권한 없음, 모든 데이터는 기기 내 drift(SQLite).</li><li><strong>한국어 UI:</strong> 사용자 노출 문자열은 모두 한국어.</li><li><strong>테스트 규약:</strong> 3계층 자동화 테스트 + 공유 헬퍼 + CI. 상세는 <a href="../testing.md"><code class="ic">../testing.md</code></a>. 모든 마일스톤이 따른다.</li></ul>
+<h2>데이터 모델 (전 마일스톤 공통)</h2>
+<p><code class="ic">Bean 1—N OriginComponent</code>(싱글=1, 블렌드=N) · <code class="ic">Bean 1—N Tasting</code>. 평가: 강도 <code class="ic">acidity/sweetness/body/bitterness</code> 1~5 + <code class="ic">overall</code> 1~5 + <code class="ic">comment</code>.</p>
+</article>

@@ -3,6 +3,7 @@
 Thumbs.db
 .idea/
 .vscode/
+.obsidian/
 *.iml
 
 # Dart / Flutter (프로젝트 생성 후 사용)

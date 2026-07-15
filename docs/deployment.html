@@ -1,0 +1,268 @@
+<title>BeanProfile 배포 규약</title>
+<style>
+*{box-sizing:border-box}
+:root{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+  --font-sans:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Consolas,"Malgun Gothic",monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}}
+:root[data-theme="light"]{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+}
+:root[data-theme="dark"]{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-sans);line-height:1.7;-webkit-font-smoothing:antialiased}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.doc{max-width:880px;margin:0 auto;padding:44px 24px 96px}
+.crumb{font-family:var(--font-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:16px}
+h1{font-size:clamp(26px,4vw,38px);font-weight:800;letter-spacing:-.025em;line-height:1.2;margin:.1em 0 .5em;text-wrap:balance}
+h2{font-size:22px;font-weight:700;margin:2em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line);letter-spacing:-.01em;text-wrap:balance}
+h3{font-size:16.5px;font-weight:700;color:var(--accent-ink);margin:1.7em 0 .5em}
+h4{font-size:14px;font-weight:700;margin:1.3em 0 .4em}
+p{margin:.7em 0}
+a{color:var(--accent);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+strong{font-weight:700;color:var(--fg)}
+hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+code.ic{font-family:var(--font-mono);font-size:.85em;background:var(--ic-bg);color:var(--ic-fg);padding:1.5px 6px;border-radius:6px}
+pre.code{position:relative;background:var(--code-bg);color:var(--code-fg);border-radius:12px;padding:16px 18px;margin:1em 0;overflow-x:auto;border:1px solid rgba(0,0,0,.28)}
+pre.code code{font-family:var(--font-mono);font-size:12.75px;line-height:1.6;white-space:pre;color:inherit;background:none;padding:0}
+pre.code[data-lang]::before{content:attr(data-lang);position:absolute;top:9px;right:13px;font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(236,227,211,.42)}
+.tablewrap{overflow-x:auto;margin:1.1em 0}
+table{border-collapse:collapse;width:100%;font-size:13.75px}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--th);font-weight:700}
+tbody tr:nth-child(even){background:var(--surface)}
+blockquote{margin:1.1em 0;padding:11px 16px;border-left:3px solid var(--accent);background:var(--surface);border-radius:0 10px 10px 0;color:var(--muted)}
+blockquote strong{color:var(--fg)}
+ul,ol{margin:.7em 0;padding-left:1.4em}
+li{margin:.32em 0}
+ul.tasklist{list-style:none;padding-left:.15em}
+ul.tasklist li.task{position:relative;padding-left:30px;margin:.5em 0}
+ul.tasklist li.task::before{content:"";position:absolute;left:0;top:.18em;width:17px;height:17px;border:2px solid var(--accent);border-radius:5px;background:transparent}
+ul.tasklist li.task.done::before{content:"\2713";background:var(--accent);color:#fff;font-size:12px;font-weight:800;text-align:center;line-height:15px}
+</style>
+<article class="doc"><div class="crumb">BeanProfile · docs</div>
+<h1>BeanProfile 배포 규약</h1>
+<p>목표: <strong><code class="ic">v*</code> 태그를 푸시하면 내 안드로이드 폰과 아이폰에 앱이 설치된다.</strong> 관련: 설계 <a href="design.md"><code class="ic">design.md</code></a> · 로드맵 <a href="plans/roadmap.md"><code class="ic">plans/roadmap.md</code></a> · 테스트 <a href="testing.md"><code class="ic">testing.md</code></a></p>
+<hr>
+<h2>1. 전제 — 왜 이런 모양인가</h2>
+<p>확정된 개발 환경이 설계를 강하게 제약한다.</p>
+<div class="tablewrap"><table><thead><tr><th>조건</th><th>결과</th></tr></thead><tbody><tr><td><strong>개발 머신이 Windows</strong> (맥 없음)</td><td>로컬 iOS 빌드 <strong>불가</strong>. Xcode·시뮬레이터·핫리로드·브레이크포인트 전부 없음</td></tr><tr><td><strong>Apple Developer Program 가입</strong> ($99/년)</td><td>유료 멤버십이라 App Store Connect API 사용 가능 → <strong>iOS 자동 배포가 성립</strong></td></tr><tr><td><strong>GitHub 저장소 public</strong></td><td>macOS 러너 <strong>무제한 무료</strong> (private이면 10배 과금 → 실질 200분/월)</td></tr><tr><td><strong>스토어 출시 안 함</strong></td><td>Play Store/App Store 심사 없음. 사이드로드 APK + TestFlight 내부 테스트</td></tr></tbody></table></div>
+<p>여기서 핵심 인식 하나:</p>
+<blockquote><strong>안드로이드에게 CI는 "편의"지만, iOS에게 CI는 "유일한 방법"이다.</strong> 안드로이드는 Windows에서 <code class="ic">flutter build apk</code> 후 USB로 넣으면 그만이다. iOS는 맥이 없으면 아이폰에 앱을 넣을 수단 자체가 없다. <strong>CI의 macOS 러너가 곧 빌린 맥이다.</strong></blockquote>
+<p>그래서 이 파이프라인이 안 뚫리면 iOS는 존재하지 않는다. 이게 M0를 최우선에 두는 이유다(§7).</p>
+<hr>
+<h2>2. 파이프라인 구조</h2>
+<pre class="code"><code>git tag v0.0.1 &amp;&amp; git push origin v0.0.1
+        │
+        ▼
+   test (ubuntu) ─── analyze + flutter test    ← 게이트
+        │ 통과해야만
+        ├──────────────────┬──────────────────┐
+        ▼                  ▼
+   android (ubuntu)    ios (macos)             ← 병렬 · 서로 독립
+   APK 빌드             IPA 빌드
+   → GitHub Release    → TestFlight</code></pre>
+<ul><li><strong>테스트 게이트를 앞에 둔다.</strong> 태그가 가리키는 커밋의 테스트가 통과했다는 보장이 없다. Linux 잡이라 공짜고 ~3분이다. 깨진 빌드를 폰에 올리는 것보다 압도적으로 싸다.</li><li><strong>Android/iOS는 병렬이고 독립이다.</strong> iOS 서명이 터져도 Android APK는 정상 릴리스된다. 초반에 iOS를 뚫는 동안 이게 실질적으로 도움이 된다.</li></ul>
+<h3>버저닝</h3>
+<p>태그 <code class="ic">v1.2.3</code> → <code class="ic">--build-name=1.2.3</code>, <code class="ic">--build-number=&lt;github.run_number&gt;</code>.</p>
+<p>빌드 번호는 <strong>반드시 단조 증가</strong>해야 한다. TestFlight는 중복 번호를 거부하고, Android <code class="ic">versionCode</code>도 역행할 수 없다. <code class="ic">run_number</code>는 워크플로 실행마다 증가하므로 조건을 만족한다.</p>
+<blockquote>⚠️ <strong>함정:</strong> 실패한 워크플로를 <strong>re-run 하면 <code class="ic">run_number</code>가 유지</strong>된다 → TestFlight가 중복으로 거부한다. 실패했으면 re-run 하지 말고 <strong>태그를 올려서</strong>(<code class="ic">v0.0.2</code>) 다시 밀 것.</blockquote>
+<hr>
+<h2>3. 1회성 셋업 — Android (~10분)</h2>
+<blockquote>이 문서의 셸 명령은 <strong>Git Bash</strong>(Git for Windows 동봉) 기준이다. <code class="ic">keytool</code>은 JDK, <code class="ic">base64</code>/<code class="ic">openssl</code>은 Git Bash에 들어 있다. PowerShell에는 <code class="ic">base64</code>가 없으므로 Git Bash에서 실행할 것.</blockquote>
+<pre class="code" data-lang="bash"><code>keytool -genkey -v -keystore beanprofile.jks -storetype JKS \
+  -keyalg RSA -keysize 2048 -validity 10000 -alias beanprofile
+base64 -w 0 beanprofile.jks &gt; beanprofile.jks.base64   # → Secret에 붙여넣기</code></pre>
+<p><code class="ic">android/app/build.gradle</code>(또는 최신 Flutter가 생성하는 <code class="ic">.kts</code>)에 Flutter 공식 문서의 서명 설정을 넣어 <code class="ic">key.properties</code>를 읽게 한다. CI가 그 파일을 런타임에 만들어준다.</p>
+<p><strong>키스토어와 비밀번호는 최소 2곳에 백업한다. 이유는 §6.</strong></p>
+<hr>
+<h2>4. 1회성 셋업 — Apple (~1~2시간)</h2>
+<p>맥 없이 <strong>브라우저 + 아이폰 + Windows의 OpenSSL</strong>로 전부 가능하다.</p>
+<div class="tablewrap"><table><thead><tr><th>#</th><th>할 일</th><th>어디서</th></tr></thead><tbody><tr><td>1</td><td>Developer Program 가입 ($99/년)</td><td>아이폰 Apple Developer 앱 또는 웹</td></tr><tr><td>2</td><td>App ID 생성 — <strong><code class="ic">com.hyunwook.beanprofile</code></strong> (확정, §4 하단 참고)</td><td>developer.apple.com</td></tr><tr><td>3</td><td>배포 인증서 → <code class="ic">.p12</code></td><td><strong>Windows / OpenSSL</strong> (아래)</td></tr><tr><td>4</td><td>Provisioning Profile (App Store 배포용)</td><td>developer.apple.com</td></tr><tr><td>5</td><td>App Store Connect <strong>API 키</strong> (<code class="ic">.p8</code>, App Manager 역할)</td><td>App Store Connect → Users and Access → Integrations</td></tr><tr><td>6</td><td>앱 레코드 생성 (App ID 연결)</td><td>App Store Connect</td></tr></tbody></table></div>
+<blockquote>🔒 <strong>번들 ID <code class="ic">com.hyunwook.beanprofile</code>은 영구값이다.</strong> Apple App ID이자 Android <code class="ic">applicationId</code>로 굳는다. 나중에 바꾸면 <strong>양쪽 OS 모두 "다른 앱"으로 취급</strong> → 기존 앱 위에 설치 불가 → 삭제 후 재설치 → <strong>시음 기록 소실</strong>. iOS는 App Store Connect 레코드도 새로 만들어야 한다. <strong>2번을 하기 전에 확정할 것.</strong> (<code class="ic">flutter create --org com.hyunwook --project-name beanprofile</code>과 반드시 일치)</blockquote>
+<h3>3번 — 맥 없이 인증서 만들기</h3>
+<p>보통 Keychain Access(맥)로 하는 CSR 생성을 OpenSSL로 대체한다.</p>
+<pre class="code" data-lang="bash"><code>openssl genrsa -out ios_dist.key 2048
+openssl req -new -key ios_dist.key -out ios_dist.csr \
+  -subj "/emailAddress=hyunwook5636@gmail.com/CN=hyunwook/C=KR"
+# → developer.apple.com에 ios_dist.csr 업로드 → dist.cer 다운로드
+openssl x509 -inform DER -in dist.cer -out dist.pem
+openssl pkcs12 -export -inkey ios_dist.key -in dist.pem -out dist.p12
+base64 -w 0 dist.p12 &gt; dist.p12.base64</code></pre>
+<p><strong>인증서는 1년짜리다. 연 1회 갱신이 필요하다(§6).</strong></p>
+<blockquote><strong>6번 주의:</strong> App Store Connect의 앱 이름은 <strong>App Store 전체에서 유일</strong>해야 한다. <code class="ic">BeanProfile</code>이 선점돼 있으면 다른 이름으로 등록한다(앱 내 표시명과 무관).</blockquote>
+<h3>대안 (지금은 채택 안 함)</h3>
+<ul><li><strong><code class="ic">fastlane match</code></strong> — 인증서를 별도 private 저장소에 암호화 보관. 팀 협업용이라 1인 개발엔 오버킬.</li><li><strong>Codemagic</strong> — Flutter 특화 CI. API 키만 주면 인증서·프로파일을 <strong>자동 관리</strong>한다. 맥 없는 개발자에겐 확실히 편하다.</li></ul>
+<p><strong>GitHub Actions + 수동 1회 발급을 택한 이유:</strong> 새 CI 플랫폼을 배우는 비용보다 "1년에 한 번 30분"이 싸고, 이미 <code class="ic">test.yml</code>이 Actions에 있어 한 곳에 모인다. <strong>단, 3번에서 며칠씩 늪에 빠지면 Codemagic으로 갈아타는 게 합리적인 탈출구다.</strong> 매몰비용에 빠지지 말 것.</p>
+<hr>
+<h2>5. GitHub Secrets</h2>
+<div class="tablewrap"><table><thead><tr><th>Secret</th><th>내용</th></tr></thead><tbody><tr><td><code class="ic">ANDROID_KEYSTORE_BASE64</code></td><td><code class="ic">.jks</code>의 base64</td></tr><tr><td><code class="ic">ANDROID_KEYSTORE_PASSWORD</code></td><td>키스토어 비밀번호</td></tr><tr><td><code class="ic">ANDROID_KEY_ALIAS</code></td><td>키 별칭 (<code class="ic">beanprofile</code>)</td></tr><tr><td><code class="ic">ANDROID_KEY_PASSWORD</code></td><td>키 비밀번호</td></tr><tr><td><code class="ic">IOS_DIST_CERT_P12_BASE64</code></td><td><code class="ic">.p12</code>의 base64</td></tr><tr><td><code class="ic">IOS_DIST_CERT_PASSWORD</code></td><td><code class="ic">.p12</code> export 시 지정한 암호</td></tr><tr><td><code class="ic">IOS_PROVISIONING_PROFILE_BASE64</code></td><td><code class="ic">.mobileprovision</code>의 base64</td></tr><tr><td><code class="ic">APPSTORE_ISSUER_ID</code></td><td>App Store Connect API Issuer ID</td></tr><tr><td><code class="ic">APPSTORE_KEY_ID</code></td><td>API 키 ID</td></tr><tr><td><code class="ic">APPSTORE_PRIVATE_KEY</code></td><td><code class="ic">.p8</code> 파일 <strong>내용 전체</strong></td></tr></tbody></table></div>
+<p><strong>저장소에 절대 커밋되면 안 되는 것</strong> — <code class="ic">.gitignore</code>에 추가:</p>
+<pre class="code"><code>*.jks
+*.p12
+*.p8
+*.mobileprovision
+*.csr
+*.key
+android/key.properties</code></pre>
+<hr>
+<h2>6. 운영 리스크 — 이 앱에 특유한 것</h2>
+<h3>A. 키스토어가 곧 시음 기록이다 🔑</h3>
+<p>안드로이드는 <strong>서명이 다르면 기존 앱 위에 설치가 안 된다</strong> → 삭제 후 재설치 → <strong>삭제하는 순간 앱 데이터가 지워진다</strong>. 그런데 이 앱은 설계상 <strong>로컬 전용 + 클라우드 백업 없음</strong>이고, JSON 내보내기는 <strong>M5</strong>(마지막)다.</p>
+<blockquote><strong>키스토어 분실 = 그때까지 쌓은 시음 기록 전부 소실. 복구 수단 없음.</strong> <strong>M1~M4 동안에는 백업 수단이 아예 없다.</strong></blockquote>
+<ul><li><strong>필수(지금):</strong> <code class="ic">.jks</code> + 비밀번호를 <strong>최소 2곳</strong>에 백업(비밀번호 관리자 + 외장/클라우드). 이거 하나로 실질 리스크가 거의 사라진다.</li><li><strong>재판단(M2):</strong> M5의 JSON export 앞당기기. <strong>지금 결정하지 않는다</strong> — M2에서 시음 기록이 실제로 쌓이기 시작할 때 다시 본다. 지금 당기면 스코프 크리프다.</li></ul>
+<h3>B. TestFlight는 90일마다 만료된다 ⏳</h3>
+<p>TestFlight 빌드는 <strong>업로드 90일 후 만료</strong>되고, 만료되면 아이폰에서 <strong>앱이 열리지 않는다</strong>. 새 빌드를 올리면 되살아나고 <strong>데이터는 유지</strong>된다(앱을 삭제하지만 않으면).</p>
+<div class="tablewrap"><table><thead><tr><th>시기</th><th>부담</th></tr></thead><tbody><tr><td><strong>개발 중(M0~M5)</strong></td><td>무해. 어차피 90일보다 훨씬 자주 태그를 민다</td></tr><tr><td><strong>개발 종료 후</strong></td><td><strong>3개월마다 태그 한 번</strong> (<code class="ic">git tag v1.0.1 &amp;&amp; git push --tags</code>, 20분 대기). 앱이 안 열리는 게 알람 역할</td></tr><tr><td><strong>매년</strong></td><td>배포 인증서 갱신(§4-3). 안 하면 태그를 밀어도 빌드가 실패한다</td></tr></tbody></table></div>
+<p><strong>탈출구(지금은 안 만듦):</strong> ad-hoc 배포는 프로파일이 <strong>1년</strong>이라 세금이 1/4로 준다. 대신 UDID 등록 + <code class="ic">manifest.plist</code>를 HTTPS에 호스팅해 OTA 링크를 만들어야 해서 설치 경로가 훨씬 번거롭다. <strong>90일 세금이 실제로 거슬릴 때</strong> 꺼내 쓸 것(YAGNI).</p>
+<h3>C. 자동화를 진짜 무인으로 만들려면</h3>
+<p><code class="ic">ios/Runner/Info.plist</code>에 다음을 넣는다:</p>
+<pre class="code" data-lang="xml"><code>&lt;key&gt;ITSAppUsesNonExemptEncryption&lt;/key&gt;
+&lt;false/&gt;</code></pre>
+<p>없으면 <strong>빌드마다 App Store Connect 웹에서 수출 규정 질문에 손으로 답해야</strong> 테스터에게 풀린다. 태그 자동화가 거기서 멈추므로 반드시 넣는다.</p>
+<hr>
+<h2>7. 로드맵 편입 — M0 신설</h2>
+<p>파이프라인은 <code class="ic">flutter create</code> 직후에 뚫는다. 이유:</p>
+<blockquote><strong>서명을 뚫는 난이도는 앱이 hello world든 완성품이든 똑같다</strong>(서명은 앱 코드와 무관하니까). 그런데 <strong>실패 원인을 분리하는 난이도는 앱이 복잡할수록 폭증한다.</strong> 맥이 없어서 <strong>빨간 CI 로그만 보고</strong> 뚫어야 하므로, 변수가 1개일 때(=hello world) 뚫는 게 압도적으로 유리하다.</blockquote>
+<p>덤으로 "iOS가 예상 못한 이유로 막힌다"를 <strong>M1 이전에</strong> 알게 된다. 5개 마일스톤을 다 만들고 나서 iOS가 안 되는 게 최악의 시나리오다.</p>
+<div class="tablewrap"><table><thead><tr><th></th><th>완료 시 동작하는 것</th><th>검증</th></tr></thead><tbody><tr><td><strong>M0</strong></td><td>GitHub public 저장소 · <code class="ic">flutter create</code> · 서명 셋업 · <code class="ic">release.yml</code></td><td><strong><code class="ic">v0.0.1</code> 태그 → 안드로이드 폰 + 아이폰에 hello world가 설치되어 실행됨</strong></td></tr></tbody></table></div>
+<p><code class="ic">flutter create</code>는 원래 M1 Task 1이었으나 <strong>M0로 이관</strong>한다. M1 한복판에 배포를 끼우면 *"각 마일스톤은 그 자체로 동작하고 검증 가능한 증분"* 원칙이 깨진다. M0도 그 기준을 정확히 만족한다.</p>
+<p>이후 <strong>M1~M5는 태그만 밀면 폰에 뜬다.</strong></p>
+<hr>
+<h2>8. <code class="ic">release.yml</code> 참고 구현</h2>
+<blockquote><strong>아직 저장소에 넣지 않는다.</strong> <code class="ic">android/</code>·<code class="ic">ios/</code> 디렉터리가 없어서(=<code class="ic">flutter create</code> 미실행) 지금 넣으면 죽은 코드다. <strong>M0에서 실물로 만든다.</strong> 아래는 검증된 참고 구현이며, 패키지·액션 최신 API에 맞춰 사소한 조정이 필요할 수 있다(M1 계획서와 같은 규약).</blockquote>
+<pre class="code" data-lang="yaml"><code>name: release
+
+# BeanProfile 배포 — v* 태그 → Android APK(GitHub Release) + iOS(TestFlight).
+# 설계/셋업: docs/deployment.md
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write        # GitHub Release 생성용
+
+jobs:
+  test:                  # 게이트 — 깨진 빌드를 폰에 올리지 않는다
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with: { channel: stable }
+      - run: flutter pub get
+      - run: dart run build_runner build --delete-conflicting-outputs
+      - run: flutter analyze
+      - run: flutter test
+
+  android:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: subosito/flutter-action@v2
+        with: { channel: stable }
+      - run: flutter pub get
+      - run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: 키스토어 복원
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: echo "$KEYSTORE_B64" | base64 -d &gt; android/app/beanprofile.jks
+
+      - name: key.properties 작성
+        env:
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          cat &gt; android/key.properties &lt;&lt;EOF
+          storeFile=beanprofile.jks
+          storePassword=$STORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
+          EOF
+
+      - name: APK 빌드
+        run: |
+          flutter build apk --release \
+            --build-name=${GITHUB_REF_NAME#v} \
+            --build-number=${{ github.run_number }}
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: build/app/outputs/flutter-apk/app-release.apk
+          generate_release_notes: true
+
+  ios:
+    needs: test
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with: { channel: stable }
+      - run: flutter pub get
+      - run: dart run build_runner build --delete-conflicting-outputs
+
+      - uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.IOS_DIST_CERT_P12_BASE64 }}
+          p12-password: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+
+      - name: 프로비저닝 프로파일 설치
+        env:
+          PROFILE_B64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          echo "$PROFILE_B64" | base64 -d \
+            &gt; ~/Library/MobileDevice/Provisioning\ Profiles/beanprofile.mobileprovision
+
+      - name: IPA 빌드
+        run: |
+          flutter build ipa --release \
+            --build-name=${GITHUB_REF_NAME#v} \
+            --build-number=${{ github.run_number }} \
+            --export-options-plist=ios/ExportOptions.plist
+
+      # IPA 파일명은 Xcode 제품명을 따라가므로 하드코딩하지 않는다 (§8 주의)
+      - name: IPA 경로 확인
+        run: echo "IPA_PATH=$(ls build/ios/ipa/*.ipa | head -1)" &gt;&gt; "$GITHUB_ENV"
+
+      - uses: apple-actions/upload-testflight-build@v1
+        with:
+          app-path: ${{ env.IPA_PATH }}
+          issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ secrets.APPSTORE_KEY_ID }}
+          api-private-key: ${{ secrets.APPSTORE_PRIVATE_KEY }}</code></pre>
+<blockquote>⚠️ <strong>IPA 이름을 하드코딩하지 말 것.</strong> <code class="ic">flutter build ipa</code>는 Xcode 제품명으로 파일명을 짓는다(<code class="ic">beanprofile.ipa</code> 등). 하드코딩하면 업로드 스텝에서 파일을 못 찾고 실패하는데, 맥이 없으면 이걸 CI 로그로만 진단해야 해서 시간을 크게 잡아먹는다. 위처럼 <code class="ic">ls</code>로 찾아서 넘긴다.</blockquote>
+<h3><code class="ic">ios/ExportOptions.plist</code> (커밋함 — 비밀 아님)</h3>
+<pre class="code" data-lang="xml"><code>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"&gt;
+&lt;plist version="1.0"&gt;
+&lt;dict&gt;
+  &lt;key&gt;method&lt;/key&gt;          &lt;string&gt;app-store&lt;/string&gt;
+  &lt;key&gt;teamID&lt;/key&gt;          &lt;string&gt;TEAM_ID&lt;/string&gt;
+  &lt;key&gt;signingStyle&lt;/key&gt;    &lt;string&gt;manual&lt;/string&gt;
+  &lt;key&gt;uploadSymbols&lt;/key&gt;   &lt;true/&gt;
+  &lt;key&gt;provisioningProfiles&lt;/key&gt;
+  &lt;dict&gt;
+    &lt;key&gt;com.hyunwook.beanprofile&lt;/key&gt;
+    &lt;string&gt;PROFILE_NAME&lt;/string&gt;
+  &lt;/dict&gt;
+&lt;/dict&gt;
+&lt;/plist&gt;</code></pre>
+<p><code class="ic">TEAM_ID</code>·<code class="ic">PROFILE_NAME</code>·번들 ID는 M0에서 실제 값으로 채운다. 최신 Xcode는 <code class="ic">method</code>로 <code class="ic">app-store-connect</code>를 선호하므로 경고가 뜨면 교체한다.</p>
+<hr>
+<h2>9. 릴리스 체크리스트</h2>
+<ul class="tasklist"><li class="task"><code class="ic">flutter analyze &amp;&amp; flutter test</code> 로컬 초록불</li><li class="task">커밋 &amp; 푸시 (main)</li><li class="task"><code class="ic">git tag vX.Y.Z &amp;&amp; git push origin vX.Y.Z</code></li><li class="task">Actions에서 <code class="ic">test</code> → <code class="ic">android</code>/<code class="ic">ios</code> 초록불 확인</li><li class="task">안드로이드: GitHub Release에서 APK 받아 설치</li><li class="task">iOS: TestFlight 앱에서 업데이트 확인 (업로드 후 처리에 5~15분)</li><li class="task">실패 시 <strong>re-run 하지 말고</strong> 태그를 올려서 다시 푸시 (§2 함정)</li></ul>
+</article>

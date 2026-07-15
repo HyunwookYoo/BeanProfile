@@ -73,7 +73,11 @@ test/
 
 ---
 
-### Task 1: 프로젝트 스캐폴드 & 의존성
+### Task 1: 프로젝트 스캐폴드 & 의존성 — **M0에서 수행**
+
+> **이 태스크는 M0(배포 파이프라인)에 속한다.** 배포 설계: [`../deployment.md`](../deployment.md)
+> 맥 없이 iOS 서명을 뚫으려면 hello world 상태에서 검증해야 실패 원인이 "인프라" 1개로 분리된다. 그래서 `flutter create`가 M0의 시작점이 됐다.
+> **M1은 Task 2부터 시작한다.** 아래 스텝은 M0에서 이미 끝나 있으므로 참고용이다(태스크 번호는 유지).
 
 **Files:**
 - Create: 프로젝트 전체(`flutter create`), `pubspec.yaml`(수정), `lib/main.dart`(교체)
@@ -84,8 +88,10 @@ test/
 
 Run:
 ```bash
-flutter create --org com.beanprofile --project-name beanprofile --platforms=android,ios .
+flutter create --org com.hyunwook --project-name beanprofile --platforms=android,ios .
 ```
+
+> **번들 ID = `com.hyunwook.beanprofile`.** 이 값은 Apple App ID·Android `applicationId`로 굳어지고, **나중에 바꾸면 앱 데이터가 날아간다**(다른 앱 취급). M0 시작 전에 확정할 것.
 
 - [ ] **Step 2: 의존성 추가**
 
@@ -145,7 +151,7 @@ Expected: analyze 0 issues, 1 test PASS.
 - [ ] **Step 7: 커밋**
 
 ```bash
-git init
+# git init 은 이미 완료됨 (repo 존재, branch main)
 git add -A
 git commit -m "chore: scaffold Flutter project and dependencies"
 ```

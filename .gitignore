@@ -23,3 +23,15 @@ coverage/
 
 # Windows 호스트 테스트용 네이티브 라이브러리 (기기마다 각자 배치 — docs/testing.md 참고)
 sqlite3.dll
+
+# 서명 비밀 — 절대 커밋 금지 (GitHub Secrets로 관리 — docs/deployment.md 참고)
+*.jks
+*.keystore
+*.p12
+*.p8
+*.mobileprovision
+*.csr
+*.key
+*.cer
+*.pem
+**/android/key.properties

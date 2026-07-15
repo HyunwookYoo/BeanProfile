@@ -98,12 +98,14 @@ test/
   widget/bean_detail_test.dart
 .github/workflows/test.yml        # CI: analyze + test (Linux)</code></pre>
 <hr>
-<h3>Task 1: 프로젝트 스캐폴드 &amp; 의존성</h3>
+<h3>Task 1: 프로젝트 스캐폴드 &amp; 의존성 — <strong>M0에서 수행</strong></h3>
+<blockquote><strong>이 태스크는 M0(배포 파이프라인)에 속한다.</strong> 배포 설계: <a href="../deployment.md"><code class="ic">../deployment.md</code></a> 맥 없이 iOS 서명을 뚫으려면 hello world 상태에서 검증해야 실패 원인이 "인프라" 1개로 분리된다. 그래서 <code class="ic">flutter create</code>가 M0의 시작점이 됐다. <strong>M1은 Task 2부터 시작한다.</strong> 아래 스텝은 M0에서 이미 끝나 있으므로 참고용이다(태스크 번호는 유지).</blockquote>
 <p><strong>Files:</strong></p>
 <ul><li>Create: 프로젝트 전체(<code class="ic">flutter create</code>), <code class="ic">pubspec.yaml</code>(수정), <code class="ic">lib/main.dart</code>(교체)</li><li>Test: <code class="ic">test/smoke_test.dart</code></li><li>Delete: <code class="ic">test/widget_test.dart</code>(기본 생성물)</li></ul>
 <ul class="tasklist"><li class="task"><strong>Step 1: Flutter 프로젝트 생성</strong> (이미 <code class="ic">C:\BeanProfile</code>에 <code class="ic">docs/</code>, <code class="ic">CLAUDE.md</code> 존재 — 비어있지 않은 폴더에 생성)</li></ul>
 <p>Run:</p>
-<pre class="code" data-lang="bash"><code>flutter create --org com.beanprofile --project-name beanprofile --platforms=android,ios .</code></pre>
+<pre class="code" data-lang="bash"><code>flutter create --org com.hyunwook --project-name beanprofile --platforms=android,ios .</code></pre>
+<blockquote><strong>번들 ID = <code class="ic">com.hyunwook.beanprofile</code>.</strong> 이 값은 Apple App ID·Android <code class="ic">applicationId</code>로 굳어지고, <strong>나중에 바꾸면 앱 데이터가 날아간다</strong>(다른 앱 취급). M0 시작 전에 확정할 것.</blockquote>
 <ul class="tasklist"><li class="task"><strong>Step 2: 의존성 추가</strong></li></ul>
 <p>Run:</p>
 <pre class="code" data-lang="bash"><code>flutter pub add drift drift_flutter flutter_riverpod intl
@@ -140,7 +142,7 @@ void main() {
 <ul class="tasklist"><li class="task"><strong>Step 6: 분석 &amp; 테스트 통과 확인</strong></li></ul>
 <p>Run: <code class="ic">flutter analyze &amp;&amp; flutter test</code> Expected: analyze 0 issues, 1 test PASS.</p>
 <ul class="tasklist"><li class="task"><strong>Step 7: 커밋</strong></li></ul>
-<pre class="code" data-lang="bash"><code>git init
+<pre class="code" data-lang="bash"><code># git init 은 이미 완료됨 (repo 존재, branch main)
 git add -A
 git commit -m "chore: scaffold Flutter project and dependencies"</code></pre>
 <hr>

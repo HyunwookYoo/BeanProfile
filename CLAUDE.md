@@ -27,6 +27,17 @@ Render any doc to themed HTML (the app's cupping-lab theme, light/dark) with **`
 
 Testing convention (3 layers, shared `test/helpers.dart`, Windows sqlite3 setup, GitHub Actions CI at `.github/workflows/test.yml`) lives in **`docs/testing.md`**; every milestone follows it.
 
+Deployment convention (`v*` tag push → Android APK via GitHub Release + iOS via TestFlight) lives in **`docs/deployment.md`**; it also holds the one-time Android/Apple signing setup runbook.
+
+## Deployment constraints (approved 2026-07-15)
+
+- **Dev machine is Windows, no Mac.** Local iOS builds are impossible — the CI macOS runner *is* the Mac. If the pipeline breaks, iOS does not exist. Android CI is mere convenience by comparison.
+- **Apple Developer Program ($99/yr) is a hard gate** for iOS: free Apple IDs expire profiles in 7 days and have no App Store Connect API, so tag-push automation cannot work without it.
+- **GitHub repo must stay public** — macOS runners are free for public repos; private would cap iOS at ~10 builds/month (10× minute multiplier).
+- **Bundle ID `com.hyunwook.beanprofile` is permanent.** Changing it later orphans app data on both platforms.
+- **The Android keystore guards the user's data.** Signature mismatch forces uninstall → wipes the local-only DB. Back it up in ≥2 places.
+- **TestFlight builds expire in 90 days** — a permanent ~quarterly tag-push tax after development ends. Certs need annual renewal.
+
 ## Status
 
-v1 design + UI mockup approved. Implementation plan is milestone-based: roadmap at `docs/plans/roadmap.md`, **M1 (foundation & bean add/list/detail) detailed at `docs/plans/milestone-1-foundation.md`**. M2–M5 written just-in-time. Implementation not started (user deciding). Latest decisions live in agentmemory under the `BeanProfile` tag.
+v1 design + UI mockup approved. Implementation plan is milestone-based: roadmap at `docs/plans/roadmap.md`, **M1 (bean add/list/detail) detailed at `docs/plans/milestone-1-foundation.md`**, **M0 (deployment pipeline) designed at `docs/deployment.md`** — plan written just-in-time. M2–M5 written just-in-time. `flutter create` moved from M1 Task 1 into M0. Implementation not started. Latest decisions live in agentmemory under the `BeanProfile` tag.

@@ -1,0 +1,239 @@
+<title>M0 — 배포 파이프라인 (Delivery) 실행 계획</title>
+<style>
+*{box-sizing:border-box}
+:root{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+  --font-sans:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Consolas,"Malgun Gothic",monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}}
+:root[data-theme="light"]{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+}
+:root[data-theme="dark"]{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-sans);line-height:1.7;-webkit-font-smoothing:antialiased}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.doc{max-width:880px;margin:0 auto;padding:44px 24px 96px}
+.crumb{font-family:var(--font-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:16px}
+h1{font-size:clamp(26px,4vw,38px);font-weight:800;letter-spacing:-.025em;line-height:1.2;margin:.1em 0 .5em;text-wrap:balance}
+h2{font-size:22px;font-weight:700;margin:2em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line);letter-spacing:-.01em;text-wrap:balance}
+h3{font-size:16.5px;font-weight:700;color:var(--accent-ink);margin:1.7em 0 .5em}
+h4{font-size:14px;font-weight:700;margin:1.3em 0 .4em}
+p{margin:.7em 0}
+a{color:var(--accent);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+strong{font-weight:700;color:var(--fg)}
+hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+code.ic{font-family:var(--font-mono);font-size:.85em;background:var(--ic-bg);color:var(--ic-fg);padding:1.5px 6px;border-radius:6px}
+pre.code{position:relative;background:var(--code-bg);color:var(--code-fg);border-radius:12px;padding:16px 18px;margin:1em 0;overflow-x:auto;border:1px solid rgba(0,0,0,.28)}
+pre.code code{font-family:var(--font-mono);font-size:12.75px;line-height:1.6;white-space:pre;color:inherit;background:none;padding:0}
+pre.code[data-lang]::before{content:attr(data-lang);position:absolute;top:9px;right:13px;font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(236,227,211,.42)}
+.tablewrap{overflow-x:auto;margin:1.1em 0}
+table{border-collapse:collapse;width:100%;font-size:13.75px}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--th);font-weight:700}
+tbody tr:nth-child(even){background:var(--surface)}
+blockquote{margin:1.1em 0;padding:11px 16px;border-left:3px solid var(--accent);background:var(--surface);border-radius:0 10px 10px 0;color:var(--muted)}
+blockquote strong{color:var(--fg)}
+ul,ol{margin:.7em 0;padding-left:1.4em}
+li{margin:.32em 0}
+ul.tasklist{list-style:none;padding-left:.15em}
+ul.tasklist li.task{position:relative;padding-left:30px;margin:.5em 0}
+ul.tasklist li.task::before{content:"";position:absolute;left:0;top:.18em;width:17px;height:17px;border:2px solid var(--accent);border-radius:5px;background:transparent}
+ul.tasklist li.task.done::before{content:"\2713";background:var(--accent);color:#fff;font-size:12px;font-weight:800;text-align:center;line-height:15px}
+</style>
+<article class="doc"><div class="crumb">BeanProfile · docs/plans</div>
+<h1>M0 — 배포 파이프라인 (Delivery) 실행 계획</h1>
+<blockquote><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code class="ic">- [ ]</code>) syntax for tracking.</blockquote>
+<p><strong>Goal:</strong> <code class="ic">v0.0.1</code> 태그 하나를 push하면 CI(macOS 러너)가 Flutter 앱을 <strong>미서명 <code class="ic">.ipa</code></strong> 로 빌드해 GitHub Release에 첨부하고, 그걸 <strong>무료 Apple ID + AltStore</strong>로 아이폰에 설치해 hello‑world 앱이 실제로 실행되게 한다 — 앱이 아직 사소할 때(변수 1개) 전달 경로 전체를 증명한다.</p>
+<p><strong>Architecture:</strong> <code class="ic">flutter create</code>로 스캐폴드를 만들고(영구 번들 ID <code class="ic">com.hyunwook.beanprofile</code> 고정), <code class="ic">.github/workflows/release.yml</code>이 <code class="ic">v*</code> 태그에서 <strong>test 게이트 → iOS 미서명 <code class="ic">.ipa</code> 빌드 → GitHub Release 첨부</strong>를 수행한다. CI에는 <strong>Apple 서명 비밀이 하나도 없다</strong> — 서명은 로컬 AltStore(윈도우 PC의 AltServer)가 무료 Apple ID로 담당한다. 사람이 하는 일은 (a) 공개 GitHub 레포 생성/push, (b) 1회성 AltStore 셋업, (c) 릴리스마다 <code class="ic">.ipa</code> 내려받아 AltStore 설치, (d) 7일마다 갱신.</p>
+<p><strong>Tech Stack:</strong> Flutter (stable), GitHub Actions (<code class="ic">subosito/flutter-action@v2</code>, <code class="ic">softprops/action-gh-release@v2</code>), AltStore/AltServer(Windows) + 무료 Apple ID.</p>
+<h2>Global Constraints</h2>
+<p>프로젝트 전역 요구 — 모든 태스크의 요구사항에 암묵적으로 포함된다.</p>
+<ul><li><strong>개발 머신은 Windows, Mac 없음.</strong> iOS 컴파일은 오직 CI의 macOS 러너에서만 가능. (<code class="ic">docs/deployment.md</code> §1)</li><li><strong>번들 ID <code class="ic">com.hyunwook.beanprofile</code>는 영구.</strong> Task 1의 <code class="ic">flutter create</code>에서 고정되며 이후 변경 시 양 OS의 앱 데이터가 고아가 됨.</li><li><strong>GitHub 레포는 반드시 공개(public).</strong> 공개 레포여야 macOS 러너 분(minutes)이 무료.</li><li><strong>무료 Apple ID 경로: CI에 iOS 서명 비밀 0개.</strong> App Store Connect / TestFlight / <code class="ic">APPSTORE_*</code> 시크릿 / 배포 인증서(<code class="ic">.p12</code>) <strong>전부 M0에서 불필요.</strong> 서명은 AltStore가 로컬에서 수행.</li><li><strong>무료 서명은 7일마다 만료.</strong> 만료 시 앱은 실행 불가(아이콘·데이터는 유지) → AltStore "Refresh All"로 갱신(윈도우 PC + 같은 WiFi 필요). 무료 계정 동시 사이드로드 <strong>최대 3앱</strong>.</li><li><strong>M0는 iOS 전용.</strong> Android 폴더는 스캐폴드하되 CI/서명/전달에는 연결하지 않음(별도 마일스톤으로 이관 — Android 서명은 Mac 게이트가 아니라 윈도우에서 로컬 디버깅 가능하므로 지금 급할 이유가 없음).</li><li><strong>서명 비밀은 절대 커밋/대화 붙여넣기 금지.</strong> (M0 무료‑iOS 경로엔 시크릿이 없지만, 향후 Android/유료 경로 대비 원칙 유지.) <code class="ic">.gitignore</code>가 이미 <code class="ic">*.jks *.p12 *.key ...</code> 차단 중.</li><li><strong>스토어 미출시, 완전 오프라인, 로컬 전용.</strong></li></ul>
+<h2>결정 근거 (요약)</h2>
+<p>무료(Free Apple ID + AltStore) 경로 확정 — 사유: 아이폰만 보유(Android 기기 없음), 혼자 사용, 개발 지속 불확실 → $99/년 커밋 연기. 자세한 내용·마이그레이션 비용은 agentmemory <code class="ic">BeanProfile</code> 태그의 2026‑07‑17 결정 및 <code class="ic">docs/deployment.md</code>(유료/TestFlight 경로의 참조 스펙) 참고. 유료 전환은 <strong>지연이지 중복 아님</strong>이며, 1회성 비용은 서명자 교체 시 아이폰 삭제‑재설치로 로컬 DB가 지워지는 것뿐(§6‑A와 동일 실패 모드).</p>
+<h2>File Structure</h2>
+<div class="tablewrap"><table><thead><tr><th>경로</th><th>동작</th><th>책임</th></tr></thead><tbody><tr><td><code class="ic">pubspec.yaml</code>, <code class="ic">lib/main.dart</code>, <code class="ic">test/widget_test.dart</code>, <code class="ic">ios/</code>, <code class="ic">android/</code>, <code class="ic">analysis_options.yaml</code>, <code class="ic">.metadata</code></td><td><strong>생성</strong>(<code class="ic">flutter create</code> 기본 스캐폴드, 손으로 안 씀)</td><td>실행 가능한 hello‑world(기본 카운터) 앱 + 기본 위젯 테스트</td></tr><tr><td><code class="ic">.github/workflows/release.yml</code></td><td><strong>생성</strong></td><td><code class="ic">v*</code> 태그 → test 게이트 → iOS 미서명 <code class="ic">.ipa</code> → GitHub Release</td></tr><tr><td><code class="ic">.github/workflows/test.yml</code></td><td><strong>수정</strong></td><td>codegen 스텝을 "build_runner 있을 때만"으로 가드(스캐폴드에서 초록 유지)</td></tr><tr><td><code class="ic">.gitignore</code></td><td><strong>변경 없음</strong></td><td>이미 Flutter 무시 규칙 + 서명 비밀 차단 완비</td></tr></tbody></table></div>
+<p><strong>M0가 포함하지 않는 것(명시):</strong> Android 빌드/서명 job, TestFlight 업로드, Apple 인증서(<code class="ic">.p12</code>)·CSR, <code class="ic">APPSTORE_*</code> 시크릿, <code class="ic">ios/ExportOptions.plist</code>, <code class="ic">Info.plist</code>의 <code class="ic">ITSAppUsesNonExemptEncryption</code>(App Store Connect 업로드가 없으므로 불필요) — 전부 유료 경로 전환 시점으로 이관.</p>
+<p><strong>성격상 주의:</strong> M0는 <strong>기능 코드</strong>가 아니라 <strong>인프라</strong>다. 따라서 기능 단위 TDD(실패 테스트 먼저)가 없다. M0의 "테스트"는 <strong>태그 → 빌드 → 설치 → 실행</strong>의 엔드‑투‑엔드 전달 루프 그 자체다. 각 태스크는 그에 맞는 구체적 검증으로 끝난다. 첫 태그 push가 한 번에 성공하지 않는 것은 <strong>정상이자 M0의 목적</strong>이다(앱이 사소할 때 실패 원인을 격리) — 아래 Troubleshooting 참고.</p>
+<hr>
+<h2>Task 1: Flutter 앱 스캐폴드 (영구 번들 ID 고정) — [CLAUDE, 실행 전 사용자 확인 필수]</h2>
+<p><strong>Files:</strong></p>
+<ul><li>Create: <code class="ic">pubspec.yaml</code>, <code class="ic">lib/main.dart</code>, <code class="ic">test/widget_test.dart</code>, <code class="ic">ios/**</code>, <code class="ic">android/**</code>, <code class="ic">analysis_options.yaml</code>, <code class="ic">.metadata</code>, <code class="ic">README.md</code></li><li>Unchanged: <code class="ic">.gitignore</code>(기존 유지 확인), <code class="ic">docs/**</code>, <code class="ic">CLAUDE.md</code></li></ul>
+<p><strong>Interfaces:</strong></p>
+<ul><li>Produces: 루트에 <code class="ic">pubspec.yaml</code>(name: <code class="ic">beanprofile</code>), 번들 ID <code class="ic">com.hyunwook.beanprofile</code>가 <code class="ic">ios/Runner.xcodeproj/project.pbxproj</code>의 <code class="ic">PRODUCT_BUNDLE_IDENTIFIER</code>와 <code class="ic">android/app/build.gradle</code>(또는 <code class="ic">build.gradle.kts</code>)의 <code class="ic">applicationId</code>에 박힘. Task 3(release.yml)이 이 스캐폴드를 빌드.</li></ul>
+<blockquote>⚠️ <strong>이 태스크는 영구 번들 ID를 고정한다.</strong> 실행 직전 사용자에게 <code class="ic">com.hyunwook.beanprofile</code> 확정을 재확인한다.</blockquote>
+<ul class="tasklist"><li class="task"><strong>Step 1: 번들 ID 확정 재확인</strong></li></ul>
+<p>사용자에게 확인: 번들 ID = <code class="ic">com.hyunwook.beanprofile</code> (영구, 변경 불가). 확정되면 다음 단계.</p>
+<ul class="tasklist"><li class="task"><strong>Step 2: 스캐폴드 생성</strong></li></ul>
+<p>기존 레포 루트(<code class="ic">C:\BeanProfile</code>)에서 실행. <code class="ic">docs/</code>, <code class="ic">CLAUDE.md</code>, <code class="ic">.gitignore</code>, <code class="ic">.github/</code>는 보존됨(flutter create는 기존 파일을 덮지 않음).</p>
+<pre class="code" data-lang="bash"><code>flutter create --org com.hyunwook --project-name beanprofile --platforms=ios,android .</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 3: 기존 <code class="ic">.gitignore</code> 보존 확인 (방어)</strong></li></ul>
+<p><code class="ic">flutter create</code>가 기존 <code class="ic">.gitignore</code>를 남겨두는지 확인. 서명 비밀 차단 블록이 그대로 있어야 함.</p>
+<p>Run: <code class="ic">grep -n "서명 비밀" .gitignore</code> Expected: <code class="ic">27:# 서명 비밀 — 절대 커밋 금지 ...</code> 한 줄 매치. (없으면 <code class="ic">.gitignore</code>가 덮인 것 → 이전 버전을 git으로 복원: <code class="ic">git checkout -- .gitignore</code> 후 Flutter 무시 규칙이 이미 있는지 확인 — 원래 파일에 <code class="ic">.dart_tool/ build/</code> 등 이미 포함됨.)</p>
+<ul class="tasklist"><li class="task"><strong>Step 4: 번들 ID가 양쪽에 정확히 박혔는지 확인</strong></li></ul>
+<p>Run: <code class="ic">grep -rn "com.hyunwook.beanprofile" ios/Runner.xcodeproj/project.pbxproj android/app/</code> Expected: iOS <code class="ic">PRODUCT_BUNDLE_IDENTIFIER = com.hyunwook.beanprofile;</code> (3곳: Debug/Release/Profile), Android <code class="ic">applicationId "com.hyunwook.beanprofile"</code> (1곳) 매치.</p>
+<ul class="tasklist"><li class="task"><strong>Step 5: 스캐폴드가 정적분석·테스트 통과하는지 확인</strong></li></ul>
+<pre class="code" data-lang="bash"><code>flutter pub get
+flutter analyze
+flutter test</code></pre>
+<p>Expected: analyze <code class="ic">No issues found!</code>, test <code class="ic">All tests passed!</code> (기본 <code class="ic">widget_test.dart</code>의 카운터 증가 테스트).</p>
+<ul class="tasklist"><li class="task"><strong>Step 6: 커밋</strong></li></ul>
+<pre class="code" data-lang="bash"><code>git add -A
+git commit -m "feat(m0): scaffold Flutter app (bundle id com.hyunwook.beanprofile, iOS+Android)"</code></pre>
+<hr>
+<h2>Task 2: <code class="ic">test.yml</code> codegen 스텝 가드 (스캐폴드에서 초록 유지) — [CLAUDE]</h2>
+<p><strong>Files:</strong></p>
+<ul><li>Modify: <code class="ic">.github/workflows/test.yml:18</code></li></ul>
+<p><strong>이유:</strong> 현재 <code class="ic">test.yml</code>은 <code class="ic">dart run build_runner build</code>를 무조건 실행하는데, M0 스캐폴드에는 <code class="ic">build_runner</code> 의존성이 없어(→ drift는 M1) 이 스텝이 "package build_runner not found"로 실패한다. Task 1이 유발하는 이 파손을 정리한다(내가 만든 것만 정리 — CLAUDE.md §3). M1에서 <code class="ic">build_runner</code>가 들어오면 가드가 자동으로 통과시킨다.</p>
+<ul class="tasklist"><li class="task"><strong>Step 1: 무조건 실행되던 codegen 스텝을 "있을 때만"으로 교체</strong></li></ul>
+<p><code class="ic">.github/workflows/test.yml</code>에서 아래 한 줄</p>
+<pre class="code" data-lang="yaml"><code>      - run: dart run build_runner build --delete-conflicting-outputs</code></pre>
+<p>을 다음으로 교체:</p>
+<pre class="code" data-lang="yaml"><code>      - name: Codegen (drift 등) — 있을 때만
+        run: |
+          if grep -q "build_runner" pubspec.yaml; then
+            dart run build_runner build --delete-conflicting-outputs
+          else
+            echo "build_runner 미설치 — codegen 건너뜀 (M1에서 활성화)"
+          fi</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 2: 가드 로직 로컬 검증(스캐폴드에는 build_runner 없음)</strong></li></ul>
+<p>Run: <code class="ic">grep -q "build_runner" pubspec.yaml &amp;&amp; echo RUN || echo SKIP</code> Expected: <code class="ic">SKIP</code> (M0 스캐폴드 기준 — 즉 CI에서 codegen을 건너뛰어 초록 유지). M1에서 build_runner 추가 후엔 <code class="ic">RUN</code>이 되어 codegen 수행.</p>
+<ul class="tasklist"><li class="task"><strong>Step 3: 커밋</strong></li></ul>
+<pre class="code" data-lang="bash"><code>git add .github/workflows/test.yml
+git commit -m "ci(m0): run build_runner only when present (keep test green on bare scaffold)"</code></pre>
+<hr>
+<h2>Task 3: <code class="ic">release.yml</code> 추가 (test 게이트 → iOS 미서명 .ipa → GitHub Release) — [CLAUDE]</h2>
+<p><strong>Files:</strong></p>
+<ul><li>Create: <code class="ic">.github/workflows/release.yml</code></li></ul>
+<p><strong>Interfaces:</strong></p>
+<ul><li>Consumes: Task 1의 스캐폴드(<code class="ic">flutter build ios</code>가 빌드할 <code class="ic">ios/</code>), Task 2와 동일한 가드된 codegen 패턴.</li><li>Produces: <code class="ic">v*</code> 태그 push 시 GitHub Release에 <code class="ic">beanprofile-&lt;tag&gt;.ipa</code>(미서명) 자산. Task 6/7이 이 자산을 사용.</li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 1: 워크플로 파일 작성</strong></li></ul>
+<p><code class="ic">.github/workflows/release.yml</code>:</p>
+<pre class="code" data-lang="yaml"><code>name: release
+
+# BeanProfile 배포 파이프라인 — v* 태그 push 시 실행.
+# 무료 Apple ID 경로: CI(macOS 러너)가 "미서명" .ipa를 만들어 GitHub Release에 첨부.
+# 서명·설치는 로컬 AltStore가 담당 (CI에 Apple 서명 비밀 없음).
+# 규약: docs/deployment.md · 계획: docs/plans/milestone-0-delivery.md
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write   # GitHub Release 생성/자산 업로드에 필요
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - name: Codegen (drift 등) — 있을 때만
+        run: |
+          if grep -q "build_runner" pubspec.yaml; then
+            dart run build_runner build --delete-conflicting-outputs
+          else
+            echo "build_runner 미설치 — codegen 건너뜀 (M1에서 활성화)"
+          fi
+      - run: flutter analyze
+      - run: flutter test
+
+  ios:
+    needs: test
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - name: Build unsigned iOS app
+        run: flutter build ios --release --no-codesign --build-name="${GITHUB_REF_NAME#v}" --build-number="${{ github.run_number }}"
+      - name: Package unsigned .ipa
+        run: |
+          cd build/ios/iphoneos
+          mkdir Payload
+          cp -r Runner.app Payload/
+          zip -qq -r -9 "$GITHUB_WORKSPACE/beanprofile-${GITHUB_REF_NAME}.ipa" Payload
+      - name: Publish GitHub Release (+.ipa 자산)
+        uses: softprops/action-gh-release@v2
+        with:
+          name: BeanProfile ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          body: |
+            무료 Apple ID(AltStore) 경로용 **미서명** iOS 빌드.
+            설치: 아이폰에서 이 .ipa를 내려받아 AltStore → My Apps → + 로 선택하면
+            AltStore가 서명해 설치합니다. (PC에서 AltServer 실행 + 같은 WiFi 필요)
+          files: beanprofile-${{ github.ref_name }}.ipa</code></pre>
+<blockquote><strong>미서명 .ipa 레시피 근거:</strong> <code class="ic">flutter build ipa --no-codesign</code>은 xcarchive만 만들고 teamID 없이는 IPA를 못 뽑는다. 신뢰 경로는 <code class="ic">flutter build ios --release --no-codesign</code>(→ <code class="ic">build/ios/iphoneos/Runner.app</code>)을 <code class="ic">Payload/</code>로 감싸 zip하는 것. AltStore가 이 미서명 .ipa를 받아 무료 Apple ID로 재서명한다.  <strong>버전 규약:</strong> <code class="ic">--build-name</code>=태그에서 <code class="ic">v</code> 제거(<code class="ic">v0.0.1</code>→<code class="ic">0.0.1</code>), <code class="ic">--build-number</code>=<code class="ic">github.run_number</code>. ⚠️ <strong>같은 태그로 워크플로를 재실행하면 run_number가 재사용</strong>되니, 새 빌드가 필요하면 태그를 올려라(<code class="ic">v0.0.2</code>).</blockquote>
+<ul class="tasklist"><li class="task"><strong>Step 2: YAML 유효성 확인</strong></li></ul>
+<p>Run: <code class="ic">python -c "import yaml,sys; yaml.safe_load(open('.github/workflows/release.yml',encoding='utf-8')); print('OK')"</code> Expected: <code class="ic">OK</code></p>
+<ul class="tasklist"><li class="task"><strong>Step 3: 커밋</strong></li></ul>
+<pre class="code" data-lang="bash"><code>git add .github/workflows/release.yml
+git commit -m "ci(m0): add release pipeline (tag -&gt; unsigned iOS .ipa -&gt; GitHub Release)"</code></pre>
+<hr>
+<h2>Task 4: 공개 GitHub 레포 생성 + main push — [HUMAN]</h2>
+<blockquote>브라우저/계정/인증이 필요해 사람만 가능. <code class="ic">gh</code> CLI가 로그인돼 있으면 아래 명령을, 아니면 GitHub 웹에서 레포 생성 후 remote만 연결.</blockquote>
+<ul class="tasklist"><li class="task"><strong>Step 1: 공개 레포 생성 &amp; push</strong></li></ul>
+<p><code class="ic">gh</code> 로그인돼 있으면(세션에서 직접 로그인하려면 프롬프트에 <code class="ic">! gh auth login</code>):</p>
+<pre class="code" data-lang="bash"><code>gh repo create beanprofile --public --source=. --remote=origin --push</code></pre>
+<p>또는 웹에서 <code class="ic">beanprofile</code>(Public) 생성 후:</p>
+<pre class="code" data-lang="bash"><code>git remote add origin https://github.com/&lt;your-username&gt;/beanprofile.git
+git push -u origin main</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 2: 확인</strong></li></ul>
+<ul><li>레포가 <strong>Public</strong>인지 확인(Settings에서 확인 — macOS 러너 무료 조건).</li><li><strong>Actions</strong> 탭에 <code class="ic">test</code> 워크플로가 push로 실행되어 <strong>초록</strong>인지 확인(Task 2 가드 덕에 codegen 건너뛰고 통과). <code class="ic">release</code> 워크플로는 목록엔 보이되 아직 실행 안 됨(태그 전용).</li></ul>
+<hr>
+<h2>Task 5: 1회성 AltStore 셋업 (Windows + iPhone) — [HUMAN, 병렬 가능 — 지금 시작해도 됨]</h2>
+<blockquote>레포/CI와 의존성 없음. 다운로드·설치가 있어 시간이 걸리니 일찍 시작 권장. 공식 가이드: &lt;https://faq.altstore.io&gt; (UI가 버전마다 바뀌므로 공식 절차를 최종 기준으로).</blockquote>
+<ul class="tasklist"><li class="task"><strong>Step 1: Apple 사이트판(apple.com) iTunes + iCloud 설치</strong></li></ul>
+<p>⚠️ <strong>반드시 apple.com 다운로드판</strong> — Microsoft Store판 iCloud는 AltServer가 못 찾아 "AltServer couldn't find iCloud" 오류가 난다.</p>
+<ul><li>iTunes: &lt;https://www.apple.com/itunes/download/win64&gt;</li><li>iCloud for Windows: apple.com 지원 페이지의 데스크톱 다운로드판.</li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 2: AltServer 설치 &amp; 관리자 실행</strong></li></ul>
+<ul><li>&lt;https://altstore.io&gt; 에서 AltServer for Windows 설치.</li><li><strong>관리자 권한으로 실행</strong> → 시스템 트레이에 AltServer 아이콘.</li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 3: 아이폰 연결 &amp; AltStore 설치</strong></li></ul>
+<ul><li>USB로 아이폰 연결 → 아이폰에서 "이 컴퓨터를 신뢰" 승인.</li><li>iTunes에서 이 기기의 <strong>"Wi‑Fi 동기화" 활성화</strong>(이후 무선 갱신용).</li><li>트레이 AltServer 아이콘 → <strong>Install AltStore → (기기 선택)</strong> → <strong>무료 Apple ID</strong> 로그인.</li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 4: 개발자 프로파일 신뢰</strong></li></ul>
+<p>아이폰: 설정 → 일반 → <strong>VPN 및 기기 관리</strong> → 본인 Apple ID 개발자 앱 → <strong>신뢰</strong>.</p>
+<ul class="tasklist"><li class="task"><strong>Step 5: 확인</strong></li></ul>
+<p>아이폰에서 <strong>AltStore 앱이 열리고</strong>, 로그인된 Apple ID가 표시되는지 확인.</p>
+<hr>
+<h2>Task 6: 첫 릴리스 — <code class="ic">v0.0.1</code> 태그 → CI 빌드 → Release에 .ipa — [CLAUDE 태그 생성 + HUMAN CI 관찰]</h2>
+<p><strong>의존:</strong> Task 3(release.yml) + Task 4(레포 push) 완료 후.</p>
+<ul class="tasklist"><li class="task"><strong>Step 1: 태그 생성 &amp; push</strong></li></ul>
+<pre class="code" data-lang="bash"><code>git tag v0.0.1
+git push origin v0.0.1</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 2: CI 확인</strong></li></ul>
+<ul><li>Actions → <code class="ic">release</code> 실행에서 <code class="ic">test</code> → <code class="ic">ios</code> job이 <strong>초록</strong>.</li><li>Releases 페이지에 <strong><code class="ic">BeanProfile v0.0.1</code></strong> 릴리스와 <strong><code class="ic">beanprofile-v0.0.1.ipa</code></strong> 자산이 있는지 확인.</li><li>실패 시 Troubleshooting 참고 후 태그를 올려(<code class="ic">v0.0.2</code>) 재시도.</li></ul>
+<hr>
+<h2>Task 7: 아이폰에 AltStore로 설치 → 앱 실행 (M0 완료조건) — [HUMAN]</h2>
+<p><strong>의존:</strong> Task 5(AltStore 셋업) + Task 6(.ipa 자산) 완료. <strong>PC에서 AltServer 실행 중 + 아이폰과 같은 WiFi.</strong></p>
+<ul class="tasklist"><li class="task"><strong>Step 1: 아이폰에서 .ipa 내려받기</strong></li></ul>
+<p>아이폰 Safari로 GitHub Release 페이지 → <code class="ic">beanprofile-v0.0.1.ipa</code> 다운로드 → "파일"앱에 저장.</p>
+<ul class="tasklist"><li class="task"><strong>Step 2: AltStore로 설치</strong></li></ul>
+<p>AltStore 앱 → <strong>My Apps</strong> 탭 → 좌상단 <strong><code class="ic">+</code></strong> → 방금 받은 <code class="ic">.ipa</code> 선택 → AltStore가 무료 Apple ID로 <strong>서명·설치</strong>(App ID 자동 등록; 무료 계정은 7일당 App ID 10개 한도).</p>
+<ul class="tasklist"><li class="task"><strong>Step 3: (필요 시) 프로파일 신뢰 후 실행</strong></li></ul>
+<p>설정 → 일반 → VPN 및 기기 관리에서 신뢰(이미 Task 5에서 했으면 생략) → 홈 화면에서 <strong>BeanProfile 앱 실행</strong>.</p>
+<ul class="tasklist"><li class="task"><strong>Step 4: 확인 (✅ M0 DoD)</strong></li></ul>
+<p>아이폰에서 <strong>BeanProfile(기본 카운터) 앱이 실행</strong>되면 M0 완료 — 태그 push → CI 빌드 → 아이폰 설치·실행의 전달 경로 전체가 증명됨.</p>
+<hr>
+<h2>Task 8: 7일 갱신 (상시) — [HUMAN, 반복]</h2>
+<ul class="tasklist"><li class="task"><strong>매 ≤7일마다:</strong> 아이폰을 PC와 같은 WiFi에 두고(AltServer 실행 중) AltStore → <strong>Refresh All</strong>. 놓쳐서 만료되면 앱이 안 열릴 뿐 데이터는 유지 — 갱신하면 되살아남. (삭제‑재설치는 로컬 DB를 지우므로 지양.)</li></ul>
+<hr>
+<h2>Troubleshooting (첫 태그가 한 번에 안 될 때 — 정상)</h2>
+<div class="tablewrap"><table><thead><tr><th>증상</th><th>원인/조치</th></tr></thead><tbody><tr><td><code class="ic">ios</code> job이 <code class="ic">flutter build ios</code>에서 실패</td><td>macos 러너 Xcode/Flutter 조합 문제. <code class="ic">subosito/flutter-action@v2</code>에 <code class="ic">flutter-version</code> 핀 고정을 검토(재현성). CocoaPods 관련이면 로그의 <code class="ic">pod install</code> 구간 확인.</td></tr><tr><td><code class="ic">.ipa</code> 첨부는 됐는데 AltStore가 설치 거부</td><td>(a) PC에서 AltServer 미실행 또는 다른 WiFi, (b) 무료 App ID 주간 10개 한도 소진, (c) iCloud가 MS Store판(→ Apple 사이트판 재설치), (d) 아이폰 미신뢰.</td></tr><tr><td>설치는 됐는데 7일 뒤 안 열림</td><td><strong>정상</strong>(무료 서명 만료). AltStore Refresh All. 데이터는 보존.</td></tr><tr><td>Package 스텝에서 <code class="ic">Runner.app</code> 못 찾음</td><td>경로 확인: <code class="ic">find build/ios -name Runner.app</code>. 표준 위치는 <code class="ic">build/ios/iphoneos/Runner.app</code>(본 레시피 기준). 다른 위치면 zip 대상 경로만 조정.</td></tr><tr><td><code class="ic">test</code> job이 codegen에서 실패</td><td>Task 2 가드가 적용됐는지 확인(<code class="ic">build_runner</code> 없을 때 건너뜀).</td></tr><tr><td>같은 태그 재실행인데 버전이 그대로</td><td><code class="ic">github.run_number</code> 재사용. 새 태그(<code class="ic">v0.0.2</code>)로 올릴 것.</td></tr></tbody></table></div>
+<h2>향후(유료 전환 시) 추가될 것 — M0 범위 밖</h2>
+<p><code class="ic">docs/deployment.md</code> §4/§5/§8이 참조 스펙: Apple 배포 인증서(<code class="ic">.p12</code>, OpenSSL 경로) + <code class="ic">APPSTORE_*</code> 시크릿 + <code class="ic">ios/ExportOptions.plist</code> + <code class="ic">Info.plist</code>의 <code class="ic">ITSAppUsesNonExemptEncryption=false</code>, 그리고 <code class="ic">release.yml</code>의 <code class="ic">ios</code> job을 TestFlight 업로드로 교체. Android는 keystore + 4개 시크릿 + APK 서명 job을 별도 마일스톤에서.</p>
+</article>

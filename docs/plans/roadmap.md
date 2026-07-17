@@ -5,7 +5,7 @@
 
 | # | 마일스톤 | 완료 시 동작하는 것 | 상세 계획 |
 |---|---|---|---|
-| **M0** | 배포 파이프라인 | GitHub public 저장소 · `flutter create` · 서명 셋업 · `release.yml` → **`v0.0.1` 태그로 hello world가 안드로이드 폰 + 아이폰에 설치됨** | 착수 직전 작성 · 설계는 [`../deployment.md`](../deployment.md) ✅ |
+| **M0** | 배포 파이프라인 | GitHub public 저장소 · `flutter create` · `release.yml` → **`v0.0.1` 태그로 hello world가 아이폰에 설치·실행됨**(무료 Apple ID + AltStore, **iOS 전용**; Android는 이후 이관) | [`milestone-0-delivery.md`](milestone-0-delivery.md) ✅ · 설계 [`../deployment.md`](../deployment.md) |
 | **M1** | 기반 & 원두 추가/조회 | 테마/3탭 셸 · drift DB(3테이블) · 원두 **수동 추가 → 리스트 → 상세(읽기)** (Task 1 스캐폴드는 M0로 이관) | [`milestone-1-foundation.md`](milestone-1-foundation.md) ✅ 작성됨 |
 | **M2** | 원두 편집/삭제 & 시음 기록 | 원두 편집·삭제 · **시음 입력**(강도 4축 + 종합 별점 + 코멘트) · 상세에 시음 리스트 · 평균 별점 계산 | 착수 직전 작성 |
 | **M3** | 사진 & OCR 리뷰 | 촬영/갤러리 · ML Kit 온디바이스 인식 · **OCR 리뷰 화면**(자동 필드 + 배정 칩) · 추가 플로우에 연결 | 착수 직전 작성 |
@@ -20,7 +20,7 @@
 - **오프라인·로컬 전용:** 네트워크 권한 없음, 모든 데이터는 기기 내 drift(SQLite).
 - **한국어 UI:** 사용자 노출 문자열은 모두 한국어.
 - **테스트 규약:** 3계층 자동화 테스트 + 공유 헬퍼 + CI. 상세는 [`../testing.md`](../testing.md). 모든 마일스톤이 따른다.
-- **배포 규약:** `v*` 태그 푸시 → Android APK(GitHub Release) + iOS(TestFlight). 상세는 [`../deployment.md`](../deployment.md). M0 이후 모든 마일스톤은 **태그만 밀면 폰에 뜬다**.
+- **배포 규약:** `v*` 태그 푸시로 폰에 전달. **현재(무료 결정): iOS 전용 — CI가 미서명 `.ipa`를 GitHub Release에 올리고 AltStore로 설치**(7일 갱신, PC+WiFi 필요). 향후 유료 전환 시 iOS(TestFlight)+Android APK 자동화로 승격 — 참조 스펙 [`../deployment.md`](../deployment.md), M0 상세 [`milestone-0-delivery.md`](milestone-0-delivery.md).
 
 ## 데이터 모델 (전 마일스톤 공통)
 

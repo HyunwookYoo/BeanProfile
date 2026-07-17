@@ -1,0 +1,60 @@
+name: release
+
+# BeanProfile 배포 파이프라인 — v* 태그 push 시 실행.
+# 무료 Apple ID 경로: CI(macOS 러너)가 "미서명" .ipa를 만들어 GitHub Release에 첨부.
+# 서명·설치는 로컬 AltStore가 담당 (CI에 Apple 서명 비밀 없음).
+# 규약: docs/deployment.md · 계획: docs/plans/milestone-0-delivery.md
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write   # GitHub Release 생성/자산 업로드에 필요
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - name: Codegen (drift 등) — 있을 때만
+        run: |
+          if grep -q "build_runner" pubspec.yaml; then
+            dart run build_runner build --delete-conflicting-outputs
+          else
+            echo "build_runner 미설치 — codegen 건너뜀 (M1에서 활성화)"
+          fi
+      - run: flutter analyze
+      - run: flutter test
+
+  ios:
+    needs: test
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - name: Build unsigned iOS app
+        run: flutter build ios --release --no-codesign --build-name="${GITHUB_REF_NAME#v}" --build-number="${{ github.run_number }}"
+      - name: Package unsigned .ipa
+        run: |
+          cd build/ios/iphoneos
+          mkdir Payload
+          cp -r Runner.app Payload/
+          zip -qq -r -9 "$GITHUB_WORKSPACE/beanprofile-${GITHUB_REF_NAME}.ipa" Payload
+      - name: Publish GitHub Release (+.ipa 자산)
+        uses: softprops/action-gh-release@v2
+        with:
+          name: BeanProfile ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          body: |
+            무료 Apple ID(AltStore) 경로용 **미서명** iOS 빌드.
+            설치: 아이폰에서 이 .ipa를 내려받아 AltStore → My Apps → + 로 선택하면
+            AltStore가 서명해 설치합니다. (PC에서 AltServer 실행 + 같은 WiFi 필요)
+          files: beanprofile-${{ github.ref_name }}.ipa

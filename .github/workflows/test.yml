@@ -15,6 +15,12 @@ jobs:
         with:
           channel: stable
       - run: flutter pub get
-      - run: dart run build_runner build --delete-conflicting-outputs
+      - name: Codegen (drift 등) — 있을 때만
+        run: |
+          if grep -q "build_runner" pubspec.yaml; then
+            dart run build_runner build --delete-conflicting-outputs
+          else
+            echo "build_runner 미설치 — codegen 건너뜀 (M1에서 활성화)"
+          fi
       - run: flutter analyze
       - run: flutter test

@@ -42,3 +42,19 @@ BeanInput sampleBlend({String name = '하우스 블렌드'}) => BeanInput(
         ComponentInput(country: 'Ethiopia', process: Process.washed, ratioPercent: 40),
       ],
     );
+
+/// 샘플 시음 (강도 4축 + 종합 + 코멘트).
+TastingInput sampleTasting({
+  int acidity = 4,
+  int sweetness = 3,
+  int body = 3,
+  int bitterness = 2,
+  int overall = 4,
+  String? comment = '균형이 좋다',
+  DateTime? date,
+}) =>
+    TastingInput(
+      date: date ?? DateTime(2026, 7, 1),
+      acidity: acidity, sweetness: sweetness, body: body,
+      bitterness: bitterness, overall: overall, comment: comment,
+    );

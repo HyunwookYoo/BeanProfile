@@ -71,6 +71,20 @@ class BeanRepository {
     return comps.length == 1 ? first : '$first 외 ${comps.length - 1}';
   }
 
+  Future<int> createTasting(int beanId, TastingInput t) {
+    return db.into(db.tastings).insert(TastingsCompanion.insert(
+          beanId: beanId,
+          date: t.date,
+          acidity: t.acidity,
+          sweetness: t.sweetness,
+          body: t.body,
+          bitterness: t.bitterness,
+          overall: t.overall,
+          comment: Value(t.comment),
+          createdAt: DateTime.now(),
+        ));
+  }
+
   Future<BeanDetail?> getBeanDetail(int beanId) async {
     final bean = await (db.select(db.beans)..where((b) => b.id.equals(beanId)))
         .getSingleOrNull();

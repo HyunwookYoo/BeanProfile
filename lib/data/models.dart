@@ -63,4 +63,28 @@ class BeanDetail {
     required this.components,
     required this.tastings,
   });
+
+  int get tastingCount => tastings.length;
+  double? get avgRating => tastings.isEmpty
+      ? null
+      : tastings.map((t) => t.overall).reduce((a, b) => a + b) / tastings.length;
+}
+
+class TastingInput {
+  final DateTime date;
+  final int acidity;
+  final int sweetness;
+  final int body;
+  final int bitterness;
+  final int overall;
+  final String? comment;
+  const TastingInput({
+    required this.date,
+    required this.acidity,
+    required this.sweetness,
+    required this.body,
+    required this.bitterness,
+    required this.overall,
+    this.comment,
+  });
 }

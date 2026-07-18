@@ -1,0 +1,9 @@
+import 'package:flutter/material.dart';
+
+class ProfileScreen extends StatelessWidget {
+  const ProfileScreen({super.key});
+  @override
+  Widget build(BuildContext context) => const Scaffold(
+        body: Center(child: Text('취향 분석은 곧 추가됩니다')),
+      );
+}

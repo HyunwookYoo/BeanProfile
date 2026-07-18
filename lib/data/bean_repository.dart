@@ -69,6 +69,11 @@ class BeanRepository {
     });
   }
 
+  Future<void> deleteBean(int beanId) {
+    // FK ON DELETE CASCADE로 originComponents + tastings가 함께 삭제된다.
+    return (db.delete(db.beans)..where((b) => b.id.equals(beanId))).go();
+  }
+
   Stream<List<BeanSummary>> watchBeanSummaries() {
     final avg = db.tastings.overall.avg();
     final cnt = db.tastings.id.count();

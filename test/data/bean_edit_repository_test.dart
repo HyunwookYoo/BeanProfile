@@ -40,4 +40,18 @@ void main() {
     final after = (await repo.getBeanDetail(id))!.bean.createdAt;
     expect(after, before);
   });
+
+  test('deleteBean removes the bean and cascades tastings + components', () async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    final repo = testRepository(db);
+    final id = await repo.createBean(sampleBlend());
+    await repo.createTasting(id, sampleTasting());
+
+    await repo.deleteBean(id);
+
+    expect(await repo.getBeanDetail(id), isNull);
+    final list = await repo.watchBeanSummaries().first;
+    expect(list, isEmpty);
+  });
 }

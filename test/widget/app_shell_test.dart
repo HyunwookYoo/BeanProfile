@@ -25,5 +25,16 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex, 1);
     expect(find.text('취향 분석은 곧 추가됩니다'), findsOneWidget);
+
+    // Close explicitly before the widget tree is torn down: drift schedules a
+    // zero-duration Timer when a stream loses its last listener (see
+    // StreamQueryStore.markAsClosed), and Flutter's test binding checks for
+    // pending timers immediately after auto-disposing the tree — too soon for
+    // that timer to fire. Closing here first makes drift skip the timer
+    // entirely (_isShuttingDown short-circuit). Now that BeanListScreen (Task
+    // 7) really watches beanListProvider, this app-shell test exercises a
+    // live drift stream for the first time. addTearDown(db.close) above stays
+    // as a safety net for early test failures; closing twice is a no-op.
+    await db.close();
   });
 }

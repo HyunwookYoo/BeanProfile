@@ -5,6 +5,7 @@ import '../../data/enums.dart';
 import '../../data/models.dart';
 import '../../providers.dart';
 import '../../theme.dart';
+import '../tasting/tasting_form_screen.dart';
 
 class BeanDetailScreen extends ConsumerWidget {
   const BeanDetailScreen({super.key, required this.beanId});
@@ -13,6 +14,7 @@ class BeanDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(beanDetailProvider(beanId));
+    final c = context.colors;
     return Scaffold(
       appBar: AppBar(title: const Text('원두 상세')),
       body: async.when(
@@ -21,6 +23,22 @@ class BeanDetailScreen extends ConsumerWidget {
         data: (d) => d == null
             ? const Center(child: Text('삭제된 원두예요'))
             : _DetailBody(detail: d),
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          child: FilledButton.icon(
+            key: const Key('add-tasting'),
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => TastingFormScreen(beanId: beanId))),
+            icon: const Icon(Icons.add),
+            label: const Text('시음 추가'),
+            style: FilledButton.styleFrom(
+                backgroundColor: c.crema,
+                foregroundColor: Colors.white,
+                minimumSize: const Size.fromHeight(48)),
+          ),
+        ),
       ),
     );
   }
@@ -66,7 +84,7 @@ class _DetailBody extends StatelessWidget {
             color: c.cup, borderRadius: BorderRadius.circular(14),
             border: Border.all(color: c.appLine),
           ),
-          child: Text('아직 시음 기록이 없어요\n(시음 입력은 다음 단계에서 추가됩니다)',
+          child: Text('아직 시음 기록이 없어요\n＋ 시음 추가로 첫 기록을 남겨보세요',
               textAlign: TextAlign.center, style: TextStyle(color: c.appMuted)),
         )
       else

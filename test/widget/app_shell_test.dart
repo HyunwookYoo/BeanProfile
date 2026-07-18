@@ -2,6 +2,7 @@ import 'package:beanprofile/app.dart';
 import 'package:beanprofile/data/database.dart';
 import 'package:beanprofile/providers.dart';
 import 'package:drift/native.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -18,9 +19,11 @@ void main() {
     expect(find.text('원두'), findsWidgets);
     expect(find.text('취향'), findsWidgets);
     expect(find.text('설정'), findsWidgets);
+    expect(tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex, 0);
 
     await tester.tap(find.text('취향'));
     await tester.pumpAndSettle();
+    expect(tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex, 1);
     expect(find.text('취향 분석은 곧 추가됩니다'), findsOneWidget);
   });
 }

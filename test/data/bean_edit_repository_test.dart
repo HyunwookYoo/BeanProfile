@@ -41,17 +41,27 @@ void main() {
     expect(after, before);
   });
 
-  test('deleteBean removes the bean and cascades tastings + components', () async {
+  test('deleteBean removes the bean and cascades components + tastings, leaving other beans intact', () async {
     final db = testDatabase();
     addTearDown(db.close);
     final repo = testRepository(db);
-    final id = await repo.createBean(sampleBlend());
-    await repo.createTasting(id, sampleTasting());
+    final a = await repo.createBean(sampleBlend());          // 2 components
+    await repo.createTasting(a, sampleTasting());
+    final b = await repo.createBean(sampleSingle(name: '남는 원두')); // control, must survive
+    await repo.createTasting(b, sampleTasting());
 
-    await repo.deleteBean(id);
+    await repo.deleteBean(a);
 
-    expect(await repo.getBeanDetail(id), isNull);
-    final list = await repo.watchBeanSummaries().first;
-    expect(list, isEmpty);
+    // A gone AND children actually cascaded — query child tables directly
+    // (getBeanDetail short-circuits to null once the beans row is gone).
+    expect(await repo.getBeanDetail(a), isNull);
+    expect(await (db.select(db.originComponents)..where((c) => c.beanId.equals(a))).get(), isEmpty);
+    expect(await (db.select(db.tastings)..where((t) => t.beanId.equals(a))).get(), isEmpty);
+
+    // B untouched — proves the delete was scoped, not delete-all
+    final bDetail = await repo.getBeanDetail(b);
+    expect(bDetail, isNotNull);
+    expect(bDetail!.components, isNotEmpty);
+    expect(bDetail.tastings, hasLength(1));
   });
 }

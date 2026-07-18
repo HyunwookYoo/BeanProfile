@@ -23,3 +23,19 @@ class SwipeDeleteBackground extends StatelessWidget {
     );
   }
 }
+
+/// 원두 삭제 확인 다이얼로그. 사용자가 '삭제'를 누르면 true.
+Future<bool> confirmDeleteBeanDialog(BuildContext context) async {
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: const Text('원두 삭제'),
+      content: const Text('이 원두와 모든 시음 기록이 삭제됩니다. 되돌릴 수 없어요.'),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('취소')),
+        TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('삭제')),
+      ],
+    ),
+  );
+  return ok == true;
+}

@@ -5,6 +5,7 @@ import '../../theme.dart';
 import 'bean_detail_screen.dart';
 import 'bean_form_screen.dart';
 import 'widgets/bean_card.dart';
+import 'widgets/delete_ux.dart';
 
 class BeanListScreen extends ConsumerWidget {
   const BeanListScreen({super.key});
@@ -37,10 +38,20 @@ class BeanListScreen extends ConsumerWidget {
             separatorBuilder: (_, __) => const SizedBox(height: 10),
             itemBuilder: (_, i) {
               final s = list[i];
-              return BeanCard(
-                summary: s,
-                onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) => BeanDetailScreen(beanId: s.bean.id))),
+              return Dismissible(
+                key: ValueKey('bean-${s.bean.id}'),
+                direction: DismissDirection.endToStart,
+                background: const SwipeDeleteBackground(),
+                confirmDismiss: (_) async {
+                  final ok = await confirmDeleteBeanDialog(context);
+                  if (ok) await ref.read(beanRepositoryProvider).deleteBean(s.bean.id);
+                  return false; // 반응형 리빌드가 삭제된 카드 제거(assert 회피)
+                },
+                child: BeanCard(
+                  summary: s,
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => BeanDetailScreen(beanId: s.bean.id))),
+                ),
               );
             },
           );

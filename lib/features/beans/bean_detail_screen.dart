@@ -67,20 +67,8 @@ class BeanDetailScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _confirmDeleteBean(
-      BuildContext context, WidgetRef ref, int id) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('원두 삭제'),
-        content: const Text('이 원두와 모든 시음 기록이 삭제됩니다. 되돌릴 수 없어요.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('취소')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('삭제')),
-        ],
-      ),
-    );
-    if (ok != true) return;
+  Future<void> _confirmDeleteBean(BuildContext context, WidgetRef ref, int id) async {
+    if (!await confirmDeleteBeanDialog(context)) return;
     await ref.read(beanRepositoryProvider).deleteBean(id);
     if (context.mounted) Navigator.of(context).pop(); // 리스트로 복귀
   }

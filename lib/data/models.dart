@@ -87,4 +87,14 @@ class TastingInput {
     required this.overall,
     this.comment,
   });
+
+  factory TastingInput.fromTasting(Tasting t) => TastingInput(
+        date: t.date,
+        acidity: t.acidity,
+        sweetness: t.sweetness,
+        body: t.body,
+        bitterness: t.bitterness,
+        overall: t.overall,
+        comment: t.comment,
+      );
 }

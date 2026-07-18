@@ -7,6 +7,7 @@ import '../../providers.dart';
 import '../../theme.dart';
 import '../tasting/tasting_form_screen.dart';
 import 'bean_form_screen.dart';
+import 'widgets/delete_ux.dart';
 import 'widgets/star_rating.dart';
 
 class BeanDetailScreen extends ConsumerWidget {
@@ -42,7 +43,10 @@ class BeanDetailScreen extends ConsumerWidget {
         error: (e, _) => Center(child: Text('오류: $e')),
         data: (d) => d == null
             ? const Center(child: Text('삭제된 원두예요'))
-            : _DetailBody(detail: d),
+            : _DetailBody(
+                detail: d,
+                onDeleteTasting: (t) => _deleteTastingWithUndo(context, ref, t),
+              ),
       ),
       bottomNavigationBar: SafeArea(
         child: Padding(
@@ -80,11 +84,26 @@ class BeanDetailScreen extends ConsumerWidget {
     await ref.read(beanRepositoryProvider).deleteBean(id);
     if (context.mounted) Navigator.of(context).pop(); // 리스트로 복귀
   }
+
+  void _deleteTastingWithUndo(BuildContext context, WidgetRef ref, Tasting t) {
+    final repo = ref.read(beanRepositoryProvider);
+    repo.deleteTasting(t.id);
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: const Text('시음 기록을 삭제했어요'),
+        action: SnackBarAction(
+          label: '실행취소',
+          onPressed: () => repo.createTasting(t.beanId, TastingInput.fromTasting(t)),
+        ),
+      ));
+  }
 }
 
 class _DetailBody extends StatelessWidget {
-  const _DetailBody({required this.detail});
+  const _DetailBody({required this.detail, required this.onDeleteTasting});
   final BeanDetail detail;
+  final void Function(Tasting) onDeleteTasting;
 
   @override
   Widget build(BuildContext context) {
@@ -165,31 +184,40 @@ class _DetailBody extends StatelessWidget {
 
   Widget _tastingRow(BuildContext context, Tasting t) {
     final c = context.colors;
-    return InkWell(
-      key: Key('tasting-row-${t.id}'),
-      borderRadius: BorderRadius.circular(12),
-      onTap: () => Navigator.of(context).push(MaterialPageRoute(
-          builder: (_) => TastingFormScreen(beanId: t.beanId, existing: t))),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(color: c.cup, borderRadius: BorderRadius.circular(12), border: Border.all(color: c.appLine)),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(t.date.toIso8601String().substring(0, 10), style: monoStyle(size: 11, color: c.appMuted)),
-          const SizedBox(height: 4),
-          Row(children: [
-            Expanded(
-              child: Text(
-                  '산미 ${t.acidity} · 단맛 ${t.sweetness} · 바디 ${t.body} · 쓴맛 ${t.bitterness}',
-                  style: monoStyle(size: 11, color: c.espresso)),
-            ),
-            StarRating(value: t.overall.toDouble(), size: 12),
-          ]),
-          if (t.comment != null && t.comment!.isNotEmpty) ...[
+    return Dismissible(
+      key: ValueKey('tasting-${t.id}'),
+      direction: DismissDirection.endToStart,
+      background: const SwipeDeleteBackground(),
+      confirmDismiss: (_) async {
+        onDeleteTasting(t);   // 삭제 + Undo 스낵바
+        return false;         // 반응형 리빌드가 행 제거(assert 회피)
+      },
+      child: InkWell(
+        key: Key('tasting-row-${t.id}'),
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => TastingFormScreen(beanId: t.beanId, existing: t))),
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(color: c.cup, borderRadius: BorderRadius.circular(12), border: Border.all(color: c.appLine)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(t.date.toIso8601String().substring(0, 10), style: monoStyle(size: 11, color: c.appMuted)),
             const SizedBox(height: 4),
-            Text(t.comment!, style: TextStyle(fontSize: 12, color: c.espresso)),
-          ],
-        ]),
+            Row(children: [
+              Expanded(
+                child: Text(
+                    '산미 ${t.acidity} · 단맛 ${t.sweetness} · 바디 ${t.body} · 쓴맛 ${t.bitterness}',
+                    style: monoStyle(size: 11, color: c.espresso)),
+              ),
+              StarRating(value: t.overall.toDouble(), size: 12),
+            ]),
+            if (t.comment != null && t.comment!.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(t.comment!, style: TextStyle(fontSize: 12, color: c.espresso)),
+            ],
+          ]),
+        ),
       ),
     );
   }

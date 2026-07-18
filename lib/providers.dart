@@ -16,6 +16,7 @@ final beanListProvider = StreamProvider<List<BeanSummary>>(
   (ref) => ref.watch(beanRepositoryProvider).watchBeanSummaries(),
 );
 
-final beanDetailProvider = StreamProvider.family<BeanDetail?, int>(
+final beanDetailProvider =
+    StreamProvider.autoDispose.family<BeanDetail?, int>(
   (ref, beanId) => ref.watch(beanRepositoryProvider).watchBeanDetail(beanId),
 );

@@ -86,8 +86,14 @@ class BeanRepository {
   }
 
   Stream<BeanDetail?> watchBeanDetail(int beanId) {
-    return (db.select(db.beans)..where((b) => b.id.equals(beanId)))
-        .watchSingleOrNull()
-        .asyncMap((_) => getBeanDetail(beanId));
+    // beans/tastings/originComponents 어느 것이 바뀌어도 재방출되도록 셋을
+    // 조인으로 등록한다(행은 무시, getBeanDetail로 재조회). watchBeanSummaries와
+    // 같은 패턴.
+    final trigger = db.select(db.beans).join([
+      leftOuterJoin(db.tastings, db.tastings.beanId.equalsExp(db.beans.id)),
+      leftOuterJoin(db.originComponents,
+          db.originComponents.beanId.equalsExp(db.beans.id)),
+    ])..where(db.beans.id.equals(beanId));
+    return trigger.watch().asyncMap((_) => getBeanDetail(beanId));
   }
 }

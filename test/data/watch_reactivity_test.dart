@@ -1,5 +1,5 @@
+import 'package:async/async.dart';
 import 'package:beanprofile/data/database.dart';
-import 'package:beanprofile/data/models.dart';
 import 'package:flutter_test/flutter_test.dart';
 import '../helpers.dart';
 
@@ -10,12 +10,9 @@ void main() {
     final repo = testRepository(db);
     final id = await repo.createBean(sampleSingle());
 
-    // expectLater가 동기적으로 구독 → 이후 insert가 재방출을 유발해야 함.
-    final expectation = expectLater(
-      repo.watchBeanDetail(id),
-      emitsThrough(
-          predicate<BeanDetail?>((d) => d != null && d.tastings.length == 1)),
-    );
+    final queue = StreamQueue(repo.watchBeanDetail(id));
+    final first = await queue.next; // initial emission — deterministic
+    expect(first?.tastings, isEmpty);
 
     await db.into(db.tastings).insert(TastingsCompanion.insert(
           beanId: id, date: DateTime(2026, 7, 1),
@@ -23,7 +20,27 @@ void main() {
           createdAt: DateTime(2026, 7, 1),
         ));
 
-    await expectation;
+    final second = await queue.next; // only completes if watchBeanDetail RE-EMITS
+    expect(second?.tastings, hasLength(1));
+    await queue.cancel();
+  });
+
+  test('watchBeanDetail re-emits when an origin component is inserted', () async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    final repo = testRepository(db);
+    final id = await repo.createBean(sampleSingle()); // 구성 1개로 시작
+
+    final queue = StreamQueue(repo.watchBeanDetail(id));
+    final first = await queue.next;
+    expect(first?.components, hasLength(1));
+
+    await db.into(db.originComponents).insert(
+        OriginComponentsCompanion.insert(beanId: id, country: 'Kenya'));
+
+    final second = await queue.next; // only completes if watchBeanDetail RE-EMITS
+    expect(second?.components, hasLength(2));
+    await queue.cancel();
   });
 
   test('deleting a bean cascades to its tastings and components', () async {

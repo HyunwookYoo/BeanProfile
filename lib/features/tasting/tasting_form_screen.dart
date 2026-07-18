@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../data/database.dart';
 import '../../data/models.dart';
 import '../../providers.dart';
 import '../../theme.dart';
@@ -7,8 +8,9 @@ import 'widgets/intensity_selector.dart';
 import 'widgets/star_input.dart';
 
 class TastingFormScreen extends ConsumerStatefulWidget {
-  const TastingFormScreen({super.key, required this.beanId});
+  const TastingFormScreen({super.key, required this.beanId, this.existing});
   final int beanId;
+  final Tasting? existing;
   @override
   ConsumerState<TastingFormScreen> createState() => _TastingFormScreenState();
 }
@@ -18,6 +20,21 @@ class _TastingFormScreenState extends ConsumerState<TastingFormScreen> {
   int _acidity = 3, _sweetness = 3, _body = 3, _bitterness = 3, _overall = 3;
   final _comment = TextEditingController();
   bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final e = widget.existing;
+    if (e != null) {
+      _date = e.date;
+      _acidity = e.acidity;
+      _sweetness = e.sweetness;
+      _body = e.body;
+      _bitterness = e.bitterness;
+      _overall = e.overall;
+      _comment.text = e.comment ?? '';
+    }
+  }
 
   @override
   void dispose() {
@@ -34,7 +51,12 @@ class _TastingFormScreenState extends ConsumerState<TastingFormScreen> {
       comment: _comment.text.trim().isEmpty ? null : _comment.text.trim(),
     );
     try {
-      await ref.read(beanRepositoryProvider).createTasting(widget.beanId, input);
+      final repo = ref.read(beanRepositoryProvider);
+      if (widget.existing == null) {
+        await repo.createTasting(widget.beanId, input);
+      } else {
+        await repo.updateTasting(widget.existing!.id, input);
+      }
       if (mounted) Navigator.of(context).pop();
     } catch (_) {
       if (mounted) {
@@ -45,11 +67,45 @@ class _TastingFormScreenState extends ConsumerState<TastingFormScreen> {
     }
   }
 
+  Future<void> _confirmDelete() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('시음 기록 삭제'),
+        content: const Text('이 시음 기록을 삭제할까요?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('취소')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('삭제')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await ref.read(beanRepositoryProvider).deleteTasting(widget.existing!.id);
+      if (mounted) Navigator.of(context).pop();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('삭제에 실패했어요')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
     return Scaffold(
-      appBar: AppBar(title: const Text('시음 기록')),
+      appBar: AppBar(
+        title: Text(widget.existing == null ? '시음 기록' : '시음 편집'),
+        actions: [
+          if (widget.existing != null)
+            IconButton(
+              key: const Key('delete-tasting'),
+              icon: const Icon(Icons.delete_outline),
+              onPressed: _saving ? null : _confirmDelete,
+            ),
+        ],
+      ),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
         Row(children: [
           Expanded(

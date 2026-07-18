@@ -85,6 +85,23 @@ class BeanRepository {
         ));
   }
 
+  Future<void> updateTasting(int tastingId, TastingInput t) {
+    return (db.update(db.tastings)..where((x) => x.id.equals(tastingId)))
+        .write(TastingsCompanion(
+      date: Value(t.date),
+      acidity: Value(t.acidity),
+      sweetness: Value(t.sweetness),
+      body: Value(t.body),
+      bitterness: Value(t.bitterness),
+      overall: Value(t.overall),
+      comment: Value(t.comment),
+    ));
+  }
+
+  Future<void> deleteTasting(int tastingId) {
+    return (db.delete(db.tastings)..where((x) => x.id.equals(tastingId))).go();
+  }
+
   Future<BeanDetail?> getBeanDetail(int beanId) async {
     final bean = await (db.select(db.beans)..where((b) => b.id.equals(beanId)))
         .getSingleOrNull();

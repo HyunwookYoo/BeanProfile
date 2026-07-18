@@ -120,20 +120,26 @@ class _DetailBody extends StatelessWidget {
 
   Widget _tastingRow(BuildContext context, Tasting t) {
     final c = context.colors;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: c.cup, borderRadius: BorderRadius.circular(12), border: Border.all(color: c.appLine)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(t.date.toIso8601String().substring(0, 10), style: monoStyle(size: 11, color: c.appMuted)),
-        const SizedBox(height: 4),
-        Text('산미 ${t.acidity} · 단맛 ${t.sweetness} · 바디 ${t.body} · 쓴맛 ${t.bitterness} · 종합 ${t.overall}',
-            style: monoStyle(size: 11, color: c.espresso)),
-        if (t.comment != null && t.comment!.isNotEmpty) ...[
+    return InkWell(
+      key: Key('tasting-row-${t.id}'),
+      borderRadius: BorderRadius.circular(12),
+      onTap: () => Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => TastingFormScreen(beanId: t.beanId, existing: t))),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: c.cup, borderRadius: BorderRadius.circular(12), border: Border.all(color: c.appLine)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(t.date.toIso8601String().substring(0, 10), style: monoStyle(size: 11, color: c.appMuted)),
           const SizedBox(height: 4),
-          Text(t.comment!, style: TextStyle(fontSize: 12, color: c.espresso)),
-        ],
-      ]),
+          Text('산미 ${t.acidity} · 단맛 ${t.sweetness} · 바디 ${t.body} · 쓴맛 ${t.bitterness} · 종합 ${t.overall}',
+              style: monoStyle(size: 11, color: c.espresso)),
+          if (t.comment != null && t.comment!.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(t.comment!, style: TextStyle(fontSize: 12, color: c.espresso)),
+          ],
+        ]),
+      ),
     );
   }
 }

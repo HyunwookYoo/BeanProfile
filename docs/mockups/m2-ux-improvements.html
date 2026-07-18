@@ -1,0 +1,404 @@
+<title>BeanProfile — UX 개선 목업 (M2+)</title>
+<style>
+  :root{
+    --bg:#E7E1D6; --fg:#2B2019; --muted:#7A6F62; --line:#D6CEC0;
+    --surface:#F3EFE8; --surface-2:#EEE8DE; --accent:#A66A24; --accent-soft:#EAD9BE;
+    --shadow:0 18px 40px -18px rgba(60,42,24,.45), 0 4px 12px -6px rgba(60,42,24,.25);
+    /* app tokens — fixed across themes (phones are screenshots of the app's light theme) */
+    --espresso:#2B2019; --oat:#ECE6DB; --cup:#FCFBF8; --cup-2:#F4EFE6;
+    --crema:#B67B2E; --crema-ink:#8A5A18; --cherry:#9E3B2D;
+    --app-muted:#8C8172; --app-line:#E4DED2; --app-line-2:#EDE8DD;
+    --font-sans:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --font-mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){:root{
+    --bg:#1B1510; --fg:#EDE5D8; --muted:#9C9081; --line:#332A21;
+    --surface:#241D16; --surface-2:#2B231B; --accent:#D89A46; --accent-soft:#3A2C18;
+    --shadow:0 20px 46px -18px rgba(0,0,0,.7), 0 4px 14px -6px rgba(0,0,0,.5);
+  }}
+  :root[data-theme="light"]{
+    --bg:#E7E1D6; --fg:#2B2019; --muted:#7A6F62; --line:#D6CEC0;
+    --surface:#F3EFE8; --surface-2:#EEE8DE; --accent:#A66A24; --accent-soft:#EAD9BE;
+    --shadow:0 18px 40px -18px rgba(60,42,24,.45), 0 4px 12px -6px rgba(60,42,24,.25);
+  }
+  :root[data-theme="dark"]{
+    --bg:#1B1510; --fg:#EDE5D8; --muted:#9C9081; --line:#332A21;
+    --surface:#241D16; --surface-2:#2B231B; --accent:#D89A46; --accent-soft:#3A2C18;
+    --shadow:0 20px 46px -18px rgba(0,0,0,.7), 0 4px 14px -6px rgba(0,0,0,.5);
+  }
+
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-sans);
+    -webkit-font-smoothing:antialiased;line-height:1.5}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+  .board{max-width:1240px;margin:0 auto;padding:40px 24px 72px}
+  .head-eyebrow{font-family:var(--font-mono);font-size:12px;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--accent);margin:0 0 10px}
+  .head-title{font-size:clamp(26px,4vw,40px);font-weight:800;letter-spacing:-.025em;margin:0;text-wrap:balance}
+  .head-sub{color:var(--muted);max-width:64ch;margin:12px 0 0;font-size:15px}
+
+  .legend{display:flex;flex-wrap:wrap;gap:8px 18px;margin:22px 0 4px;
+    padding:14px 16px;background:var(--surface);border:1px solid var(--line);border-radius:14px}
+  .legend b{font-weight:700}
+  .legend span{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
+  .sw{width:13px;height:13px;border-radius:4px;display:inline-block;flex:none}
+
+  .screens{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));
+    gap:14px 20px;margin-top:26px;justify-items:center}
+  .screen-card{width:100%;max-width:360px;display:flex;flex-direction:column;align-items:center}
+  .screen-head{width:100%;display:flex;align-items:baseline;gap:10px;margin:0 4px 12px}
+  .screen-idx{font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--accent)}
+  .screen-name{font-weight:700;font-size:16px}
+  .screen-cap{width:100%;margin:14px 4px 8px;color:var(--muted);font-size:12.5px}
+  .screen-cap li{margin:3px 0}.screen-cap ul{margin:6px 0 0;padding-left:16px}
+  .screen-cap .k{color:var(--fg);font-weight:600}
+  .screen-cap .rec{color:var(--accent);font-weight:700}
+
+  .phone{width:320px;height:664px;border-radius:40px;background:#0d0a07;
+    padding:9px;box-shadow:var(--shadow);flex:none;position:relative}
+  .screen{position:relative;width:100%;height:100%;border-radius:32px;overflow:hidden;
+    background:var(--oat);color:var(--espresso);display:flex;flex-direction:column;font-size:14px}
+  .statusbar{height:34px;flex:none;display:flex;align-items:center;justify-content:space-between;
+    padding:0 20px;font-family:var(--font-mono);font-size:12px;font-weight:600;color:var(--espresso)}
+  .statusbar .dots{display:flex;gap:4px;align-items:center}
+  .statusbar .dots i{width:6px;height:6px;border-radius:50%;background:var(--espresso);opacity:.55}
+  .appbar{flex:none;display:flex;align-items:center;gap:10px;padding:6px 16px 12px}
+  .appbar h1{font-size:20px;font-weight:800;letter-spacing:-.02em;margin:0;flex:1}
+  .appbar .sub{font-family:var(--font-mono);font-size:11px;color:var(--app-muted);font-weight:600}
+  .iconbtn{width:34px;height:34px;border-radius:11px;border:1px solid var(--app-line);
+    background:var(--cup);display:flex;align-items:center;justify-content:center;color:var(--espresso);flex:none}
+  .iconbtn.ghost{border:none;background:transparent}
+  .body{flex:1;overflow:hidden;padding:0 16px;position:relative}
+  svg{display:block}
+  .ico{width:18px;height:18px;stroke:currentColor;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round}
+
+  /* bean list card */
+  .bean{display:flex;gap:12px;padding:12px;border-radius:16px;background:var(--cup);
+    border:1px solid var(--app-line)}
+  .thumb{width:52px;height:64px;border-radius:10px;flex:none;
+    background:linear-gradient(150deg,#c9a15f,#7c5a2c 60%,#4b3618);position:relative;overflow:hidden}
+  .thumb::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 50% 30%,rgba(255,255,255,.28),transparent 55%)}
+  .bean .info{flex:1;min-width:0}
+  .bean .nm{font-weight:700;font-size:14.5px;letter-spacing:-.01em;line-height:1.25}
+  .bean .ro{font-size:11.5px;color:var(--app-muted);margin-top:1px}
+  .bean .meta{display:flex;align-items:center;gap:8px;margin-top:7px;flex-wrap:wrap}
+  .badge{font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:6px;background:#e7ded0;color:#6b5836;font-family:var(--font-mono)}
+  .notechips{display:flex;gap:5px;margin-top:8px;flex-wrap:wrap}
+  .nchip{font-size:10.5px;padding:2px 8px;border-radius:999px;background:var(--cup-2);border:1px solid var(--app-line-2);color:#6b6053}
+  .stars{color:var(--crema);letter-spacing:1px;font-size:13px}
+  .stars .e{color:#d9cdb8}
+  .rate{display:inline-flex;align-items:center;gap:5px}
+  .rate b{font-family:var(--font-mono);font-size:12.5px;font-weight:700}
+  .count{font-family:var(--font-mono);font-size:11px;color:var(--app-muted)}
+
+  /* detail tasting log */
+  .divlabel{display:flex;align-items:center;justify-content:space-between;margin:4px 2px 10px}
+  .divlabel .t{font-weight:700;font-size:13.5px}
+  .addbtn{font-size:11.5px;font-weight:700;color:var(--crema);display:inline-flex;align-items:center;gap:4px}
+  .tlog{background:var(--cup);border:1px solid var(--app-line);border-radius:13px;padding:10px 12px}
+  .tlog .top{display:flex;align-items:center;justify-content:space-between}
+  .tlog .dt{font-family:var(--font-mono);font-size:11.5px;color:var(--app-muted);font-weight:600}
+  .tlog .ax{display:flex;gap:9px;margin-top:7px;font-family:var(--font-mono);font-size:10.5px;color:#6b6053}
+  .tlog .ax b{color:var(--espresso)}
+  .tlog .cm{font-size:11.5px;color:#6b6053;margin-top:7px}
+
+  /* tasting form bits */
+  .sectlabel{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--app-muted);margin:2px 0 9px;font-weight:700}
+  .axrow{margin-bottom:13px}
+  .axrow .lab{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+  .axrow .lab .nm{font-weight:700;font-size:13px}
+  .axrow .lab .vl{font-family:var(--font-mono);font-size:11px;color:var(--app-muted)}
+  .dots5{display:flex;gap:7px}
+  .dots5 i{flex:1;height:9px;border-radius:5px;background:var(--app-line)}
+  .dots5 i.on{background:var(--crema)}
+  .commentbox{background:var(--cup);border:2px solid var(--crema);border-radius:12px;
+    padding:10px 12px;font-size:12.5px;color:var(--espresso);min-height:58px;position:relative}
+  .commentbox .caret{display:inline-block;width:1.5px;height:15px;background:var(--crema);vertical-align:-2px;margin-left:1px}
+
+  /* ---- NEW: swipe-to-delete ---- */
+  .swipe{position:relative;margin-bottom:10px;border-radius:16px}
+  .swipe .under{position:absolute;inset:0;background:var(--cherry);border-radius:16px;
+    display:flex;align-items:center;justify-content:flex-end;padding-right:22px;gap:7px;color:#fff;font-weight:700;font-size:13px}
+  .swipe .under .ico{stroke:#fff;width:20px;height:20px}
+  .swipe .over{position:relative;transform:translateX(-88px);box-shadow:-10px 0 18px -10px rgba(60,42,24,.45);border-radius:16px}
+  .swipe .over.log{border-radius:13px}
+
+  /* ---- NEW: undo snackbar ---- */
+  .snackbar{position:absolute;left:12px;right:12px;bottom:14px;background:#33291f;color:#f2ead9;
+    border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:10px;font-size:12.5px;
+    box-shadow:0 12px 26px -8px rgba(0,0,0,.5);z-index:5}
+  .snackbar .u{margin-left:auto;color:var(--crema);font-weight:800;letter-spacing:.02em}
+
+  /* ---- NEW: confirm dialog ---- */
+  .scrim{position:absolute;inset:0;background:rgba(30,22,14,.44);display:flex;align-items:center;justify-content:center;padding:22px;z-index:6}
+  .dialog{background:var(--cup);border-radius:18px;padding:18px 16px 12px;width:100%;box-shadow:0 24px 50px -18px rgba(0,0,0,.55)}
+  .dialog h3{margin:0 0 8px;font-size:15px;font-weight:800;color:var(--espresso)}
+  .dialog p{margin:0 0 14px;font-size:12.5px;color:var(--app-muted);line-height:1.5}
+  .dialog .acts{display:flex;justify-content:flex-end;gap:4px}
+  .dialog .acts b{font-weight:700;font-size:13px;padding:8px 12px;border-radius:9px;color:var(--app-muted)}
+  .dialog .acts b.danger{color:var(--cherry)}
+
+  /* ---- NEW: long-press bottom sheet ---- */
+  .sheet{position:absolute;left:0;right:0;bottom:0;background:var(--cup);border-radius:20px 20px 0 0;
+    padding:8px 12px 18px;box-shadow:0 -14px 34px -14px rgba(0,0,0,.4);z-index:6}
+  .sheet .grab{width:38px;height:4px;border-radius:2px;background:var(--app-line);margin:6px auto 8px}
+  .sheet .head{font-size:11.5px;color:var(--app-muted);padding:2px 8px 6px;font-weight:700}
+  .sheet .row{display:flex;align-items:center;gap:12px;padding:12px 8px;font-size:14px;font-weight:600;border-radius:10px;color:var(--espresso)}
+  .sheet .row .ico{width:19px;height:19px;color:var(--espresso)}
+  .sheet .row.danger{color:var(--cherry)}
+  .sheet .row.danger .ico{stroke:var(--cherry)}
+
+  /* ---- NEW: keyboard + accessory bar ---- */
+  .kbbar{flex:none;display:flex;justify-content:space-between;align-items:center;padding:7px 14px;
+    background:var(--surface-2);border-top:1px solid var(--app-line)}
+  .kbbar .hint{font-size:11px;color:var(--app-muted)}
+  .kbbar .done{color:var(--crema);font-weight:800;font-size:13.5px}
+  .keyboard{flex:none;background:#cfc8bc;padding:7px 4px 9px;display:flex;flex-direction:column;gap:6px}
+  .kbrow{display:flex;gap:5px;justify-content:center;padding:0 3px}
+  .key{background:#fbfaf8;border-radius:5px;height:28px;flex:1;box-shadow:0 1px 0 rgba(0,0,0,.28);
+    display:flex;align-items:center;justify-content:center;font-size:11.5px;color:#2b2019}
+  .key.dark{background:#a9a096;color:#fff;flex:.7}
+  .key.space{flex:4}
+
+  /* on-phone annotation pins */
+  .pin{position:absolute;background:var(--espresso);color:var(--oat);font-size:10.5px;font-weight:700;
+    padding:4px 9px;border-radius:999px;z-index:7;box-shadow:0 5px 12px -4px rgba(0,0,0,.5);display:inline-flex;gap:5px;align-items:center}
+  .pin.crema{background:var(--crema);color:#fff}
+  .pin .n{font-family:var(--font-mono)}
+
+  .tapzone{position:absolute;left:16px;right:16px;top:150px;height:120px;border:1.5px dashed var(--crema);
+    border-radius:14px;display:flex;align-items:center;justify-content:center;color:var(--crema-ink);
+    font-size:11.5px;font-weight:700;background:rgba(182,123,46,.06);z-index:4;text-align:center}
+
+  .decide{margin-top:34px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px 22px}
+  .decide h2{margin:0 0 4px;font-size:19px;font-weight:800;letter-spacing:-.02em}
+  .decide .qs{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-top:16px}
+  .qcard{background:var(--surface-2);border:1px solid var(--line);border-radius:13px;padding:14px 15px}
+  .qcard .qn{font-family:var(--font-mono);font-size:11px;color:var(--accent);font-weight:700;letter-spacing:.1em}
+  .qcard .qt{font-weight:700;font-size:14px;margin:4px 0 8px}
+  .qcard ul{margin:0;padding-left:16px;font-size:12.5px;color:var(--muted)}
+  .qcard li{margin:4px 0}
+  .qcard .rec{color:var(--accent);font-weight:700}
+
+  .board-foot{margin-top:28px;color:var(--muted);font-size:12.5px;border-top:1px solid var(--line);padding-top:16px;max-width:74ch}
+  .board-foot code{font-family:var(--font-mono);background:var(--surface);padding:1px 6px;border-radius:5px}
+</style>
+
+<div class="board">
+  <header>
+    <p class="head-eyebrow">BeanProfile · UX 개선 · M2+</p>
+    <h1 class="head-title">키보드 내리기 · 스와이프/롱프레스 삭제</h1>
+    <p class="head-sub">기존 v1 목업(커핑 랩 노트)의 톤을 그대로 이어, 이번엔 <b>인터랙션 상태</b>를 그렸습니다. 정적 화면이 아니라 "손가락이 닿았을 때 무엇이 일어나는가"를 비교하기 위한 것 — 각 폰 아래 결정 포인트와 하단 질문에서 방향을 골라 주세요.</p>
+  </header>
+
+  <div class="legend">
+    <span><i class="sw" style="background:var(--crema)"></i><b>크레마 앰버</b> = 강조·활성·별점</span>
+    <span><i class="sw" style="background:var(--cherry)"></i><b>체리 레드</b> = 삭제(파괴적 동작)</span>
+    <span><i class="sw" style="background:#33291f"></i>스낵바 = <b>실행취소</b> 가능한 삭제</span>
+    <span><i class="sw" style="background:var(--espresso)"></i>핀 = 동작 설명</span>
+  </div>
+
+  <section class="screens">
+
+    <!-- 1. 키보드 내리기 -->
+    <article class="screen-card">
+      <div class="screen-head"><span class="screen-idx">01</span><span class="screen-name">키보드 내리기</span></div>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i></span></div>
+        <div class="appbar">
+          <button class="iconbtn ghost" aria-label="닫기"><svg class="ico" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+          <div style="flex:1"><h1 style="font-size:18px">시음 기록</h1><div class="sub">예가체프 코체레</div></div>
+        </div>
+        <div class="body">
+          <div class="tapzone">빈 곳 탭 · 위로 스크롤<br>→ 키보드 내려감</div>
+          <div class="sectlabel">종합 만족도</div>
+          <div style="font-size:26px;letter-spacing:5px;color:var(--crema);margin-bottom:12px">★★★★<span style="color:#dccfb8">★</span></div>
+          <div class="sectlabel">코멘트</div>
+          <div class="commentbox">밝고 깔끔. 홍차 여운<span class="caret"></span></div>
+        </div>
+        <div class="kbbar">
+          <span class="hint">여러 줄 입력 — 리턴은 줄바꿈</span>
+          <span class="done">완료 ▾</span>
+        </div>
+        <div class="keyboard">
+          <div class="kbrow"><span class="key">ㅂ</span><span class="key">ㅈ</span><span class="key">ㄷ</span><span class="key">ㄱ</span><span class="key">ㅅ</span><span class="key">ㅛ</span><span class="key">ㅕ</span><span class="key">ㅑ</span><span class="key">ㅐ</span><span class="key">ㅔ</span></div>
+          <div class="kbrow"><span class="key">ㅁ</span><span class="key">ㄴ</span><span class="key">ㅇ</span><span class="key">ㄹ</span><span class="key">ㅎ</span><span class="key">ㅗ</span><span class="key">ㅓ</span><span class="key">ㅏ</span><span class="key">ㅣ</span></div>
+          <div class="kbrow"><span class="key dark">⇧</span><span class="key">ㅋ</span><span class="key">ㅌ</span><span class="key">ㅊ</span><span class="key">ㅍ</span><span class="key">ㅠ</span><span class="key">ㅜ</span><span class="key">ㅡ</span><span class="key dark">⌫</span></div>
+          <div class="kbrow"><span class="key dark">123</span><span class="key space">space</span><span class="key dark">return</span></div>
+        </div>
+      </div></div>
+      <div class="screen-cap"><span class="k">문제</span> 멀티라인(코멘트·메모)·숫자(비율%) 키보드엔 완료 키가 없어 못 내림.
+        <ul>
+          <li><span class="rec">기본(추천):</span> 빈 곳 탭 → 내림 + 위로 스크롤 → 내림 (2줄, 모든 필드 커버)</li>
+          <li><span class="k">추가:</span> 키보드 위 <span class="k">완료 바</span> · 별점/도트/날짜 탭 시 자동 내림</li>
+        </ul>
+      </div>
+    </article>
+
+    <!-- 2. 시음 카드 스와이프 + Undo -->
+    <article class="screen-card">
+      <div class="screen-head"><span class="screen-idx">02</span><span class="screen-name">시음 카드 — 스와이프 삭제 + 실행취소</span></div>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i></span></div>
+        <div class="appbar">
+          <button class="iconbtn ghost" aria-label="뒤로"><svg class="ico" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+          <h1 style="font-size:17px;flex:1">원두 상세</h1>
+          <button class="iconbtn ghost" aria-label="편집"><svg class="ico" viewBox="0 0 24 24"><path d="M4 20h4L18 10l-4-4L4 16z"/><path d="M13 7l4 4"/></svg></button>
+        </div>
+        <div class="body">
+          <div class="divlabel"><span class="t">시음 기록 · 6</span><span class="count">평균 ★4.5</span></div>
+
+          <div class="swipe">
+            <div class="under"><svg class="ico" viewBox="0 0 24 24"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg>삭제</div>
+            <div class="over log"><div class="tlog">
+              <div class="top"><span class="dt">07-10</span><span class="stars">★★★★<span class="e">★</span></span></div>
+              <div class="ax">산미 <b>4</b> · 단맛 <b>3</b> · 바디 <b>2</b> · 쓴맛 <b>2</b></div>
+              <div class="cm">"밝고 깔끔. 식으면서 홍차 여운이 길게."</div>
+            </div></div>
+          </div>
+
+          <div class="tlog" style="margin-bottom:8px">
+            <div class="top"><span class="dt">07-06</span><span class="stars">★★★★<span class="e">★</span></span></div>
+            <div class="ax">산미 <b>4</b> · 단맛 <b>4</b> · 바디 <b>3</b> · 쓴맛 <b>2</b></div>
+          </div>
+
+          <div class="pin crema" style="right:26px;top:118px"><span class="n">←</span> 밀면 삭제</div>
+        </div>
+        <div class="snackbar">시음 기록을 삭제했어요<span class="u">실행취소</span></div>
+      </div></div>
+      <div class="screen-cap"><span class="k">동작</span> 행을 왼쪽으로 밀면 빨간 삭제가 드러나고, 떼면 즉시 삭제.
+        <ul>
+          <li><span class="rec">추천:</span> 다이얼로그 없이 <span class="k">Undo 스낵바(4초)</span> — 시음은 되살리기 쉬워(재삽입) 마찰 최소화</li>
+          <li>탭(→편집)과 충돌 없음: 세로 탭 / 가로 스와이프 구분</li>
+        </ul>
+      </div>
+    </article>
+
+    <!-- 3. 원두 카드 스와이프 + 확인 -->
+    <article class="screen-card">
+      <div class="screen-head"><span class="screen-idx">03</span><span class="screen-name">원두 카드 — 스와이프 삭제 + 확인</span></div>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i></span></div>
+        <div class="appbar"><div style="flex:1"><h1>내 원두</h1><div class="sub">24 원두 · 68 시음</div></div>
+          <button class="iconbtn" aria-label="검색"><svg class="ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg></button>
+        </div>
+        <div class="body">
+          <div class="swipe">
+            <div class="under"><svg class="ico" viewBox="0 0 24 24"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg>삭제</div>
+            <div class="over"><div class="bean">
+              <div class="thumb"></div>
+              <div class="info">
+                <div class="nm">에티오피아 예가체프 코체레</div>
+                <div class="ro">프릳츠 커피 · 워시드</div>
+                <div class="meta"><span class="rate"><span class="stars">★★★★<span class="e">★</span></span><b>4.5</b></span><span class="count">시음 6</span></div>
+              </div>
+            </div></div>
+          </div>
+
+          <div class="bean" style="margin-bottom:10px">
+            <div class="thumb"></div>
+            <div class="info">
+              <div class="nm">수프리모 하우스 블렌드</div>
+              <div class="ro">테라로사</div>
+              <div class="meta"><span class="badge">BLEND</span><span class="rate"><span class="stars">★★★★<span class="e">★</span></span><b>3.8</b></span><span class="count">시음 4</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="scrim">
+          <div class="dialog">
+            <h3>원두 삭제</h3>
+            <p>이 원두와 <b>모든 시음 기록 6건</b>이 삭제됩니다. 되돌릴 수 없어요.</p>
+            <div class="acts"><b>취소</b><b class="danger">삭제</b></div>
+          </div>
+        </div>
+      </div></div>
+      <div class="screen-cap"><span class="k">동작</span> 밀면 삭제가 드러나고, 떼면 <span class="k">확인 다이얼로그</span>.
+        <ul>
+          <li><span class="rec">추천:</span> 원두 삭제는 시음까지 <span class="k">연쇄 삭제(파괴적)</span> → Undo보다 확인이 안전 (기존 다이얼로그 재사용)</li>
+          <li>대안: 원두도 Undo로 통일(전체 복원 로직 추가 필요)</li>
+        </ul>
+      </div>
+    </article>
+
+    <!-- 4. 롱프레스 대안 -->
+    <article class="screen-card">
+      <div class="screen-head"><span class="screen-idx">04</span><span class="screen-name">대안 — 롱프레스 메뉴</span></div>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i></span></div>
+        <div class="appbar"><div style="flex:1"><h1>내 원두</h1><div class="sub">24 원두 · 68 시음</div></div>
+          <button class="iconbtn" aria-label="검색"><svg class="ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg></button>
+        </div>
+        <div class="body">
+          <div class="bean" style="margin-bottom:10px;outline:2px solid var(--crema);outline-offset:2px">
+            <div class="thumb"></div>
+            <div class="info">
+              <div class="nm">에티오피아 예가체프 코체레</div>
+              <div class="ro">프릳츠 커피 · 워시드</div>
+              <div class="meta"><span class="rate"><span class="stars">★★★★<span class="e">★</span></span><b>4.5</b></span><span class="count">시음 6</span></div>
+            </div>
+          </div>
+          <div class="bean">
+            <div class="thumb"></div>
+            <div class="info">
+              <div class="nm">콜롬비아 핑크 버번 내추럴</div>
+              <div class="ro">모모스 커피 · 내추럴</div>
+              <div class="meta"><span class="rate"><span class="stars">★★★★★</span><b>4.7</b></span><span class="count">시음 2</span></div>
+            </div>
+          </div>
+          <div class="pin" style="left:24px;top:96px">꾹 누름 (롱프레스)</div>
+        </div>
+        <div class="scrim" style="align-items:flex-end;padding:0">
+          <div class="sheet">
+            <div class="grab"></div>
+            <div class="head">예가체프 코체레</div>
+            <div class="row"><svg class="ico" viewBox="0 0 24 24"><path d="M4 20h4L18 10l-4-4L4 16z"/><path d="M13 7l4 4"/></svg>편집</div>
+            <div class="row danger"><svg class="ico" viewBox="0 0 24 24"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg>삭제</div>
+          </div>
+        </div>
+      </div></div>
+      <div class="screen-cap"><span class="k">동작</span> 카드를 꾹 누르면 <span class="k">액션 시트</span>(편집·삭제).
+        <ul>
+          <li>스와이프의 <span class="k">대안 또는 보완</span> — 여러 동작을 담기 좋음(편집도 노출)</li>
+          <li>스와이프가 더 발견성 높음 · 롱프레스는 우발적 실행 적음</li>
+        </ul>
+      </div>
+    </article>
+
+  </section>
+
+  <div class="decide">
+    <h2>정할 것 — 방향 3가지</h2>
+    <div class="qs">
+      <div class="qcard">
+        <div class="qn">Q1 · 키보드</div>
+        <div class="qt">어떻게 내릴까?</div>
+        <ul>
+          <li><span class="rec">A(추천):</span> 빈 곳 탭 + 스크롤로 내림 (범용·저비용)</li>
+          <li>B: A + 별점/도트/날짜 탭 시 자동 내림</li>
+          <li>C: 키보드 위 "완료" 바까지</li>
+        </ul>
+      </div>
+      <div class="qcard">
+        <div class="qn">Q2 · 삭제 제스처</div>
+        <div class="qt">스와이프 vs 롱프레스</div>
+        <ul>
+          <li><span class="rec">A(추천):</span> 스와이프-삭제 (양쪽 카드)</li>
+          <li>B: 롱프레스 시트만</li>
+          <li>C: 둘 다</li>
+        </ul>
+      </div>
+      <div class="qcard">
+        <div class="qn">Q3 · 확인 방식</div>
+        <div class="qt">Undo vs 다이얼로그</div>
+        <ul>
+          <li><span class="rec">A(추천):</span> 시음=Undo 스낵바 / 원두=확인 다이얼로그</li>
+          <li>B: 둘 다 Undo (원두 전체복원 로직 추가)</li>
+          <li>C: 둘 다 확인 다이얼로그</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <p class="board-foot">소스: <code>docs/mockups/m2-ux-improvements.html</code>. 이 목업은 <b>방향 확정용</b>입니다 — 위 Q1~Q3을 고르면(추천 조합: <b>A·A·A</b>) 그대로 설계 스펙 → 구현 계획(SDD)으로 넘어갑니다. 범위상 M2에 붙는 후속(M2.1)로 볼지, 다음 마일스톤에 포함할지도 함께 정해요.</p>
+</div>

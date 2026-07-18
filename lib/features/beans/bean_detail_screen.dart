@@ -6,6 +6,7 @@ import '../../data/models.dart';
 import '../../providers.dart';
 import '../../theme.dart';
 import '../tasting/tasting_form_screen.dart';
+import 'bean_form_screen.dart';
 
 class BeanDetailScreen extends ConsumerWidget {
   const BeanDetailScreen({super.key, required this.beanId});
@@ -14,9 +15,21 @@ class BeanDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(beanDetailProvider(beanId));
+    final detail = async.value;
     final c = context.colors;
     return Scaffold(
-      appBar: AppBar(title: const Text('원두 상세')),
+      appBar: AppBar(
+        title: const Text('원두 상세'),
+        actions: [
+          if (detail != null)
+            IconButton(
+              key: const Key('edit-bean'),
+              icon: const Icon(Icons.edit_outlined),
+              onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => BeanFormScreen(existing: detail))),
+            ),
+        ],
+      ),
       body: async.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('오류: $e')),

@@ -37,6 +37,38 @@ class BeanRepository {
     });
   }
 
+  Future<void> updateBean(int beanId, BeanInput input) {
+    return db.transaction(() async {
+      await (db.update(db.beans)..where((b) => b.id.equals(beanId))).write(
+        BeansCompanion(
+          name: Value(input.name),
+          roaster: Value(input.roaster),
+          type: Value(input.type),
+          roastLevel: Value(input.roastLevel),
+          roastDate: Value(input.roastDate),
+          cupNotes: Value(input.cupNotes),
+          memo: Value(input.memo),
+        ),
+      );
+      await (db.delete(db.originComponents)..where((c) => c.beanId.equals(beanId)))
+          .go();
+      for (final c in input.components) {
+        await db.into(db.originComponents).insert(
+              OriginComponentsCompanion.insert(
+                beanId: beanId,
+                country: c.country,
+                region: Value(c.region),
+                farm: Value(c.farm),
+                variety: Value(c.variety),
+                process: Value(c.process),
+                altitude: Value(c.altitude),
+                ratioPercent: Value(c.ratioPercent),
+              ),
+            );
+      }
+    });
+  }
+
   Stream<List<BeanSummary>> watchBeanSummaries() {
     final avg = db.tastings.overall.avg();
     final cnt = db.tastings.id.count();

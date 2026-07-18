@@ -6,7 +6,8 @@ import '../../providers.dart';
 import '../../theme.dart';
 
 class BeanFormScreen extends ConsumerStatefulWidget {
-  const BeanFormScreen({super.key});
+  const BeanFormScreen({super.key, this.existing});
+  final BeanDetail? existing;
   @override
   ConsumerState<BeanFormScreen> createState() => _BeanFormScreenState();
 }
@@ -29,6 +30,35 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
   DateTime? _roastDate;
   final _components = [_ComponentDraft()];
   bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final e = widget.existing;
+    if (e != null) {
+      _name.text = e.bean.name;
+      _roaster.text = e.bean.roaster;
+      _cupNotes.text = e.bean.cupNotes.join(', ');
+      _memo.text = e.bean.memo ?? '';
+      _type = e.bean.type;
+      _roast = e.bean.roastLevel;
+      _roastDate = e.bean.roastDate;
+      for (final c in _components) {
+        c.dispose();
+      }
+      _components
+        ..clear()
+        ..addAll(e.components.map((comp) {
+          final d = _ComponentDraft();
+          d.country.text = comp.country;
+          d.region.text = comp.region ?? '';
+          d.process = comp.process;
+          d.ratio.text = comp.ratioPercent?.toString() ?? '';
+          return d;
+        }));
+      if (_components.isEmpty) _components.add(_ComponentDraft());
+    }
+  }
 
   @override
   void dispose() {
@@ -69,15 +99,28 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
             ),
       ],
     );
-    await ref.read(beanRepositoryProvider).createBean(input);
-    if (mounted) Navigator.of(context).pop();
+    try {
+      final repo = ref.read(beanRepositoryProvider);
+      if (widget.existing == null) {
+        await repo.createBean(input);
+      } else {
+        await repo.updateBean(widget.existing!.bean.id, input);
+      }
+      if (mounted) Navigator.of(context).pop();
+    } catch (_) {
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('저장에 실패했어요. 다시 시도해 주세요')));
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
     return Scaffold(
-      appBar: AppBar(title: const Text('원두 추가')),
+      appBar: AppBar(title: Text(widget.existing == null ? '원두 추가' : '원두 편집')),
       body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
         TextField(key: const Key('field-name'), controller: _name,
             decoration: const InputDecoration(labelText: '제품명 *')),

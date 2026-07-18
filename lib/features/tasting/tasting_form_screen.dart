@@ -106,7 +106,13 @@ class _TastingFormScreenState extends ConsumerState<TastingFormScreen> {
             ),
         ],
       ),
-      body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: ListView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          children: [
         Row(children: [
           Expanded(
             child: Text('시음일 ${_date.toIso8601String().substring(0, 10)}',
@@ -140,7 +146,9 @@ class _TastingFormScreenState extends ConsumerState<TastingFormScreen> {
           maxLines: 3,
           decoration: const InputDecoration(labelText: '코멘트'),
         ),
-      ]),
+          ],
+        ),
+      ),
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),

@@ -121,7 +121,13 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
     final c = context.colors;
     return Scaffold(
       appBar: AppBar(title: Text(widget.existing == null ? '원두 추가' : '원두 편집')),
-      body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: ListView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          children: [
         TextField(key: const Key('field-name'), controller: _name,
             decoration: const InputDecoration(labelText: '제품명 *')),
         const SizedBox(height: 10),
@@ -169,7 +175,9 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
             decoration: const InputDecoration(labelText: '컵노트 (쉼표로 구분)', hintText: '블루베리, 자스민, 홍차')),
         const SizedBox(height: 10),
         TextField(controller: _memo, maxLines: 3, decoration: const InputDecoration(labelText: '메모')),
-      ]),
+          ],
+        ),
+      ),
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),

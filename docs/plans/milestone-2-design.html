@@ -1,0 +1,155 @@
+<title>☕ BeanProfile — M2 설계: 원두 편집/삭제 &amp; 시음 기록</title>
+<style>
+*{box-sizing:border-box}
+:root{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+  --font-sans:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Consolas,"Malgun Gothic",monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}}
+:root[data-theme="light"]{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+}
+:root[data-theme="dark"]{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-sans);line-height:1.7;-webkit-font-smoothing:antialiased}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.doc{max-width:880px;margin:0 auto;padding:44px 24px 96px}
+.crumb{font-family:var(--font-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:16px}
+h1{font-size:clamp(26px,4vw,38px);font-weight:800;letter-spacing:-.025em;line-height:1.2;margin:.1em 0 .5em;text-wrap:balance}
+h2{font-size:22px;font-weight:700;margin:2em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line);letter-spacing:-.01em;text-wrap:balance}
+h3{font-size:16.5px;font-weight:700;color:var(--accent-ink);margin:1.7em 0 .5em}
+h4{font-size:14px;font-weight:700;margin:1.3em 0 .4em}
+p{margin:.7em 0}
+a{color:var(--accent);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+strong{font-weight:700;color:var(--fg)}
+hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+code.ic{font-family:var(--font-mono);font-size:.85em;background:var(--ic-bg);color:var(--ic-fg);padding:1.5px 6px;border-radius:6px}
+pre.code{position:relative;background:var(--code-bg);color:var(--code-fg);border-radius:12px;padding:16px 18px;margin:1em 0;overflow-x:auto;border:1px solid rgba(0,0,0,.28)}
+pre.code code{font-family:var(--font-mono);font-size:12.75px;line-height:1.6;white-space:pre;color:inherit;background:none;padding:0}
+pre.code[data-lang]::before{content:attr(data-lang);position:absolute;top:9px;right:13px;font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(236,227,211,.42)}
+.tablewrap{overflow-x:auto;margin:1.1em 0}
+table{border-collapse:collapse;width:100%;font-size:13.75px}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--th);font-weight:700}
+tbody tr:nth-child(even){background:var(--surface)}
+blockquote{margin:1.1em 0;padding:11px 16px;border-left:3px solid var(--accent);background:var(--surface);border-radius:0 10px 10px 0;color:var(--muted)}
+blockquote strong{color:var(--fg)}
+ul,ol{margin:.7em 0;padding-left:1.4em}
+li{margin:.32em 0}
+ul.tasklist{list-style:none;padding-left:.15em}
+ul.tasklist li.task{position:relative;padding-left:30px;margin:.5em 0}
+ul.tasklist li.task::before{content:"";position:absolute;left:0;top:.18em;width:17px;height:17px;border:2px solid var(--accent);border-radius:5px;background:transparent}
+ul.tasklist li.task.done::before{content:"\2713";background:var(--accent);color:#fff;font-size:12px;font-weight:800;text-align:center;line-height:15px}
+</style>
+<article class="doc"><div class="crumb">BeanProfile · docs/plans</div>
+<h1>☕ BeanProfile — M2 설계: 원두 편집/삭제 &amp; 시음 기록</h1>
+<div class="tablewrap"><table><thead><tr><th>항목</th><th>내용</th></tr></thead><tbody><tr><td>작성일</td><td>2026-07-18</td></tr><tr><td>상태</td><td>설계 승인 (브레인스토밍) → 구현 계획(writing-plans) 대기</td></tr><tr><td>마일스톤</td><td>M2</td></tr><tr><td>선행</td><td>M1 (원두 추가/조회) <strong>DONE</strong> · <code class="ic">v0.1.0</code></td></tr><tr><td>상위 문서</td><td>설계 <a href="../design.md"><code class="ic">../design.md</code></a> · 로드맵 <a href="roadmap.md"><code class="ic">roadmap.md</code></a> · 목업 <a href="../mockups/ui-mockup-v1.html"><code class="ic">../mockups/ui-mockup-v1.html</code></a> · 테스트 <a href="../testing.md"><code class="ic">../testing.md</code></a></td></tr></tbody></table></div>
+<hr>
+<h2>1. 목표 &amp; 범위</h2>
+<p>M2 완료 시 동작하는 것: <strong>원두 편집·삭제</strong> · <strong>시음 완전 CRUD</strong>(강도 4축 + 종합 별점 + 코멘트) · 상세 화면의 시음 리스트 · <strong>평균 별점</strong> 표시.</p>
+<h3>확정 범위 (브레인스토밍 2026-07-18)</h3>
+<div class="tablewrap"><table><thead><tr><th>결정</th><th>선택</th></tr></thead><tbody><tr><td>시음(Tasting) 범위</td><td><strong>완전 CRUD</strong> (생성·수정·삭제). 원두와 대칭이고 저널 앱 실사용에 필요</td></tr><tr><td>원두 편집 범위</td><td><strong>원두 필드 + 구성(OriginComponent) 전체</strong>. 추가 폼 재사용 + 구성 전체 교체</td></tr></tbody></table></div>
+<p>M1에서 이미 완료되어 M2가 <strong>재사용</strong>하는 것:</p>
+<ul><li><code class="ic">watchBeanSummaries</code>(repo:40)가 SQL 집계(<code class="ic">AVG(overall)</code>·<code class="ic">COUNT(id)</code> + <code class="ic">LEFT JOIN tastings</code>)로 <strong>리스트 평균★·시음횟수를 이미 계산</strong>하며, 조인이 <code class="ic">tastings</code>를 참조하므로 <strong>시음 쓰기에 리스트가 자동 갱신</strong>된다. → "평균 별점 계산"은 리스트 측에서 사실상 완료.</li><li><code class="ic">getBeanDetail</code>(repo:74)가 시음을 <code class="ic">date</code> 내림차순으로 이미 로드.</li><li>FK CASCADE + 마이그레이션 <code class="ic">PRAGMA foreign_keys = ON</code>이 켜져 있어 원두 삭제 시 구성·시음이 자동 정리.</li></ul>
+<hr>
+<h2>2. 접근법 결정</h2>
+<div class="tablewrap"><table><thead><tr><th>결정</th><th>선택</th><th>근거 / 기각한 대안</th></tr></thead><tbody><tr><td><strong>편집 폼</strong></td><td>기존 <code class="ic">BeanFormScreen</code>에 <code class="ic">existing</code> 파라미터 추가 → 프리필 후 <code class="ic">updateBean</code></td><td>"편집 = 프리필된 추가" 모델, DRY. 대안(별도 편집 화면)은 폼 로직 중복 → 기각</td></tr><tr><td><strong>구성 편집</strong></td><td>저장 시 해당 원두의 구성을 <strong>전체 교체</strong>(delete-all → re-insert)</td><td>구성은 다른 테이블이 FK로 참조하지 않아 교체가 안전(분석은 쿼리 시점에 원두→국가 귀속). row-diff 로직 불필요</td></tr><tr><td><strong>시음 폼</strong></td><td>신규 <code class="ic">TastingFormScreen({beanId, existing?})</code> 생성/편집 겸용</td><td>원두 폼과 동일한 파라미터화 패턴. 삭제는 편집 모드에서 노출</td></tr><tr><td><strong>상세 평균★</strong></td><td><code class="ic">BeanDetail.tastings</code>에서 Dart로 계산(getter)</td><td>개인용이라 N이 작음. 별도 집계 쿼리 불필요</td></tr><tr><td><strong>상세 반응성</strong></td><td><code class="ic">watchBeanDetail</code>(repo:88)를 <strong>beans + tastings + originComponents 3테이블 watch</strong>로 교체</td><td>현재 <code class="ic">beans</code> 행만 watch → 시음/구성 쓰기에 무반응(M1 리뷰 발견). join-to-register로 3테이블 등록 후 <code class="ic">asyncMap</code>으로 <code class="ic">getBeanDetail</code> 재조회</td></tr><tr><td><strong>시음 삭제 경로</strong></td><td>시음 행 탭 → 편집 화면의 삭제 버튼(확인 다이얼로그)</td><td>단일 경로·단순. 스와이프-삭제/undo는 폴리시로 이후</td></tr><tr><td><strong>원두 삭제</strong></td><td>상세 AppBar 휴지통 → 확인 다이얼로그 → <code class="ic">deleteBean</code> → 리스트로 pop</td><td>CASCADE로 구성·시음 자동 삭제. 되돌리기 없음(v1)</td></tr></tbody></table></div>
+<hr>
+<h2>3. 데이터 계층</h2>
+<h3>3.1 모델 — <code class="ic">lib/data/models.dart</code></h3>
+<p>신규 입력 DTO:</p>
+<pre class="code" data-lang="dart"><code>class TastingInput {
+  final DateTime date;
+  final int acidity, sweetness, body, bitterness, overall; // 각 1–5
+  final String? comment;
+  const TastingInput({
+    required this.date,
+    required this.acidity,
+    required this.sweetness,
+    required this.body,
+    required this.bitterness,
+    required this.overall,
+    this.comment,
+  });
+}</code></pre>
+<p><code class="ic">BeanDetail</code>에 계산 getter 추가(리포지토리·쿼리 변경 없음):</p>
+<pre class="code" data-lang="dart"><code>int get tastingCount =&gt; tastings.length;
+double? get avgRating =&gt; tastings.isEmpty
+    ? null
+    : tastings.map((t) =&gt; t.overall).reduce((a, b) =&gt; a + b) / tastings.length;</code></pre>
+<h3>3.2 Repository — <code class="ic">lib/data/bean_repository.dart</code></h3>
+<p>추가 메서드(시그니처 + 핵심 시맨틱). 구현은 계획 단계에서 상세화.</p>
+<pre class="code" data-lang="dart"><code>// 원두 필드 update + 구성 전체 교체. createdAt 보존(update 대상 아님).
+Future&lt;void&gt; updateBean(int beanId, BeanInput input);   // 트랜잭션
+
+// beans 행 삭제 → FK CASCADE로 originComponents + tastings 자동 삭제
+Future&lt;void&gt; deleteBean(int beanId);
+
+Future&lt;int&gt;  createTasting(int beanId, TastingInput t); // createdAt = now()
+Future&lt;void&gt; updateTasting(int tastingId, TastingInput t); // beanId·createdAt 보존
+Future&lt;void&gt; deleteTasting(int tastingId);</code></pre>
+<ul><li><code class="ic">updateBean</code>은 <strong>항상 beans 행을 write</strong>한다(구성만 바뀌어도). → 리스트/상세 watch가 확실히 재방출됨.</li><li><code class="ic">updateTasting</code>은 <code class="ic">beanId</code>·<code class="ic">createdAt</code>을 건드리지 않는다(companion에서 해당 필드 생략).</li></ul>
+<h3>3.3 상세 반응성 — <code class="ic">watchBeanDetail</code></h3>
+<p><strong>요구사항:</strong> beans·tastings·originComponents 중 <strong>어느 하나라도 쓰기가 발생하면</strong> 재방출해야 한다. 권장 구현은 기존 <code class="ic">watchBeanSummaries</code>와 같은 join-to-register(조인으로 watch 대상 테이블 등록, 행은 무시하고 <code class="ic">getBeanDetail</code>로 재조회):</p>
+<pre class="code" data-lang="dart"><code>Stream&lt;BeanDetail?&gt; watchBeanDetail(int beanId) {
+  final q = db.select(db.beans).join([
+    leftOuterJoin(db.tastings, db.tastings.beanId.equalsExp(db.beans.id)),
+    leftOuterJoin(db.originComponents, db.originComponents.beanId.equalsExp(db.beans.id)),
+  ])..where(db.beans.id.equals(beanId));
+  return q.watch().asyncMap((_) =&gt; getBeanDetail(beanId));
+}</code></pre>
+<p>원두 삭제 시 조인 결과가 0행 → <code class="ic">getBeanDetail</code> → <code class="ic">null</code> → 상세는 "삭제된 원두예요" 표시.</p>
+<h3>3.4 Provider — <code class="ic">lib/providers.dart</code></h3>
+<p><code class="ic">beanDetailProvider</code>를 <code class="ic">autoDispose</code>로 변경(상세를 벗어나면 스트림 구독 해제):</p>
+<pre class="code" data-lang="dart"><code>final beanDetailProvider =
+    StreamProvider.autoDispose.family&lt;BeanDetail?, int&gt;(
+  (ref, beanId) =&gt; ref.watch(beanRepositoryProvider).watchBeanDetail(beanId),
+);</code></pre>
+<hr>
+<h2>4. 화면 &amp; UX</h2>
+<p>목업(<code class="ic">ui-mockup-v1.html</code>)의 시각 언어를 그대로 따른다. 새 시각 자료 없음.</p>
+<h3>4.1 원두 상세 — <code class="ic">bean_detail_screen.dart</code> (수정)</h3>
+<ul><li><strong>AppBar 액션:</strong> ✎ 편집 · 🗑 삭제</li><li><strong>상단:</strong> 이름/로스터 아래 <strong>평균★(<code class="ic">StarRating</code>) · 시음 N회</strong> 표시</li><li><strong>시음 리스트:</strong> 각 행에 <strong>종합 별점 표시</strong>, 행 <strong>탭 → 시음 편집</strong>. 빈 상태 문구에서 "다음 단계에서 추가" 제거</li><li><strong>하단 <code class="ic">bottomNavigationBar</code>:</strong> "시음 추가" 버튼 — ListView <code class="ic">cacheExtent</code> 테스트 함정(M1 교훈) 회피 겸 주요 액션 고정</li></ul>
+<h3>4.2 원두 편집 — <code class="ic">bean_form_screen.dart</code> (수정, 재사용)</h3>
+<ul><li>생성자에 <code class="ic">BeanDetail? existing</code> 추가. <code class="ic">existing != null</code>이면 AppBar "원두 편집", 컨트롤러·구성·enum 프리필, 저장 시 <code class="ic">updateBean(existing.bean.id, input)</code> 호출</li><li>폼이 잡는 구성 필드는 국가·지역·가공·비율(현행 유지). farm/variety/altitude는 폼 범위 밖 → §9 참조</li></ul>
+<h3>4.3 시음 폼 — <code class="ic">lib/features/tasting/tasting_form_screen.dart</code> (신규)</h3>
+<ul><li>필드: 날짜(기본 오늘, <code class="ic">showDatePicker</code>) · 강도 4축(도트 슬라이더) · 종합 별점(입력) · 코멘트(멀티라인)</li><li>저장 버튼 <code class="ic">bottomNavigationBar</code>. 편집 모드에서 삭제 버튼(확인 다이얼로그) 노출</li><li>생성 시 <code class="ic">createTasting(beanId, input)</code>, 편집 시 <code class="ic">updateTasting(existing.id, input)</code></li></ul>
+<h3>4.4 입력 위젯 (신규) — <code class="ic">lib/features/tasting/widgets/</code></h3>
+<ul><li><code class="ic">IntensitySelector</code> — 1–5 도트 탭 선택(강도 4축용)</li><li><code class="ic">StarInput</code> — 1–5 별 탭 선택(종합용). 기존 <code class="ic">StarRating</code>은 <strong>표시 전용 유지</strong></li></ul>
+<h3>4.5 실패 처리 (M2-prep d)</h3>
+<p>두 폼의 저장을 <code class="ic">try/catch</code>로 감싼다: 실패 시 <code class="ic">_saving = false</code> 리셋 + <code class="ic">SnackBar</code>로 알림, 성공 시 <code class="ic">pop</code>. (현재 <code class="ic">bean_form_screen</code>은 <code class="ic">createBean</code> 실패 시 <code class="ic">_saving</code>이 영구히 true로 남음.)</p>
+<hr>
+<h2>5. 테스트 전략 (docs/testing.md 3계층)</h2>
+<h3>5.1 공유 헬퍼 (신규, M2-prep c) — <code class="ic">test/helpers.dart</code></h3>
+<p>인메모리 <code class="ic">AppDatabase</code>(NativeDatabase.memory) + <code class="ic">BeanRepository</code> 생성 헬퍼, 위젯 테스트용 <code class="ic">pumpApp(tester, overrides)</code> 헬퍼. 신규 M2 테스트가 사용(기존 테스트 마이그레이션은 중복이 실제로 줄 때만, 최소 변경).</p>
+<h3>5.2 리포지토리 테스트</h3>
+<ul><li><code class="ic">updateBean</code>: 필드 갱신 + 구성 교체(옛 구성 제거·새 구성 존재)</li><li><strong><code class="ic">deleteBean</code> CASCADE</strong>(M2-prep e): 해당 원두의 tastings·originComponents가 함께 삭제, 다른 원두는 무영향</li><li>시음 CRUD 왕복(create→read→update→delete)</li><li>시음 추가 후 <code class="ic">watchBeanSummaries</code>의 <code class="ic">avgRating</code>/<code class="ic">tastingCount</code> 재계산</li><li><strong><code class="ic">watchBeanDetail</code> 재방출</strong>(반응성 회귀): listen 후 <code class="ic">createTasting</code> → 새 emission에 시음 포함</li></ul>
+<h3>5.3 위젯 테스트</h3>
+<ul><li>시음 폼: 입력 → 저장 → pop, 필수/검증</li><li>상세: 편집/삭제/시음추가 네비게이션, 삭제 확인 다이얼로그</li><li>원두 폼 편집 모드 프리필</li></ul>
+<hr>
+<h2>6. M2-prep 5건 착지점</h2>
+<div class="tablewrap"><table><thead><tr><th>#</th><th>항목</th><th>위치</th></tr></thead><tbody><tr><td>a</td><td><code class="ic">watchBeanDetail</code> 3테이블 재방출</td><td>§3.3 · T1</td></tr><tr><td>b</td><td><code class="ic">beanDetailProvider</code> autoDispose</td><td>§3.4 · T1</td></tr><tr><td>c</td><td><code class="ic">test/helpers.dart</code> 생성</td><td>§5.1 · T1</td></tr><tr><td>d</td><td>폼 <code class="ic">_saving</code> 리셋 + SnackBar</td><td>§4.5 · T3·T5</td></tr><tr><td>e</td><td>Tastings-cascade 테스트</td><td>§5.2 · T1</td></tr></tbody></table></div>
+<hr>
+<h2>7. 태스크 분해 (writing-plans에서 상세화)</h2>
+<p>각 태스크: 실패 테스트 → 최소 구현 → 통과 → 커밋(main 직접). 태스크별 SDD 리뷰 + 최종 opus 전체브랜치 리뷰(M1과 동일).</p>
+<ol><li><strong>기반 정비</strong> — <code class="ic">watchBeanDetail</code> 반응성, <code class="ic">beanDetailProvider</code> autoDispose, <code class="ic">test/helpers.dart</code>, cascade 테스트 (prep a·b·c·e)</li><li><strong>TastingInput + createTasting</strong> — 모델 + repo + 테스트</li><li><strong>시음 입력 화면(생성)</strong> — <code class="ic">TastingFormScreen</code> + <code class="ic">IntensitySelector</code>/<code class="ic">StarInput</code> + 상세 "시음 추가" 연결 + 실패 처리(d)</li><li><strong>시음 수정/삭제</strong> — <code class="ic">updateTasting</code>/<code class="ic">deleteTasting</code> + 폼 편집 모드/삭제 + 상세 행 탭·삭제</li><li><strong>원두 편집</strong> — <code class="ic">updateBean</code> + 구성 교체 + 폼 편집 모드 + 상세 편집 액션 + 실패 처리(d)</li><li><strong>원두 삭제</strong> — <code class="ic">deleteBean</code> + 상세 삭제 액션 + 확인 다이얼로그</li><li><strong>상세 평균★·시음 행 정리</strong> — <code class="ic">BeanDetail</code> getter 표시 + placeholder 제거</li></ol>
+<hr>
+<h2>8. 파일 영향</h2>
+<p><strong>신규</strong></p>
+<ul><li><code class="ic">lib/features/tasting/tasting_form_screen.dart</code></li><li><code class="ic">lib/features/tasting/widgets/intensity_selector.dart</code></li><li><code class="ic">lib/features/tasting/widgets/star_input.dart</code></li><li><code class="ic">test/helpers.dart</code> + M2 테스트 파일들</li></ul>
+<p><strong>수정</strong></p>
+<ul><li><code class="ic">lib/data/models.dart</code> — <code class="ic">TastingInput</code>, <code class="ic">BeanDetail</code> getter</li><li><code class="ic">lib/data/bean_repository.dart</code> — 5개 메서드 + <code class="ic">watchBeanDetail</code></li><li><code class="ic">lib/providers.dart</code> — <code class="ic">beanDetailProvider</code> autoDispose</li><li><code class="ic">lib/features/beans/bean_form_screen.dart</code> — 편집 모드 + 실패 처리</li><li><code class="ic">lib/features/beans/bean_detail_screen.dart</code> — 평균★·액션·시음추가·행 탭</li></ul>
+<hr>
+<h2>9. 스코프 밖 · 가정 · 리스크</h2>
+<p><strong>스코프 밖</strong>(design.md §8 및 이후 마일스톤): 브루잉 파라미터 · 되돌리기/소프트삭제 · 스와이프-삭제 · farm/variety/altitude 폼 입력 · 검색/정렬(M5) · OCR(M3).</p>
+<p><strong>가정 / 리스크</strong></p>
+<ul><li><strong>구성 전체 교체의 무손실성:</strong> 폼이 국가·지역·가공·비율만 잡으므로 farm/variety/altitude는 생성 때도 비어 있어 편집 교체로 손실될 값이 없다. M3에서 OCR이 이 필드를 채우면 그 시점에 폼 확장 또는 편집 전략 재검토 필요.</li><li><strong>리스트 originLabel 갱신:</strong> <code class="ic">watchBeanSummaries</code>는 originComponents를 watch하지 않지만, <code class="ic">updateBean</code>이 항상 beans 행을 write하므로 리스트가 재방출되어 실사용상 최신 유지.</li><li><strong>삭제 후 네비게이션:</strong> 상세에서 원두 삭제 시 리스트로 pop. 상세가 열린 채 스트림이 <code class="ic">null</code>을 emit해도 "삭제된 원두예요" 폴백이 있어 안전.</li></ul>
+</article>

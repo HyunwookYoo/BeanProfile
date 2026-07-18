@@ -35,4 +35,63 @@ void main() {
     // 상세가 live drift 스트림을 watch → teardown 전 명시 close(Global Constraints).
     await db.close();
   });
+
+  testWidgets('tapping edit-bean navigates to the bean edit form', (tester) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    final repo = testRepository(db);
+    final id = await repo.createBean(sampleSingle());
+
+    await tester.pumpWidget(wrapApp(BeanDetailScreen(beanId: id), db: db));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('edit-bean')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('원두 편집'), findsOneWidget);
+
+    // detail이 push로 남아 live drift 스트림을 watch 중 → teardown 전 명시 close.
+    await tester.pump(const Duration(milliseconds: 200));
+    await db.close();
+  });
+
+  testWidgets('tapping add-tasting navigates to the tasting create form', (tester) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    final repo = testRepository(db);
+    final id = await repo.createBean(sampleSingle());
+
+    await tester.pumpWidget(wrapApp(BeanDetailScreen(beanId: id), db: db));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('add-tasting')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('시음 기록'), findsOneWidget);
+
+    // detail이 push로 남아 live drift 스트림을 watch 중 → teardown 전 명시 close.
+    await tester.pump(const Duration(milliseconds: 200));
+    await db.close();
+  });
+
+  testWidgets('tapping a tasting row navigates to the tasting edit form', (tester) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    final repo = testRepository(db);
+    final id = await repo.createBean(sampleSingle());
+    await repo.createTasting(id, sampleTasting());
+    final tid = (await repo.getBeanDetail(id))!.tastings.first.id;
+
+    await tester.pumpWidget(wrapApp(BeanDetailScreen(beanId: id), db: db));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(Key('tasting-row-$tid')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('시음 편집'), findsOneWidget);
+
+    // detail이 push로 남아 live drift 스트림을 watch 중 → teardown 전 명시 close.
+    await tester.pump(const Duration(milliseconds: 200));
+    await db.close();
+  });
 }

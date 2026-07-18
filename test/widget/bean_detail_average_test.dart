@@ -29,5 +29,10 @@ void main() {
 
     expect(find.text('시음 2회'), findsOneWidget);
     expect(find.text('3.0'), findsWidgets); // 평균 (4+2)/2 = 3.0, StarRating이 렌더
+
+    // 종합 텍스트 라벨은 사라지고 행별 StarRating(overall)만 렌더되는지 확인.
+    expect(find.textContaining('종합'), findsNothing);
+    expect(find.text('4.0'), findsOneWidget);
+    expect(find.text('2.0'), findsOneWidget);
   });
 }

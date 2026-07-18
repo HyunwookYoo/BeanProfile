@@ -7,6 +7,7 @@ import '../../providers.dart';
 import '../../theme.dart';
 import '../tasting/tasting_form_screen.dart';
 import 'bean_form_screen.dart';
+import 'widgets/star_rating.dart';
 
 class BeanDetailScreen extends ConsumerWidget {
   const BeanDetailScreen({super.key, required this.beanId});
@@ -94,6 +95,13 @@ class _DetailBody extends StatelessWidget {
       const SizedBox(height: 2),
       Text([bean.roaster, bean.type.label].where((e) => e.isNotEmpty).join(' · '),
           style: TextStyle(color: c.appMuted)),
+      const SizedBox(height: 8),
+      Row(children: [
+        StarRating(value: detail.avgRating),
+        const SizedBox(width: 10),
+        Text('시음 ${detail.tastingCount}회',
+            style: TextStyle(color: c.appMuted, fontSize: 12)),
+      ]),
       const SizedBox(height: 14),
       for (final comp in detail.components) _componentBlock(context, comp),
       if (bean.roastLevel != null || bean.roastDate != null)
@@ -169,8 +177,14 @@ class _DetailBody extends StatelessWidget {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(t.date.toIso8601String().substring(0, 10), style: monoStyle(size: 11, color: c.appMuted)),
           const SizedBox(height: 4),
-          Text('산미 ${t.acidity} · 단맛 ${t.sweetness} · 바디 ${t.body} · 쓴맛 ${t.bitterness} · 종합 ${t.overall}',
-              style: monoStyle(size: 11, color: c.espresso)),
+          Row(children: [
+            Expanded(
+              child: Text(
+                  '산미 ${t.acidity} · 단맛 ${t.sweetness} · 바디 ${t.body} · 쓴맛 ${t.bitterness}',
+                  style: monoStyle(size: 11, color: c.espresso)),
+            ),
+            StarRating(value: t.overall.toDouble(), size: 12),
+          ]),
           if (t.comment != null && t.comment!.isNotEmpty) ...[
             const SizedBox(height: 4),
             Text(t.comment!, style: TextStyle(fontSize: 12, color: c.espresso)),

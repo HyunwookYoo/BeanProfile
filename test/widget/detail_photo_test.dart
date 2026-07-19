@@ -19,7 +19,7 @@ void main() {
     await t.tap(find.byType(BeanThumbnail));
     await t.pumpAndSettle();
     // 전체화면 다이얼로그의 Image
-    expect(find.byType(Image), findsWidgets);
+    expect(find.byType(InteractiveViewer), findsOneWidget); // 전체화면 뷰어가 실제로 열렸는지 판별
     await t.pump(const Duration(milliseconds: 200)); // autoDispose-pop 데드락 회피
 
     // 상세가 live drift 스트림을 watch → teardown 전 명시 close(Global Constraints).

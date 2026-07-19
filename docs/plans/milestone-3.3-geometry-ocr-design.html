@@ -1,0 +1,125 @@
+<title>M3.3 — 좌표 기반 OCR 파싱 (설계)</title>
+<style>
+*{box-sizing:border-box}
+:root{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+  --font-sans:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Consolas,"Malgun Gothic",monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}}
+:root[data-theme="light"]{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+}
+:root[data-theme="dark"]{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-sans);line-height:1.7;-webkit-font-smoothing:antialiased}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.doc{max-width:880px;margin:0 auto;padding:44px 24px 96px}
+.crumb{font-family:var(--font-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:16px}
+h1{font-size:clamp(26px,4vw,38px);font-weight:800;letter-spacing:-.025em;line-height:1.2;margin:.1em 0 .5em;text-wrap:balance}
+h2{font-size:22px;font-weight:700;margin:2em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line);letter-spacing:-.01em;text-wrap:balance}
+h3{font-size:16.5px;font-weight:700;color:var(--accent-ink);margin:1.7em 0 .5em}
+h4{font-size:14px;font-weight:700;margin:1.3em 0 .4em}
+p{margin:.7em 0}
+a{color:var(--accent);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+strong{font-weight:700;color:var(--fg)}
+hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+code.ic{font-family:var(--font-mono);font-size:.85em;background:var(--ic-bg);color:var(--ic-fg);padding:1.5px 6px;border-radius:6px}
+pre.code{position:relative;background:var(--code-bg);color:var(--code-fg);border-radius:12px;padding:16px 18px;margin:1em 0;overflow-x:auto;border:1px solid rgba(0,0,0,.28)}
+pre.code code{font-family:var(--font-mono);font-size:12.75px;line-height:1.6;white-space:pre;color:inherit;background:none;padding:0}
+pre.code[data-lang]::before{content:attr(data-lang);position:absolute;top:9px;right:13px;font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(236,227,211,.42)}
+.tablewrap{overflow-x:auto;margin:1.1em 0}
+table{border-collapse:collapse;width:100%;font-size:13.75px}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--th);font-weight:700}
+tbody tr:nth-child(even){background:var(--surface)}
+blockquote{margin:1.1em 0;padding:11px 16px;border-left:3px solid var(--accent);background:var(--surface);border-radius:0 10px 10px 0;color:var(--muted)}
+blockquote strong{color:var(--fg)}
+ul,ol{margin:.7em 0;padding-left:1.4em}
+li{margin:.32em 0}
+ul.tasklist{list-style:none;padding-left:.15em}
+ul.tasklist li.task{position:relative;padding-left:30px;margin:.5em 0}
+ul.tasklist li.task::before{content:"";position:absolute;left:0;top:.18em;width:17px;height:17px;border:2px solid var(--accent);border-radius:5px;background:transparent}
+ul.tasklist li.task.done::before{content:"\2713";background:var(--accent);color:#fff;font-size:12px;font-weight:800;text-align:center;line-height:15px}
+</style>
+<article class="doc"><div class="crumb">BeanProfile · docs/plans</div>
+<h1>M3.3 — 좌표 기반 OCR 파싱 (설계)</h1>
+<blockquote>상태: 승인됨(2026-07-20). 계획: <code class="ic">milestone-3.3-geometry-ocr-plan.md</code>. 목표 릴리스 <strong>v0.3.3</strong>.</blockquote>
+<h2>1. 배경 &amp; 문제</h2>
+<p>M3~M3.2에서 "사진 자동채움이 실제 카드에서 안 된다"는 문제가 반복됐다. 에뮬레이터 실측(실제 ML Kit OCR, <code class="ic">assets/test/ocr_card_orig.png</code>)으로 근본 원인을 확정했다.</p>
+<p>깨끗한 <code class="ic">라벨: 값</code> 카드는 <strong>8/8</strong> 자동채움, 실제형(콜론 없는 2열 레이아웃) 카드는 <strong>4/8</strong> 만 채워진다.</p>
+<div class="tablewrap"><table><thead><tr><th>필드</th><th>방식</th><th>콜론 카드</th><th>실제형 카드</th></tr></thead><tbody><tr><td>국가·가공·로스팅·날짜</td><td>키워드/정규식(내용 매칭)</td><td>✅</td><td>✅</td></tr><tr><td>제품명·로스터리·지역·컵노트</td><td>라벨(콜론) 매칭</td><td>✅</td><td>❌</td></tr></tbody></table></div>
+<p><strong>원인:</strong> ML Kit은 실제형 카드의 텍스트를 <strong>라벨 열 전체 → 값 열 전체</strong> 순서로 직렬화한다. 즉 텍스트 순서상 <code class="ic">지역</code>과 값 <code class="ic">후일라</code>가 떨어져 있고, 콜론도 없어 한 줄로 묶을 수 없다. 내용만으로 잡는 4필드는 레이아웃과 무관하게 성공하지만, 라벨↔값 <strong>인접성</strong>에 의존하는 4필드는 실패한다.</p>
+<p><strong>관찰:</strong> 텍스트 순서로는 못 묶지만, 각 줄의 <strong>boundingBox 좌표</strong>로는 <code class="ic">지역</code>(왼쪽)과 <code class="ic">후일라</code>(같은 y·오른쪽)가 같은 행임을 알 수 있다. 즉 좌표를 살리면 라벨↔값을 공간적으로 복원할 수 있다.</p>
+<h2>2. 목표 &amp; 범위</h2>
+<p><strong>목표:</strong> 실제형 카드에서 <strong>지역·컵노트·제품명·로스터리</strong> 자동채움을 좌표 기반으로 복원한다.</p>
+<p><strong>범위 내:</strong></p>
+<ul><li><code class="ic">OcrService.recognize</code> 반환 타입을 <code class="ic">String</code> → <code class="ic">List&lt;OcrLine&gt;</code>(텍스트+좌표)로 확장.</li><li>파서를 좌표 기반 <code class="ic">라벨→값</code> 공간 매칭 + 타이포 제목/이브로우 추정으로 재작성. 콜론/키워드/칩 폴백은 유지.</li><li>페이크·테스트·에뮬레이터 프로브를 구조화 입력으로 갱신.</li></ul>
+<p><strong>범위 밖(무변경):</strong> <code class="ic">OcrDraft</code> 모델, <code class="ic">bean_form_screen</code>(폼·칩 배정 UX), 데이터 모델·저장소·DB, 촬영/갤러리 UX, 프로바이더 배선(타입만 바뀜).</p>
+<p><strong>비회귀 보장:</strong> 콜론 카드·기존 문자열 테스트는 폴백 레이어로 계속 동작한다. 최악의 경우(험한 실제 봉투)에도 지금보다 나빠지지 않는다.</p>
+<h2>3. seam 변경</h2>
+<p><code class="ic">lib/services/ocr_service.dart</code>:</p>
+<pre class="code" data-lang="dart"><code>/// OCR 한 줄(텍스트 + 이미지 픽셀 좌표). 순수 Dart(dart:ui 비의존)로 호스트 테스트에서 손쉽게 생성.
+class OcrLine {
+  final String text;
+  final double left, top, right, bottom;
+  const OcrLine(this.text, {this.left = 0, this.top = 0, this.right = 0, this.bottom = 0});
+  double get centerX =&gt; (left + right) / 2;
+  double get centerY =&gt; (top + bottom) / 2;
+  double get height =&gt; bottom - top;
+  double get width =&gt; right - left;
+}
+
+abstract class OcrService {
+  /// 이미지의 인식 라인들을 반환한다. 실패/빈 이미지면 빈 리스트.
+  Future&lt;List&lt;OcrLine&gt;&gt; recognize(String imagePath);
+}</code></pre>
+<p><code class="ic">MlkitOcrService</code>: <code class="ic">result.blocks</code>의 각 <code class="ic">TextBlock.lines</code>를 순회, <code class="ic">TextLine.text</code>와 <code class="ic">TextLine.boundingBox</code>(Rect)를 <code class="ic">OcrLine</code>으로 매핑. 예외 시 <code class="ic">[]</code> 반환(기존 '자동 인식 실패' 배너로 이어짐).</p>
+<pre class="code" data-lang="dart"><code>final result = await _recognizer!.processImage(InputImage.fromFilePath(imagePath));
+return [
+  for (final block in result.blocks)
+    for (final line in block.lines)
+      OcrLine(line.text,
+          left: line.boundingBox.left, top: line.boundingBox.top,
+          right: line.boundingBox.right, bottom: line.boundingBox.bottom),
+];</code></pre>
+<p>프로바이더(<code class="ic">ocrServiceProvider</code>)는 코드 변경 없음(반환 타입만 바뀜).</p>
+<h2>4. 파서 재설계 (<code class="ic">lib/features/beans/ocr/ocr_parser.dart</code>)</h2>
+<p>새 코어 <strong><code class="ic">OcrDraft parseOcr(List&lt;OcrLine&gt; lines)</code></strong>. 4개 레이어를 순서대로 적용한다.</p>
+<h3>4.1 좌표 라벨→값 (지역·컵노트)</h3>
+<p><strong>바레-라벨 줄</strong>: 줄의 트림·소문자·후행 <code class="ic">:：</code> 제거 텍스트가 라벨 토큰과 <strong>정확히 일치</strong>하는 줄.</p>
+<ul><li>region 토큰: <code class="ic">지역</code>, <code class="ic">region</code></li><li>cupNotes 토큰: <code class="ic">컵노트</code>, <code class="ic">컵 노트</code>, <code class="ic">notes</code>, <code class="ic">cup notes</code>, <code class="ic">cup note</code>, <code class="ic">tasting notes</code>, <code class="ic">향미</code></li></ul>
+<p>라벨 줄 <code class="ic">L</code>의 값 후보 탐색(모든 임계값은 <code class="ic">L.height</code> 단위 → 스케일 불변):</p>
+<ol><li><strong>같은 행·오른쪽</strong>: 수직 정렬(<code class="ic">|V.centerY - L.centerY| ≤ 0.6·L.height</code>)이고 <code class="ic">V.left ≥ L.right - 0.5·L.height</code>이며 바레-라벨이 아닌 줄 <code class="ic">V</code> 중 <code class="ic">V.left</code>가 가장 작은(가장 가까운 오른쪽) 것.</li><li>없으면 <strong>바로 아래</strong>: <code class="ic">V.top ≥ L.bottom - 0.5·L.height</code>이고 x가 겹치거나(<code class="ic">V.left ≤ L.right &amp;&amp; V.right ≥ L.left</code>) 같은 열 시작(<code class="ic">|V.left - L.left| ≤ 1.5·L.height</code>)이며 바레-라벨이 아닌 줄 중 <code class="ic">V.top</code>이 가장 작은(가장 가까운 아래) 것.</li></ol>
+<p>매칭된 <code class="ic">V.text</code>가 값. 컵노트는 <code class="ic">[,/·、]</code>로 분할(기존 <code class="ic">_matchCupNotes</code>와 동일). → 스타일 카드: <code class="ic">지역=후일라</code>(같은 행), <code class="ic">컵노트=딸기,복숭아,레드와인</code>(아래).</p>
+<h3>4.2 타이포 제목/이브로우 (제품명·로스터리)</h3>
+<p>전 줄 높이의 <strong>중앙값</strong> <code class="ic">medianH</code>. 최대 높이 줄 <code class="ic">T</code>.</p>
+<ul><li><code class="ic">T.height &lt; 1.3·medianH</code>(균일 텍스트)이면 타이포 추정 없음 → 제품명·로스터리 이 단계에서 <code class="ic">null</code>(오채움 회피).</li><li><code class="ic">T</code>가 상단부(<code class="ic">T.top ≤ minTop + 0.45·(maxBottom − minTop)</code>, 여기서 minTop/maxBottom은 전 줄 경계)이면 <strong>제품명 = <code class="ic">T.text</code></strong>.</li><li><strong>로스터리 = 이브로우</strong>: <code class="ic">T</code> 위(<code class="ic">V.bottom ≤ T.top + 0.3·T.height</code>)이고 x가 겹치며 <code class="ic">V.height &lt; T.height</code>인 줄 중 가장 가까운(가장 큰 <code class="ic">V.bottom</code>) 것. 없으면 <code class="ic">null</code>.</li></ul>
+<p>→ 스타일 카드: <code class="ic">제품명=콜롬비아 핑크버번 내추럴</code>, <code class="ic">로스터리=베이스캠프 로스 터스</code>(자간 오독은 사용자가 수정).</p>
+<h3>4.3 콜론/키워드 폴백 (기존 로직 재사용)</h3>
+<p>4.1·4.2에서 못 채운 라벨 필드는 <strong>줄 텍스트에 기존 콜론 라벨 추출</strong>로 보강 → 깨끗한 콜론 카드 계속 동작.</p>
+<ul><li>name/roaster/region: <code class="ic">_firstLabel(texts, _nameLabel/_roasterLabel/_regionLabel)</code></li><li>cupNotes: <code class="ic">_matchCupNotes(texts)</code></li></ul>
+<p>내용 매칭 필드는 <strong>조인 텍스트</strong>(줄들을 <code class="ic">\n</code>로 결합)에 기존 로직 그대로:</p>
+<ul><li>country: <code class="ic">_firstMatch(lower, _countries)</code></li><li>roastLevel: <code class="ic">_firstMatch(lower, _roastKeywords)</code></li><li>process: <code class="ic">_firstMatch(lower, _processKeywords)</code></li><li>roastDate: <code class="ic">_matchDate(joined)</code></li></ul>
+<h3>4.4 칩</h3>
+<p>전 줄 텍스트 dedupe(기존 <code class="ic">_dedupe</code>). 무변경.</p>
+<h3>4.5 하위호환 래퍼</h3>
+<p><code class="ic">OcrDraft parseOcrText(String rawText)</code> 유지: <code class="ic">\n</code> 분할·트림·비어있지 않은 줄을 <strong>세로로 쌓은 합성 라인</strong>(<code class="ic">OcrLine(text, top: i·H, bottom: i·H+H, left: 0, right: W)</code>)으로 만들어 <code class="ic">parseOcr</code> 호출. 단일 열이라 4.1의 "같은 행·오른쪽"은 매칭되지 않고, 콜론 줄은 4.3 폴백이 처리 → <strong>기존 유닛 테스트 전부 유지</strong>.</p>
+<h2>5. 데이터 흐름</h2>
+<p><code class="ic">add_bean_sheet._recognize</code>: <code class="ic">ref.read(ocrServiceProvider).recognize(path)</code> → <code class="ic">List&lt;OcrLine&gt;</code> → <code class="ic">parseOcr(lines)</code> → <code class="ic">OcrDraft</code>. 스피너·폼 이동 등 나머지는 동일. <code class="ic">BeanFormScreen</code>·<code class="ic">OcrDraft</code> 무변경.</p>
+<h2>6. 오류 처리 &amp; 폴백 레이어링</h2>
+<ul><li><code class="ic">recognize</code> 예외/빈 이미지 → <code class="ic">[]</code> → <code class="ic">parseOcr([])</code> → 전 필드 null/빈 → 폼의 '자동 인식 실패' 배너(기존 경로).</li><li>좌표 매칭 실패(험한 레이아웃) → 콜론/키워드 폴백 → 그래도 못 잡으면 칩으로 노출(기존 배정 UX). 어느 단계도 예외를 던지지 않는다.</li></ul>
+<h2>7. 테스트 (3계층 + 실측)</h2>
+<ul><li><strong>유닛(<code class="ic">test/unit/ocr_parser_test.dart</code>)</strong>: <code class="ic">parseOcr</code>에 손으로 만든 라인+좌표로</li><li>(a) 2열 스타일: <code class="ic">지역</code>(왼쪽)+<code class="ic">후일라</code>(같은 y·오른쪽) → region; <code class="ic">컵노트</code>(위)+값(아래) → cupNotes.</li><li>(b) 제목/이브로우: 큰 줄 → name, 그 위 작은 줄 → roaster.</li><li>(c) 균일 높이 → name/roaster null(오채움 가드).</li><li>(d) 콜론 문자열 폴백: 기존 <code class="ic">parseOcrText</code> 문자열 테스트 전부 유지.</li><li><strong>위젯(<code class="ic">test/widget/…</code>)</strong>: <code class="ic">FakeOcrService</code>에 <code class="ic">.lines([...])</code>/<code class="ic">.text('...')</code> 두 생성자. 기존 폼 프리필·칩 테스트는 <code class="ic">.text</code> 경로 유지.</li><li><strong>실측(<code class="ic">integration_test/ocr_probe_test.dart</code>)</strong>: <code class="ic">recognize→parseOcr</code>로 갱신. 스타일 카드(<code class="ic">ocr_card_orig.png</code>)에서 <strong>지역·컵노트·제품명·로스터리까지</strong> 채워지는지 emulator로 검증(근본해결 증거). 콜론 카드(<code class="ic">ocr_card_ko.png</code>)는 8/8 회귀 가드 유지.</li></ul>
+<h2>8. 실행 규약</h2>
+<p>TDD + SDD(구현·리뷰·수정 sonnet, 최종 opus, main 직접 커밋). 진행원장 <code class="ic">.superpowers/sdd/progress.md</code>에 M3.3 섹션. 목표 릴리스 <strong>v0.3.3</strong>(대기 중인 적응형 아이콘·콜론 제품명/로스터리 커밋도 함께 실림).</p>
+<h2>9. 파일 영향</h2>
+<ul><li>변경: <code class="ic">lib/services/ocr_service.dart</code>(OcrLine + 반환타입), <code class="ic">lib/features/beans/ocr/ocr_parser.dart</code>(parseOcr 코어 + parseOcrText 래퍼), <code class="ic">lib/features/beans/add_bean_sheet.dart</code>(호출부), <code class="ic">test/helpers.dart</code>(FakeOcrService), <code class="ic">test/unit/ocr_parser_test.dart</code>, <code class="ic">test/widget/*</code>(페이크 생성자), <code class="ic">integration_test/ocr_probe_test.dart</code>.</li><li>무변경: <code class="ic">ocr_draft.dart</code>, <code class="ic">bean_form_screen.dart</code>, <code class="ic">providers.dart</code>(코드), 데이터/DB/저장소.</li></ul>
+</article>

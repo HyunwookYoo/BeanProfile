@@ -1,0 +1,136 @@
+<title>☕ BeanProfile — M3.1 설계: OCR 칩 배정 재설계</title>
+<style>
+*{box-sizing:border-box}
+:root{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+  --font-sans:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Consolas,"Malgun Gothic",monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}}
+:root[data-theme="light"]{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+}
+:root[data-theme="dark"]{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-sans);line-height:1.7;-webkit-font-smoothing:antialiased}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.doc{max-width:880px;margin:0 auto;padding:44px 24px 96px}
+.crumb{font-family:var(--font-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:16px}
+h1{font-size:clamp(26px,4vw,38px);font-weight:800;letter-spacing:-.025em;line-height:1.2;margin:.1em 0 .5em;text-wrap:balance}
+h2{font-size:22px;font-weight:700;margin:2em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line);letter-spacing:-.01em;text-wrap:balance}
+h3{font-size:16.5px;font-weight:700;color:var(--accent-ink);margin:1.7em 0 .5em}
+h4{font-size:14px;font-weight:700;margin:1.3em 0 .4em}
+p{margin:.7em 0}
+a{color:var(--accent);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+strong{font-weight:700;color:var(--fg)}
+hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+code.ic{font-family:var(--font-mono);font-size:.85em;background:var(--ic-bg);color:var(--ic-fg);padding:1.5px 6px;border-radius:6px}
+pre.code{position:relative;background:var(--code-bg);color:var(--code-fg);border-radius:12px;padding:16px 18px;margin:1em 0;overflow-x:auto;border:1px solid rgba(0,0,0,.28)}
+pre.code code{font-family:var(--font-mono);font-size:12.75px;line-height:1.6;white-space:pre;color:inherit;background:none;padding:0}
+pre.code[data-lang]::before{content:attr(data-lang);position:absolute;top:9px;right:13px;font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(236,227,211,.42)}
+.tablewrap{overflow-x:auto;margin:1.1em 0}
+table{border-collapse:collapse;width:100%;font-size:13.75px}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--th);font-weight:700}
+tbody tr:nth-child(even){background:var(--surface)}
+blockquote{margin:1.1em 0;padding:11px 16px;border-left:3px solid var(--accent);background:var(--surface);border-radius:0 10px 10px 0;color:var(--muted)}
+blockquote strong{color:var(--fg)}
+ul,ol{margin:.7em 0;padding-left:1.4em}
+li{margin:.32em 0}
+ul.tasklist{list-style:none;padding-left:.15em}
+ul.tasklist li.task{position:relative;padding-left:30px;margin:.5em 0}
+ul.tasklist li.task::before{content:"";position:absolute;left:0;top:.18em;width:17px;height:17px;border:2px solid var(--accent);border-radius:5px;background:transparent}
+ul.tasklist li.task.done::before{content:"\2713";background:var(--accent);color:#fff;font-size:12px;font-weight:800;text-align:center;line-height:15px}
+</style>
+<article class="doc"><div class="crumb">BeanProfile · docs/plans</div>
+<h1>☕ BeanProfile — M3.1 설계: OCR 칩 배정 재설계</h1>
+<div class="tablewrap"><table><thead><tr><th>항목</th><th>내용</th></tr></thead><tbody><tr><td>작성일</td><td>2026-07-19</td></tr><tr><td>상태</td><td>설계 승인(브레인스토밍) → 구현 계획(writing-plans) 대기</td></tr><tr><td>마일스톤</td><td>M3.1 (M3 위 UX 패치)</td></tr><tr><td>선행</td><td>M3 (사진 &amp; OCR) <strong>DONE</strong> · <code class="ic">v0.3.0</code></td></tr><tr><td>목표 버전</td><td><code class="ic">v0.3.1</code> (패치 태그, M3 파이프라인 재사용)</td></tr><tr><td>목업</td><td><a href="../mockups/m3.1-chip-assign.html"><code class="ic">../mockups/m3.1-chip-assign.html</code></a> · <a href="https://claude.ai/code/artifact/7cfa6937-5cd9-4bcb-a2fe-b727723d11f8">아티팩트</a></td></tr><tr><td>상위 문서</td><td>M3 <a href="milestone-3-design.md"><code class="ic">milestone-3-design.md</code></a> · 설계 <a href="../design.md"><code class="ic">../design.md</code></a> §5</td></tr></tbody></table></div>
+<hr>
+<h2>1. 목표 &amp; 범위</h2>
+<p>M3 온디바이스 테스트에서 드러난 <strong>인식 칩 배정 UX의 2가지 결함</strong>을 고친다. 데이터 모델·기능 변화가 아니라 <strong>상호작용 재설계</strong>이며, <code class="ic">bean_form_screen</code>과 <code class="ic">OcrChipsPanel</code>에 국한된다.</p>
+<h3>확정 결정 (브레인스토밍 2026-07-19)</h3>
+<div class="tablewrap"><table><thead><tr><th>#</th><th>결정</th><th>선택</th></tr></thead><tbody><tr><td>Q1</td><td>배정 상호작용</td><td><strong>칩 먼저</strong> — 칩 탭 → "어디에 넣을까요?" 시트 → 대상 탭 (포커스-먼저 폐기)</td></tr><tr><td>Q2</td><td>자동값 텍스트 칸</td><td><strong>시트에 포함(덮어쓰기 허용)</strong> — 현재 값 미리보기와 함께 표시</td></tr><tr><td>Q3</td><td>드래그드롭</td><td><strong>미지원</strong> — 이 레이아웃(칩 아래·칸 위·스크롤)에선 자동스크롤 커스텀·터치 정확도·테스트 취약으로 역효과</td></tr><tr><td>—</td><td>배정 대상</td><td><strong>모든 자유 텍스트 필드</strong>(제품명·로스터리·원산지 국가·지역·컵노트·메모). 컵노트=추가, 그 외=교체</td></tr></tbody></table></div>
+<hr>
+<h2>2. 문제 (온디바이스 발견)</h2>
+<ol><li><strong>지역·국가를 못 채움.</strong> M3 Task 5는 칩 배정 대상을 상위 4개 필드(제품명·로스터리·컵노트·메모)로만 배선했다(<code class="ic">_activeField</code> + 4개 <code class="ic">FocusNode</code>). 구성(원산지) 안의 <strong>국가·지역 필드는 배정 배선이 없다</strong> → OCR이 지역을 읽어 칩으로 보여줘도 넣을 곳이 없다.</li><li><strong>포커스-먼저 방식이 구조적으로 취약.</strong> 칩 패널은 폼 <strong>하단</strong>, 대상 칸은 <strong>위</strong>. "칸 포커스 → 칩까지 스크롤 → 칩 탭"인데, 스크롤 시 (a) 키보드가 내려가고(M2.1 <code class="ic">onDrag</code> dismiss) (b) 대상 칸이 화면 밖으로 사라져 <strong>무엇을 채우는지 안 보인다.</strong> "멀리 떨어진 대상 + 보이지 않는 유지 상태" 조합이 근본 원인.</li></ol>
+<hr>
+<h2>3. 설계</h2>
+<h3>3.1 상호작용 — 칩 먼저 (배정 시트)</h3>
+<p><code class="ic">OcrChipsPanel</code>의 칩을 탭하면 <strong>모달 바텀시트</strong>가 열려 "이 텍스트를 어디에 넣을지" 묻는다. 대상을 탭하면 해당 칸에 채워지고 칩은 흐려진다(used). 스크롤 위치·포커스와 무관하고, 시트는 모달 오버레이라 <strong>대상 칸이 화면에 안 보여도 배정된다</strong> — 이것이 핵심.</p>
+<h3>3.2 배정 대상 &amp; 규칙</h3>
+<div class="tablewrap"><table><thead><tr><th>대상(라벨)</th><th>컨트롤러</th><th>규칙</th></tr></thead><tbody><tr><td>제품명</td><td><code class="ic">_name</code></td><td>교체</td></tr><tr><td>로스터리</td><td><code class="ic">_roaster</code></td><td>교체</td></tr><tr><td>원산지 국가</td><td><code class="ic">_components.first.country</code></td><td>교체</td></tr><tr><td>지역</td><td><code class="ic">_components.first.region</code></td><td>교체</td></tr><tr><td>컵노트에 추가</td><td><code class="ic">_cupNotes</code></td><td><strong>추가</strong>(비어있으면 그대로, 아니면 <code class="ic">, </code> 뒤에 붙임)</td></tr><tr><td>메모</td><td><code class="ic">_memo</code></td><td>교체</td></tr></tbody></table></div>
+<ul><li><strong>자동값 포함:</strong> 이미 자동으로 찬 칸(예: 국가=Ethiopia)도 목록에 <strong>현재 값을 부제로</strong> 표시하고 탭하면 덮어쓴다(오탐 교정). 빈 칸은 "비어있음".</li><li>로스팅단계·날짜·가공은 enum/날짜라 문자열 칩 대상이 아님 → 기존 피커로 수정(불변).</li><li><strong>첫 구성만</strong> 대상(Task 5의 프리필과 동일). 블렌드 2번째+ 구성 필드는 직접 입력(스코프 밖).</li></ul>
+<h3>3.3 제거 (포커스 메커니즘 폐기)</h3>
+<p><code class="ic">bean_form_screen</code>에서 삭제한다:</p>
+<ul><li>필드: <code class="ic">_nameFocus</code>, <code class="ic">_roasterFocus</code>, <code class="ic">_cupNotesFocus</code>, <code class="ic">_memoFocus</code>, <code class="ic">_activeField</code>.</li><li><code class="ic">initState</code>의 4개 focus 리스너, <code class="ic">dispose</code>의 4개 focus 해제.</li><li><code class="ic">_assignChip</code>의 기존 본문(활성 필드 채우기 + "먼저 채울 칸을 탭…" SnackBar).</li><li>4개 TextField(name/roaster/cupNotes/memo)의 <code class="ic">focusNode:</code> 인자.</li></ul>
+<p>(키보드 내리기(M2.1 GestureDetector unfocus + <code class="ic">keyboardDismissBehavior</code>)와 "OCR 자동" 하이라이트는 무관하므로 <strong>유지</strong>.)</p>
+<h3>3.4 추가 / 변경</h3>
+<ul><li><code class="ic">bean_form_screen</code>에 <code class="ic">Future&lt;void&gt; _openAssignSheet(String chip)</code> 추가:</li></ul>
+<pre class="code" data-lang="dart"><code>Future&lt;void&gt; _openAssignSheet(String chip) async {
+  // (라벨, 컨트롤러, append?)
+  final targets = &lt;(String, TextEditingController, bool)&gt;[
+    ('제품명', _name, false),
+    ('로스터리', _roaster, false),
+    ('원산지 국가', _components.first.country, false),
+    ('지역', _components.first.region, false),
+    ('컵노트에 추가', _cupNotes, true),
+    ('메모', _memo, false),
+  ];
+  final picked = await showModalBottomSheet&lt;int&gt;(
+    context: context,
+    builder: (ctx) =&gt; SafeArea(
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(18, 14, 18, 6),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text('‘$chip’ 어디에 넣을까요?',
+                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+          ),
+        ),
+        for (var i = 0; i &lt; targets.length; i++)
+          ListTile(
+            key: Key('assign-${targets[i].$1}'),
+            title: Text(targets[i].$1),
+            subtitle: Text(targets[i].$2.text.trim().isEmpty ? '비어있음' : targets[i].$2.text),
+            onTap: () =&gt; Navigator.pop(ctx, i),
+          ),
+      ]),
+    ),
+  );
+  if (picked == null || !mounted) return;
+  final (_, ctrl, append) = targets[picked];
+  setState(() {
+    if (append) {
+      final cur = ctrl.text.trim();
+      ctrl.text = cur.isEmpty ? chip : '$cur, $chip';
+    } else {
+      ctrl.text = chip;
+    }
+    _usedChips.add(chip);
+  });
+}</code></pre>
+<ul><li><code class="ic">OcrChipsPanel</code> 호출을 <code class="ic">onTap: _assignChip</code> → <code class="ic">onTap: _openAssignSheet</code>로 변경.</li><li><code class="ic">OcrChipsPanel</code>의 힌트 문구를 "인식된 텍스트 — <strong>칩을 누르면 어디에 넣을지 물어봐요</strong>"로 갱신.</li><li>지역 TextField(<code class="ic">_componentEditor</code>)에 <code class="ic">key: Key('field-region-$i')</code> 추가(테스트가 값 확인용).</li></ul>
+<hr>
+<h2>4. 파일 영향</h2>
+<p><strong>수정</strong></p>
+<ul><li><code class="ic">lib/features/beans/bean_form_screen.dart</code> — 포커스 메커니즘 제거, <code class="ic">_openAssignSheet</code> 추가, 칩 onTap 변경, 지역 필드 key.</li><li><code class="ic">lib/features/beans/widgets/ocr_chips_panel.dart</code> — 힌트 문구.</li><li><code class="ic">test/widget/ocr_form_test.dart</code> — 옛 focus-routing 테스트를 시트 배정 테스트로 교체 + 지역/자동값 케이스 추가.</li></ul>
+<p>(데이터 모델·저장소·providers 변경 없음. <code class="ic">helpers.dart</code> 불변.)</p>
+<hr>
+<h2>5. 테스트 전략 (docs/testing.md 3계층 · <code class="ic">test/helpers</code> 재사용)</h2>
+<p>M3 Task 5의 <code class="ic">ocr_form_test.dart</code>에서 <strong>focus-routing 테스트(2칩→2필드)는 폐기</strong>(메커니즘 삭제)하고 다음으로 대체:</p>
+<ul><li><strong>칩 탭 → 시트:</strong> draft chips로 폼 pump(뷰포트 확대 — 칩 패널이 하단) → 칩 탭 → <code class="ic">find.byKey(Key('assign-지역'))</code> 등 시트 항목이 뜬다.</li><li><strong>지역 배정(Problem 1 회귀 가드):</strong> 시트에서 "지역" 탭 → <code class="ic">field-region-0</code> TextField의 값이 칩 텍스트 · 칩 흐려짐. (스크롤로 지역 칸이 안 보여도 배정됨 — 시트가 모달이라.)</li><li><strong>컵노트 추가:</strong> "컵노트에 추가" 탭 → 기존 값에 <code class="ic">, {칩}</code> 붙음.</li><li><strong>자동값 덮어쓰기:</strong> 국가 자동으로 찬 draft → 시트의 "원산지 국가" 부제가 현재 값 → 탭하면 칩으로 덮임.</li><li>유지: 프리필+하이라이트+칩 렌더, 빈 draft→배너, 저장 시 photoPath persist, persist 실패 graceful.</li></ul>
+<hr>
+<h2>6. 스코프 밖 (이번 아님)</h2>
+<ul><li>블렌드 2번째+ 구성의 국가·지역 배정(첫 구성만).</li><li>드래그드롭, quick-assign(직전 대상 기억/추천).</li><li>농장·품종·고도 등 폼에 없는 필드 신설(칩은 있으나 넣을 칸 없음 — 후속).</li><li>파서 오탐 자체(§5 반자동, 사용자 교정).</li></ul>
+<hr>
+<h2>7. 완료 기준 (DoD)</h2>
+<ul><li><code class="ic">flutter analyze</code> 0 · <code class="ic">flutter test</code> 전체 green.</li><li>칩 탭 → 시트 → <strong>지역 포함 모든 자유 텍스트 칸에 배정</strong>(스크롤 무관).</li><li>컵노트 추가 · 자동값 칸 덮어쓰기 동작.</li><li>태스크별 SDD 리뷰 + opus 최종 리뷰 통과 → <code class="ic">v0.3.1</code> 태그 → 기기 확인(지역 배정·시트 흐름).</li></ul>
+</article>

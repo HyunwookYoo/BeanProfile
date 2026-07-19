@@ -1,0 +1,223 @@
+<title>BeanProfile — M3.1 칩 배정 재설계 목업</title>
+<style>
+  :root{
+    --bg:#E7E1D6; --fg:#2B2019; --muted:#7A6F62; --line:#D6CEC0;
+    --surface:#F3EFE8; --accent:#A66A24;
+    --shadow:0 18px 40px -18px rgba(60,42,24,.45), 0 4px 12px -6px rgba(60,42,24,.25);
+    --espresso:#2B2019; --oat:#ECE6DB; --cup:#FCFBF8; --cup-2:#F4EFE6;
+    --crema:#B67B2E; --crema-ink:#8A5A18; --cherry:#9E3B2D;
+    --app-muted:#8C8172; --app-line:#E4DED2; --app-line-2:#EDE8DD;
+    --font-sans:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --font-mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Consolas,"Malgun Gothic",monospace;
+  }
+  @media (prefers-color-scheme:dark){:root{
+    --bg:#1B1510; --fg:#EDE5D8; --muted:#9C9081; --line:#332A21; --surface:#241D16; --accent:#D89A46;
+    --shadow:0 20px 46px -18px rgba(0,0,0,.7), 0 4px 14px -6px rgba(0,0,0,.5);
+  }}
+  :root[data-theme="light"]{--bg:#E7E1D6;--fg:#2B2019;--muted:#7A6F62;--line:#D6CEC0;--surface:#F3EFE8;--accent:#A66A24}
+  :root[data-theme="dark"]{--bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--surface:#241D16;--accent:#D89A46}
+
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-sans);line-height:1.5;-webkit-font-smoothing:antialiased}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+  .board{max-width:1180px;margin:0 auto;padding:40px 24px 72px}
+  .eyebrow{font-family:var(--font-mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin:0 0 10px;font-weight:700}
+  h1.title{font-size:clamp(24px,4vw,38px);font-weight:800;letter-spacing:-.025em;margin:0;text-wrap:balance}
+  .sub{color:var(--muted);max-width:66ch;margin:12px 0 0;font-size:15px}
+
+  .legend{display:flex;flex-wrap:wrap;gap:8px 18px;margin:22px 0 4px;padding:14px 16px;background:var(--surface);border:1px solid var(--line);border-radius:14px}
+  .legend span{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
+  .legend b{font-weight:700}
+  .sw{width:13px;height:13px;border-radius:4px;display:inline-block;flex:none}
+
+  .screens{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:18px 20px;margin-top:26px;justify-items:center}
+  .screen-card{width:100%;max-width:360px;display:flex;flex-direction:column;align-items:center}
+  .screen-head{width:100%;display:flex;align-items:baseline;gap:10px;margin:0 4px 12px}
+  .screen-idx{font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--accent)}
+  .screen-name{font-weight:700;font-size:16px}
+  .screen-cap{width:100%;margin:14px 4px 8px;color:var(--muted);font-size:12.5px}
+  .screen-cap li{margin:3px 0}.screen-cap ul{margin:6px 0 0;padding-left:16px}.screen-cap .k{color:var(--fg);font-weight:600}
+
+  .phone{width:320px;height:664px;border-radius:40px;background:#0d0a07;padding:9px;box-shadow:var(--shadow);flex:none;position:relative}
+  .screen{position:relative;width:100%;height:100%;border-radius:32px;overflow:hidden;background:var(--oat);color:var(--espresso);display:flex;flex-direction:column;font-size:14px}
+  .statusbar{height:34px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 20px;font-family:var(--font-mono);font-size:12px;font-weight:600}
+  .statusbar .dots{display:flex;gap:4px}.statusbar .dots i{width:6px;height:6px;border-radius:50%;background:var(--espresso);opacity:.55}
+  .appbar{flex:none;display:flex;align-items:center;gap:10px;padding:6px 16px 12px}
+  .appbar h1{font-size:18px;font-weight:800;letter-spacing:-.02em;margin:0;flex:1}
+  .iconbtn{width:34px;height:34px;border-radius:11px;border:none;background:transparent;display:flex;align-items:center;justify-content:center;color:var(--espresso);flex:none}
+  .body{flex:1;overflow:hidden;padding:0 16px}
+  svg{display:block}.ico{width:18px;height:18px;stroke:currentColor;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round}
+
+  .sectlabel{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--app-muted);margin:2px 0 9px;font-weight:700}
+  .field{background:var(--cup);border:1px solid var(--app-line);border-radius:12px;padding:8px 11px;margin-bottom:8px;position:relative}
+  .field .lb{font-size:10.5px;color:var(--app-muted);font-weight:600}
+  .field .vl{font-size:13.5px;font-weight:600;margin-top:1px}
+  .field .vl.mono{font-family:var(--font-mono);font-size:12px}
+  .field .vl.empty{color:#bdb2a1;font-weight:500}
+  .field.auto{border-color:var(--crema);background:linear-gradient(0deg,#EAD9BE,var(--cup) 42%)}
+  .field.auto .lb{color:var(--crema-ink)}.field .lb .tick{float:right;color:var(--crema);font-family:var(--font-mono);font-weight:700}
+  .field.focus{border-color:var(--crema);box-shadow:0 0 0 3px #EAD9BE}
+  .field .chipbtn{position:absolute;right:8px;top:50%;transform:translateY(-50%);display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:700;color:var(--crema-ink);background:var(--cup-2);border:1px solid var(--app-line);border-radius:8px;padding:4px 8px}
+  .field .chipbtn.on{background:var(--crema);color:#fff;border-color:var(--crema)}
+  .field.hasbtn{padding-right:74px}
+
+  .assign{margin:12px 0 6px;padding:11px;border:1px dashed var(--crema);border-radius:12px;background:var(--cup)}
+  .assign .hint{font-size:11px;color:var(--crema-ink);margin-bottom:8px;font-weight:600}
+  .frag{display:flex;flex-wrap:wrap;gap:6px}
+  .frag .f{font-size:11.5px;padding:5px 10px;border-radius:8px;background:var(--cup-2);border:1px solid var(--app-line);color:var(--espresso);font-weight:600}
+  .frag .f.mono{font-family:var(--font-mono);font-size:11px}
+  .frag .f.tap{background:var(--crema);color:#fff;border-color:var(--crema);position:relative}
+  .frag .f.tap::after{content:"탭";position:absolute;top:-8px;right:-7px;background:var(--espresso);color:var(--oat);font-size:8.5px;font-weight:700;padding:1px 5px;border-radius:6px;font-family:var(--font-mono)}
+  .frag .f.used{opacity:.4;text-decoration:line-through}
+
+  .scrim{position:absolute;inset:0;background:rgba(20,14,8,.36)}
+  .dim{filter:saturate(.6) brightness(.99);opacity:.5}
+  .sheet{position:absolute;left:0;right:0;bottom:0;background:var(--cup);border-radius:20px 20px 0 0;padding:8px 14px 16px;box-shadow:0 -12px 30px -10px rgba(0,0,0,.35)}
+  .sheet .grip{width:38px;height:4px;border-radius:3px;background:var(--app-line);margin:6px auto 12px}
+  .sheet .stitle{font-weight:800;font-size:15px;margin:0 4px 12px}
+  .sheet .stitle b{color:var(--crema-ink)}
+  .opt{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:12px;border:1px solid var(--app-line);background:var(--cup);margin-bottom:7px}
+  .opt.primary{border-color:var(--crema);background:linear-gradient(0deg,#EAD9BE,var(--cup) 60%)}
+  .opt .ot{font-weight:700;font-size:13px;flex:none}
+  .opt .prev{margin-left:auto;font-size:11.5px;color:var(--app-muted);font-family:var(--font-mono);text-align:right}
+  .opt .prev.empty{color:#c3b8a6}
+  .opt.add .ot{color:var(--crema-ink)}
+
+  .warn{margin:12px 0 4px;padding:10px 12px;border-radius:12px;background:#f7e7e3;border:1px solid #e6b7ac;color:#7a2b20;font-size:11px;font-weight:600;line-height:1.5}
+  .warn b{color:#5e1f16}
+
+  .cta{margin-top:6px;height:44px;border-radius:14px;background:var(--espresso);color:var(--oat);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px}
+
+  .decisions{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin:28px 0 6px}
+  .dcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+  .dcard.rec{border-color:var(--crema);box-shadow:0 0 0 2px #EAD9BE}
+  .dcard .tag{font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);font-weight:700}
+  .dcard h4{margin:6px 0 5px;font-size:13.5px}
+  .dcard p{margin:0;font-size:12px;color:var(--muted);line-height:1.55}.dcard p b{color:var(--fg)}
+  .board-foot{margin-top:30px;color:var(--muted);font-size:12.5px;border-top:1px solid var(--line);padding-top:18px;max-width:74ch}
+  .board-foot code{font-family:var(--font-mono);background:var(--surface);padding:1px 6px;border-radius:5px}
+</style>
+
+<div class="board">
+  <header>
+    <p class="eyebrow">BeanProfile · M3.1 · CHIP ASSIGN REDESIGN</p>
+    <h1 class="title">인식 칩 배정 — 상호작용 다시 잡기</h1>
+    <p class="sub">온디바이스 테스트에서 나온 2가지: 지역·국가 등 구성 필드가 배정 대상에서 빠졌고, "칸 포커스 → 칩까지 스크롤 → 칩 탭"이 스크롤 중 키보드가 내려가고 칸이 화면 밖으로 사라져 취약합니다. 아래 <b>안 A(칩 먼저)</b>·<b>안 B(필드 먼저)</b>를 비교해 방향을 정합니다.</p>
+  </header>
+
+  <div class="legend">
+    <span><i class="sw" style="background:var(--crema)"></i>탭할 <b>칩/대상</b></span>
+    <span><i class="sw" style="background:#EAD9BE;border:1px solid var(--crema)"></i>OCR <b>자동</b> 채운 값</span>
+    <span><i class="sw" style="background:#f7e7e3;border:1px solid #e6b7ac"></i>현재 <b>문제</b></span>
+  </div>
+
+  <section class="screens">
+
+    <!-- 0. 현재 문제 -->
+    <article class="screen-card">
+      <div class="screen-head"><span class="screen-idx">현재</span><span class="screen-name">지금의 문제</span></div>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i></span></div>
+        <div class="appbar"><button class="iconbtn"><svg class="ico" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><h1>정보 확인</h1></div>
+        <div class="body">
+          <div class="sectlabel">직접 채우기</div>
+          <div class="field focus"><div class="lb">지역</div><div class="vl empty">입력…  ← ① 여기 탭(포커스)</div></div>
+          <div class="field"><div class="lb">제품명</div><div class="vl">예가체프 코체레</div></div>
+          <div class="warn">② 칩까지 <b>스크롤</b>하면 키보드가 내려가고 <b>지역 칸이 화면 밖</b>으로 → 무엇을 채우는지 안 보이고 선택이 풀림.<br>③ 게다가 <b>지역·국가는 배정 대상도 아님</b>(칩 눌러도 안 들어감).</div>
+          <div class="assign">
+            <div class="hint">인식된 텍스트 — 눌러서 필드에 배정</div>
+            <div class="frag"><span class="f">Yirgacheffe</span><span class="f">Kochere</span><span class="f">Heirloom</span><span class="f mono">1,900m</span><span class="f">프릳츠</span></div>
+          </div>
+        </div>
+      </div></div>
+      <div class="screen-cap"><span class="k">근본 원인</span>
+        <ul><li>대상 칸(위)과 칩(아래)이 <span class="k">멀리 떨어짐</span> + 유지 상태가 <span class="k">보이지 않음</span>.</li><li>구성 필드(지역·국가)는 <span class="k">배정 배선 자체가 없음</span>.</li></ul>
+      </div>
+    </article>
+
+    <!-- A1. 칩 먼저 — 칩 탭 -->
+    <article class="screen-card">
+      <div class="screen-head"><span class="screen-idx">A·1</span><span class="screen-name">칩 먼저 — 칩 탭</span></div>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i></span></div>
+        <div class="appbar"><button class="iconbtn"><svg class="ico" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><h1>정보 확인</h1></div>
+        <div class="body">
+          <div class="sectlabel">자동 인식됨</div>
+          <div class="field auto"><div class="lb">원산지 국가 <span class="tick">✓</span></div><div class="vl">Ethiopia</div></div>
+          <div class="sectlabel" style="margin-top:12px">직접 채우기</div>
+          <div class="field"><div class="lb">제품명</div><div class="vl">예가체프 코체레</div></div>
+          <div class="field"><div class="lb">지역</div><div class="vl empty">비어있음</div></div>
+          <div class="assign">
+            <div class="hint">인식된 텍스트 — 칩을 누르면 <b>어디에 넣을지</b> 물어봐요</div>
+            <div class="frag"><span class="f tap">Yirgacheffe</span><span class="f">Kochere</span><span class="f">Heirloom</span><span class="f mono">1,900m</span><span class="f">프릳츠</span></div>
+          </div>
+        </div>
+      </div></div>
+      <div class="screen-cap"><span class="k">1단계</span>
+        <ul><li>스크롤 위치·포커스와 <span class="k">무관</span> — 그냥 칩을 탭.</li></ul>
+      </div>
+    </article>
+
+    <!-- A2. 칩 먼저 — 배정 시트 -->
+    <article class="screen-card">
+      <div class="screen-head"><span class="screen-idx">A·2 ★</span><span class="screen-name">칩 먼저 — 배정 시트</span></div>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i></span></div>
+        <div class="appbar dim"><button class="iconbtn"><svg class="ico" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><h1>정보 확인</h1></div>
+        <div class="body dim">
+          <div class="field"><div class="lb">제품명</div><div class="vl">예가체프 코체레</div></div>
+          <div class="field"><div class="lb">지역</div><div class="vl empty">비어있음</div></div>
+        </div>
+        <div class="scrim"></div>
+        <div class="sheet">
+          <div class="grip"></div>
+          <p class="stitle">‘<b>Yirgacheffe</b>’ 을 어디에 넣을까요?</p>
+          <div class="opt"><span class="ot">제품명</span><span class="prev">예가체프 코체레</span></div>
+          <div class="opt"><span class="ot">로스터리</span><span class="prev empty">비어있음</span></div>
+          <div class="opt"><span class="ot">원산지 국가</span><span class="prev">Ethiopia</span></div>
+          <div class="opt primary"><span class="ot">지역</span><span class="prev empty">비어있음 · 여기 탭</span></div>
+          <div class="opt add"><span class="ot">＋ 컵노트에 추가</span><span class="prev">블루베리, 자스민</span></div>
+          <div class="opt"><span class="ot">메모</span><span class="prev empty">비어있음</span></div>
+        </div>
+      </div></div>
+      <div class="screen-cap"><span class="k">2단계</span>
+        <ul><li>대상 탭 → 그 칸에 채워지고 칩은 <span class="k">흐려짐</span>. 각 칸의 <span class="k">현재 값</span>이 미리보기로 보임.</li><li>스크롤·포커스 유지 불필요 · <span class="k">어디서든 2탭</span> · 모든 필드 대상.</li></ul>
+      </div>
+    </article>
+
+    <!-- B. 필드 먼저 -->
+    <article class="screen-card">
+      <div class="screen-head"><span class="screen-idx">B</span><span class="screen-name">필드 먼저 (대안)</span></div>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i></span></div>
+        <div class="appbar"><button class="iconbtn"><svg class="ico" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><h1>정보 확인</h1></div>
+        <div class="body">
+          <div class="sectlabel">직접 채우기 — 각 칸의 <b>칩</b> 버튼으로 배정</div>
+          <div class="field hasbtn"><div class="lb">제품명</div><div class="vl">예가체프 코체레</div><span class="chipbtn">칩 ▾</span></div>
+          <div class="field hasbtn"><div class="lb">로스터리</div><div class="vl empty">비어있음</div><span class="chipbtn">칩 ▾</span></div>
+          <div class="field hasbtn"><div class="lb">지역</div><div class="vl empty">비어있음</div><span class="chipbtn on">칩 ▾</span></div>
+          <div class="field hasbtn"><div class="lb">메모</div><div class="vl empty">비어있음</div><span class="chipbtn">칩 ▾</span></div>
+        </div>
+        <div class="scrim" style="background:rgba(20,14,8,.28)"></div>
+        <div class="sheet">
+          <div class="grip"></div>
+          <p class="stitle">지역에 넣을 텍스트 고르기</p>
+          <div class="frag" style="padding:2px 2px 6px"><span class="f tap">Yirgacheffe</span><span class="f">Kochere</span><span class="f">Heirloom</span><span class="f mono">1,900m</span><span class="f">프릳츠</span></div>
+        </div>
+      </div></div>
+      <div class="screen-cap"><span class="k">칸 기준</span>
+        <ul><li>각 칸 우측 <span class="k">칩 ▾</span> → 인식 칩 목록에서 선택 → 그 칸에 채움.</li><li>칸마다 버튼이 붙어 <span class="k">화면이 다소 복잡</span>. 칸 여러 개(블렌드 구성)면 더.</li></ul>
+      </div>
+    </article>
+
+  </section>
+
+  <div class="decisions">
+    <div class="dcard rec"><span class="tag">추천 · 안 A</span><h4>칩 먼저 (칩 탭 → 시트)</h4><p>스크롤·포커스와 <b>무관</b>, 어디서든 <b>2탭</b>, <b>모든 필드</b> 대상. 어포던스는 칩 하나뿐이라 깔끔. OCR 멘탈모델(<b>“이 텍스트 뭐지 → 어디 넣지”</b>)과 정확히 일치.</p></div>
+    <div class="dcard"><span class="tag">대안 · 안 B</span><h4>필드 먼저 (칸의 칩 버튼)</h4><p>“이 칸을 채운다” 사고엔 직관적이나, <b>칸마다 버튼</b>이 붙어 화면이 복잡해지고 블렌드 구성이 늘면 더 산만.</p></div>
+    <div class="dcard"><span class="tag">공통 결정</span><h4>모든 자유 텍스트 필드 대상화</h4><p>제품명·로스터리·<b>원산지 국가·지역</b>·컵노트·메모. (지금은 상위 4개만.) 컵노트는 <b>추가(append)</b>, 나머지는 교체.</p></div>
+    <div class="dcard"><span class="tag">확인 요청</span><h4>자동값 필드도 시트에?</h4><p>국가처럼 <b>이미 자동으로 찬 필드</b>도 시트 목록에 넣어 덮어쓰기 허용할지, 아니면 자유 텍스트 칸만 보여줄지.</p></div>
+  </div>
+
+  <p class="board-foot">이 목업은 <b>M3.1 상호작용 확정용</b>입니다. 방향(A/B)·문구·"자동값 필드 포함 여부"를 정하면 설계 스펙 → 구현 계획(SDD)으로 넘어갑니다. 소스는 지금 scratchpad, 확정되면 <code>docs/mockups/</code>로 옮겨 커밋합니다.</p>
+</div>

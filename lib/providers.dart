@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'data/bean_repository.dart';
 import 'data/database.dart';
+import 'services/ocr_service.dart';
+import 'services/photo_service.dart';
 
 final databaseProvider = Provider<AppDatabase>((ref) {
   final db = AppDatabase();
@@ -20,3 +22,6 @@ final beanDetailProvider =
     StreamProvider.autoDispose.family<BeanDetail?, int>(
   (ref, beanId) => ref.watch(beanRepositoryProvider).watchBeanDetail(beanId),
 );
+
+final ocrServiceProvider = Provider<OcrService>((ref) => MlkitOcrService());
+final photoServiceProvider = Provider<PhotoService>((ref) => ImagePickerPhotoService());

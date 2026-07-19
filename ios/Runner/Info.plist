@@ -45,5 +45,9 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>원두 봉투·정보 카드를 촬영해 정보를 자동으로 인식하는 데 사용해요.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>저장된 사진에서 원두 정보를 불러오는 데 사용해요.</string>
 </dict>
 </plist>

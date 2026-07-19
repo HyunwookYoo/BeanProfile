@@ -4,6 +4,7 @@ import '../../providers.dart';
 import '../../theme.dart';
 import 'bean_detail_screen.dart';
 import 'bean_form_screen.dart';
+import 'debug_ocr_screen.dart';
 import 'widgets/bean_card.dart';
 import 'widgets/delete_ux.dart';
 
@@ -14,7 +15,17 @@ class BeanListScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final beans = ref.watch(beanListProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('내 원두', style: TextStyle(fontWeight: FontWeight.w800))),
+      appBar: AppBar(
+        title: const Text('내 원두', style: TextStyle(fontWeight: FontWeight.w800)),
+        actions: [
+          IconButton(
+            key: const Key('debug-ocr'),
+            icon: const Icon(Icons.bug_report_outlined),
+            onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const DebugOcrScreen())),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => const BeanFormScreen())),

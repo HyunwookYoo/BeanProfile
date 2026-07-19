@@ -11,8 +11,12 @@ class MlkitOcrService implements OcrService {
 
   @override
   Future<String> recognize(String imagePath) async {
-    _recognizer ??= TextRecognizer(script: TextRecognitionScript.korean);
-    final result = await _recognizer!.processImage(InputImage.fromFilePath(imagePath));
-    return result.text;
+    try {
+      _recognizer ??= TextRecognizer(script: TextRecognitionScript.korean);
+      final result = await _recognizer!.processImage(InputImage.fromFilePath(imagePath));
+      return result.text;
+    } catch (_) {
+      return ''; // 인식 실패/모델 미다운로드 → 빈 문자열(폼의 '자동 인식 실패' 배너로 이어짐)
+    }
   }
 }

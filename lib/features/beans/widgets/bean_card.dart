@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../data/enums.dart';
 import '../../../data/models.dart';
 import '../../../theme.dart';
+import 'bean_thumbnail.dart';
 import 'star_rating.dart';
 
 class BeanCard extends StatelessWidget {
@@ -23,27 +24,33 @@ class BeanCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: c.appLine),
         ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(bean.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-          const SizedBox(height: 2),
-          Text([bean.roaster, summary.originLabel].where((e) => e != null && e.isNotEmpty).join(' · '),
-              style: TextStyle(fontSize: 12, color: c.appMuted)),
-          const SizedBox(height: 8),
-          Row(children: [
-            if (bean.type == BeanType.blend) ...[
-              _Badge(text: 'BLEND', color: c.cremaInk),
-              const SizedBox(width: 8),
-            ],
-            StarRating(value: summary.avgRating),
-            const Spacer(),
-            Text('시음 ${summary.tastingCount}', style: monoStyle(size: 11, color: c.appMuted)),
-          ]),
-          if (bean.cupNotes.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Wrap(spacing: 5, runSpacing: 5, children: [
-              for (final n in bean.cupNotes.take(4)) _Note(text: n, color: c),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          BeanThumbnail(photoPath: bean.photoPath),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(bean.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+              const SizedBox(height: 2),
+              Text([bean.roaster, summary.originLabel].where((e) => e != null && e.isNotEmpty).join(' · '),
+                  style: TextStyle(fontSize: 12, color: c.appMuted)),
+              const SizedBox(height: 8),
+              Row(children: [
+                if (bean.type == BeanType.blend) ...[
+                  _Badge(text: 'BLEND', color: c.cremaInk),
+                  const SizedBox(width: 8),
+                ],
+                StarRating(value: summary.avgRating),
+                const Spacer(),
+                Text('시음 ${summary.tastingCount}', style: monoStyle(size: 11, color: c.appMuted)),
+              ]),
+              if (bean.cupNotes.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Wrap(spacing: 5, runSpacing: 5, children: [
+                  for (final n in bean.cupNotes.take(4)) _Note(text: n, color: c),
+                ]),
+              ],
             ]),
-          ],
+          ),
         ]),
       ),
     );

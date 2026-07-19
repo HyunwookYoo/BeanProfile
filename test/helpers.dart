@@ -58,3 +58,11 @@ TastingInput sampleTasting({
       acidity: acidity, sweetness: sweetness, body: body,
       bitterness: bitterness, overall: overall, comment: comment,
     );
+
+extension BeanInputPhoto on BeanInput {
+  BeanInput copyWithPhoto(String path) => BeanInput(
+        name: name, roaster: roaster, type: type, roastLevel: roastLevel,
+        roastDate: roastDate, cupNotes: cupNotes, memo: memo, components: components,
+        photoPath: path,
+      );
+}

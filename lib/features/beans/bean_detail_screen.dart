@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/database.dart';
@@ -7,6 +8,7 @@ import '../../providers.dart';
 import '../../theme.dart';
 import '../tasting/tasting_form_screen.dart';
 import 'bean_form_screen.dart';
+import 'widgets/bean_thumbnail.dart';
 import 'widgets/delete_ux.dart';
 import 'widgets/star_rating.dart';
 
@@ -98,16 +100,27 @@ class _DetailBody extends StatelessWidget {
     final c = context.colors;
     final bean = detail.bean;
     return ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 24), children: [
-      Text(bean.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-      const SizedBox(height: 2),
-      Text([bean.roaster, bean.type.label].where((e) => e.isNotEmpty).join(' · '),
-          style: TextStyle(color: c.appMuted)),
-      const SizedBox(height: 8),
-      Row(children: [
-        StarRating(value: detail.avgRating),
-        const SizedBox(width: 10),
-        Text('시음 ${detail.tastingCount}회',
-            style: TextStyle(color: c.appMuted, fontSize: 12)),
+      Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        GestureDetector(
+          onTap: bean.photoPath == null ? null : () => _showFullPhoto(context, bean.photoPath!),
+          child: BeanThumbnail(photoPath: bean.photoPath, width: 56, height: 70),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(bean.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 2),
+            Text([bean.roaster, bean.type.label].where((e) => e.isNotEmpty).join(' · '),
+                style: TextStyle(color: c.appMuted)),
+            const SizedBox(height: 8),
+            Row(children: [
+              StarRating(value: detail.avgRating),
+              const SizedBox(width: 10),
+              Text('시음 ${detail.tastingCount}회',
+                  style: TextStyle(color: c.appMuted, fontSize: 12)),
+            ]),
+          ]),
+        ),
       ]),
       const SizedBox(height: 14),
       for (final comp in detail.components) _componentBlock(context, comp),
@@ -142,6 +155,21 @@ class _DetailBody extends StatelessWidget {
       else
         for (final t in detail.tastings) _tastingRow(context, t),
     ]);
+  }
+
+  void _showFullPhoto(BuildContext context, String path) {
+    showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: const EdgeInsets.all(12),
+        child: InteractiveViewer(
+          child: Image.file(File(path), fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => const SizedBox(
+                  height: 200, child: Center(child: Icon(Icons.broken_image_outlined, color: Colors.white54)))),
+        ),
+      ),
+    );
   }
 
   Widget _componentBlock(BuildContext context, OriginComponent comp) {

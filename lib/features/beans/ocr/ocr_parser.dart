@@ -78,9 +78,23 @@ T? _firstMatch<T>(String lower, Map<String, T> table) {
   return null;
 }
 
+final RegExp _roastLabel = RegExp(r'roast|로스팅|볶은', caseSensitive: false);
+
 DateTime? _matchDate(String text) {
+  // 1) 로스팅 라벨이 있는 줄에서 먼저 찾는다(유통기한 등 다른 날짜에 밀리지 않게).
+  for (final line in text.split('\n')) {
+    if (_roastLabel.hasMatch(line)) {
+      final d = _dateIn(line);
+      if (d != null) return d;
+    }
+  }
+  // 2) 없으면 전체 텍스트에서 첫 유효 날짜.
+  return _dateIn(text);
+}
+
+DateTime? _dateIn(String s) {
   for (final re in _datePatterns) {
-    final m = re.firstMatch(text);
+    final m = re.firstMatch(s);
     if (m == null) continue;
     var year = int.parse(m.group(1)!);
     if (year < 100) year += 2000;

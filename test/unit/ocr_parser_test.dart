@@ -24,6 +24,12 @@ void main() {
     test('말이 안 되는 숫자는 무시', () {
       expect(parseOcrText('lot 99.99.99').roastDate, isNull);
     });
+    test('로스팅 라벨 줄의 날짜가 유통기한 등 다른 날짜보다 우선', () {
+      expect(parseOcrText('Best Before 2027-01-15\nRoasted 2026-07-02').roastDate,
+          DateTime(2026, 7, 2));
+      expect(parseOcrText('로스팅일 2026.07.02\n유통기한 2027.01.15').roastDate,
+          DateTime(2026, 7, 2));
+    });
   });
 
   group('roastLevel', () {
@@ -32,6 +38,10 @@ void main() {
       expect(parseOcrText('Full City').roastLevel, RoastLevel.mediumDark);
       expect(parseOcrText('미디엄 로스팅').roastLevel, RoastLevel.medium);
       expect(parseOcrText('다크').roastLevel, RoastLevel.dark);
+    });
+    test('라이트미디엄/light medium 복합어가 단일어보다 우선(순서 회귀 가드)', () {
+      expect(parseOcrText('라이트미디엄 로스팅').roastLevel, RoastLevel.lightMedium);
+      expect(parseOcrText('Light Medium').roastLevel, RoastLevel.lightMedium);
     });
   });
 

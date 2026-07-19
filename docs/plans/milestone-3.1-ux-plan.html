@@ -1,0 +1,265 @@
+<title>M3.1 OCR 칩 배정 재설계 — 구현 계획</title>
+<style>
+*{box-sizing:border-box}
+:root{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+  --font-sans:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Consolas,"Malgun Gothic",monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}}
+:root[data-theme="light"]{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+}
+:root[data-theme="dark"]{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-sans);line-height:1.7;-webkit-font-smoothing:antialiased}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.doc{max-width:880px;margin:0 auto;padding:44px 24px 96px}
+.crumb{font-family:var(--font-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:16px}
+h1{font-size:clamp(26px,4vw,38px);font-weight:800;letter-spacing:-.025em;line-height:1.2;margin:.1em 0 .5em;text-wrap:balance}
+h2{font-size:22px;font-weight:700;margin:2em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line);letter-spacing:-.01em;text-wrap:balance}
+h3{font-size:16.5px;font-weight:700;color:var(--accent-ink);margin:1.7em 0 .5em}
+h4{font-size:14px;font-weight:700;margin:1.3em 0 .4em}
+p{margin:.7em 0}
+a{color:var(--accent);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+strong{font-weight:700;color:var(--fg)}
+hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+code.ic{font-family:var(--font-mono);font-size:.85em;background:var(--ic-bg);color:var(--ic-fg);padding:1.5px 6px;border-radius:6px}
+pre.code{position:relative;background:var(--code-bg);color:var(--code-fg);border-radius:12px;padding:16px 18px;margin:1em 0;overflow-x:auto;border:1px solid rgba(0,0,0,.28)}
+pre.code code{font-family:var(--font-mono);font-size:12.75px;line-height:1.6;white-space:pre;color:inherit;background:none;padding:0}
+pre.code[data-lang]::before{content:attr(data-lang);position:absolute;top:9px;right:13px;font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(236,227,211,.42)}
+.tablewrap{overflow-x:auto;margin:1.1em 0}
+table{border-collapse:collapse;width:100%;font-size:13.75px}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--th);font-weight:700}
+tbody tr:nth-child(even){background:var(--surface)}
+blockquote{margin:1.1em 0;padding:11px 16px;border-left:3px solid var(--accent);background:var(--surface);border-radius:0 10px 10px 0;color:var(--muted)}
+blockquote strong{color:var(--fg)}
+ul,ol{margin:.7em 0;padding-left:1.4em}
+li{margin:.32em 0}
+ul.tasklist{list-style:none;padding-left:.15em}
+ul.tasklist li.task{position:relative;padding-left:30px;margin:.5em 0}
+ul.tasklist li.task::before{content:"";position:absolute;left:0;top:.18em;width:17px;height:17px;border:2px solid var(--accent);border-radius:5px;background:transparent}
+ul.tasklist li.task.done::before{content:"\2713";background:var(--accent);color:#fff;font-size:12px;font-weight:800;text-align:center;line-height:15px}
+</style>
+<article class="doc"><div class="crumb">BeanProfile · docs/plans</div>
+<h1>M3.1 OCR 칩 배정 재설계 — 구현 계획</h1>
+<blockquote><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code class="ic">- [ ]</code>) syntax for tracking.</blockquote>
+<p><strong>Goal:</strong> 취약한 "칸 포커스 → 스크롤 → 칩 탭" 배정을 <strong>"칩 탭 → '어디에 넣을까요?' 시트 → 대상 탭"</strong> 으로 교체하고, 지역·국가를 포함한 <strong>모든 자유 텍스트 필드</strong>를 배정 대상으로 만든다.</p>
+<p><strong>Architecture:</strong> <code class="ic">FocusNode</code> 기반 <code class="ic">_activeField</code> 메커니즘을 제거한다. <code class="ic">OcrChipsPanel</code>의 칩 탭은 이제 모달 바텀시트를 열어 텍스트 필드 대상 목록(현재 값 미리보기 포함)을 보여주고, 선택 시 해당 컨트롤러에 채운다(컵노트=추가, 그 외=교체) + 칩을 used로 표시. 시트가 모달이라 대상 칸이 스크롤로 안 보여도 배정된다.</p>
+<p><strong>Tech Stack:</strong> Flutter · flutter_riverpod · Dart 3 records · flutter_test.</p>
+<h2>Global Constraints</h2>
+<ul><li><strong>한국어 UI</strong> · 오프라인/로컬 전용.</li><li><strong>데이터 모델·저장소·providers 변경 없음</strong> (순수 UI 상호작용 패치).</li><li><code class="ic">flutter analyze</code> 0 · 기존 테스트 green 유지.</li><li>커밋 트레일러: <code class="ic">Co-Authored-By: Claude Opus 4.8 (1M context) &lt;noreply@anthropic.com&gt;</code> · main 직접 커밋(트렁크).</li><li>배정 대상 = 제품명·로스터리·원산지 국가·지역·컵노트·메모(첫 구성만). 컵노트=추가, 그 외=교체. 자동으로 찬 칸도 포함(덮어쓰기).</li><li>로스팅단계·날짜·가공은 enum/날짜라 칩 대상 아님(기존 피커 유지). 키보드 내리기·"OCR 자동" 하이라이트 유지.</li></ul>
+<hr>
+<h2>File Structure</h2>
+<p><strong>수정 (신규 파일 없음)</strong></p>
+<ul><li><code class="ic">lib/features/beans/bean_form_screen.dart</code> — 포커스 메커니즘 제거 + <code class="ic">_openAssignSheet</code> 추가 + 칩 onTap 교체 + 지역 필드 key.</li><li><code class="ic">lib/features/beans/widgets/ocr_chips_panel.dart</code> — 힌트/문서 문구.</li><li><code class="ic">test/widget/ocr_form_test.dart</code> — 포커스-라우팅 테스트 → 시트 배정 테스트로 교체.</li></ul>
+<p>작은 단일 패치라 <strong>1 태스크</strong>로 구성한다(제거+추가가 서로 얽혀 중간 상태가 컴파일되지 않으므로 분리 불가).</p>
+<hr>
+<h3>Task 1: 칩-먼저 배정 시트로 교체</h3>
+<p><strong>Files:</strong></p>
+<ul><li>Modify: <code class="ic">lib/features/beans/bean_form_screen.dart</code>, <code class="ic">lib/features/beans/widgets/ocr_chips_panel.dart</code></li><li>Test: <code class="ic">test/widget/ocr_form_test.dart</code></li></ul>
+<p><strong>Interfaces:</strong></p>
+<ul><li>Consumes: <code class="ic">OcrChipsPanel({required List&lt;String&gt; chips, required Set&lt;String&gt; used, required void Function(String) onTap})</code> (시그니처 불변 — <code class="ic">onTap</code>이 이제 시트를 연다) · <code class="ic">BeanFormScreen</code> 상태의 <code class="ic">_name</code>/<code class="ic">_roaster</code>/<code class="ic">_cupNotes</code>/<code class="ic">_memo</code>/<code class="ic">_components</code>/<code class="ic">_usedChips</code>.</li><li>Produces: (내부) <code class="ic">Future&lt;void&gt; _openAssignSheet(String chip)</code> · 지역 필드 <code class="ic">Key('field-region-$i')</code>.</li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 1: 포커스-라우팅 테스트를 시트 배정 테스트로 교체 (실패 테스트 작성)</strong></li></ul>
+<p><code class="ic">test/widget/ocr_form_test.dart</code>에서 <strong>기존 두 번째 테스트 <code class="ic">'칩이 포커스된 칸으로 라우팅됨 (하드코딩 아님)'</code> 전체(현재 40–67행)를 삭제</strong>하고 그 자리에 아래 4개 테스트를 넣는다(나머지 테스트는 불변):</p>
+<pre class="code" data-lang="dart"><code>  testWidgets('칩 탭 → 배정 시트가 대상 목록을 보여줌', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    t.view.physicalSize = const Size(2400, 4000);
+    t.view.devicePixelRatio = 3.0;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(wrapApp(
+      const BeanFormScreen(draft: OcrDraft(chips: ['Yirgacheffe'])),
+      db: db,
+    ));
+    await t.pump();
+
+    await t.tap(find.byKey(const Key('chip-Yirgacheffe')));
+    await t.pumpAndSettle();
+
+    expect(find.byKey(const Key('assign-지역')), findsOneWidget);
+    expect(find.byKey(const Key('assign-원산지 국가')), findsOneWidget);
+    expect(find.byKey(const Key('assign-컵노트에 추가')), findsOneWidget);
+  });
+
+  testWidgets('시트에서 지역 선택 → 지역 칸에 채워지고 칩 흐려짐', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    t.view.physicalSize = const Size(2400, 4000);
+    t.view.devicePixelRatio = 3.0;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(wrapApp(
+      const BeanFormScreen(draft: OcrDraft(chips: ['Yirgacheffe'])),
+      db: db,
+    ));
+    await t.pump();
+
+    await t.tap(find.byKey(const Key('chip-Yirgacheffe')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const Key('assign-지역')));
+    await t.pumpAndSettle();
+
+    expect(t.widget&lt;TextField&gt;(find.byKey(const Key('field-region-0'))).controller!.text, 'Yirgacheffe');
+    expect(t.widget&lt;ActionChip&gt;(find.byKey(const Key('chip-Yirgacheffe'))).onPressed, isNull);
+  });
+
+  testWidgets('시트에서 컵노트에 추가 → 기존 값에 append', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    t.view.physicalSize = const Size(2400, 4000);
+    t.view.devicePixelRatio = 3.0;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(wrapApp(
+      const BeanFormScreen(draft: OcrDraft(cupNotes: ['블루베리'], chips: ['홍차'])),
+      db: db,
+    ));
+    await t.pump();
+
+    await t.tap(find.byKey(const Key('chip-홍차')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const Key('assign-컵노트에 추가')));
+    await t.pumpAndSettle();
+
+    expect(find.text('블루베리, 홍차'), findsOneWidget);
+  });
+
+  testWidgets('자동으로 찬 국가 칸도 시트에서 덮어쓸 수 있음', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    t.view.physicalSize = const Size(2400, 4000);
+    t.view.devicePixelRatio = 3.0;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(wrapApp(
+      const BeanFormScreen(draft: OcrDraft(country: 'Ethiopia', chips: ['Colombia'])),
+      db: db,
+    ));
+    await t.pump();
+
+    expect(t.widget&lt;TextField&gt;(find.byKey(const Key('field-country-0'))).controller!.text, 'Ethiopia');
+
+    await t.tap(find.byKey(const Key('chip-Colombia')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const Key('assign-원산지 국가')));
+    await t.pumpAndSettle();
+
+    expect(t.widget&lt;TextField&gt;(find.byKey(const Key('field-country-0'))).controller!.text, 'Colombia');
+  });</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 2: RED 확인</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/widget/ocr_form_test.dart</code> Expected: 새 4개 테스트 FAIL — 칩을 탭해도 시트(<code class="ic">assign-*</code> ListTile)가 안 열림(현재는 <code class="ic">_assignChip</code>이 SnackBar만 띄움). (기존 유지 테스트는 PASS.)</p>
+<ul class="tasklist"><li class="task"><strong>Step 3a: <code class="ic">bean_form_screen.dart</code> — 상태 필드에서 포커스 메커니즘 제거</strong></li></ul>
+<p>현재 상태 필드 블록(현 37–42행):</p>
+<pre class="code" data-lang="dart"><code>  bool _saving = false;
+  final _nameFocus = FocusNode();
+  final _roasterFocus = FocusNode();
+  final _cupNotesFocus = FocusNode();
+  final _memoFocus = FocusNode();
+  TextEditingController? _activeField;
+  final _usedChips = &lt;String&gt;{};</code></pre>
+<p>를 아래로 교체(포커스 필드·<code class="ic">_activeField</code> 삭제, <code class="ic">_usedChips</code> 유지):</p>
+<pre class="code" data-lang="dart"><code>  bool _saving = false;
+  final _usedChips = &lt;String&gt;{};</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 3b: <code class="ic">initState</code>의 포커스 리스너 4줄 삭제</strong></li></ul>
+<p><code class="ic">initState</code> 끝의 아래 4줄(현 79–82행)을 <strong>삭제</strong>:</p>
+<pre class="code" data-lang="dart"><code>    _nameFocus.addListener(() { if (_nameFocus.hasFocus) _activeField = _name; });
+    _roasterFocus.addListener(() { if (_roasterFocus.hasFocus) _activeField = _roaster; });
+    _cupNotesFocus.addListener(() { if (_cupNotesFocus.hasFocus) _activeField = _cupNotes; });
+    _memoFocus.addListener(() { if (_memoFocus.hasFocus) _activeField = _memo; });</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 3c: <code class="ic">dispose</code>의 포커스 해제 2줄 삭제</strong></li></ul>
+<p><code class="ic">dispose</code>에서 아래 2줄(현 88–89행)을 <strong>삭제</strong>(나머지 dispose는 유지):</p>
+<pre class="code" data-lang="dart"><code>    _nameFocus.dispose(); _roasterFocus.dispose();
+    _cupNotesFocus.dispose(); _memoFocus.dispose();</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 3d: <code class="ic">_assignChip</code>을 <code class="ic">_openAssignSheet</code>로 교체</strong></li></ul>
+<p>기존 <code class="ic">_assignChip</code> 메서드(현 100–116행)를 <strong>삭제</strong>하고 아래로 교체:</p>
+<pre class="code" data-lang="dart"><code>  Future&lt;void&gt; _openAssignSheet(String chip) async {
+    // (라벨, 대상 컨트롤러, append 여부)
+    final targets = &lt;(String, TextEditingController, bool)&gt;[
+      ('제품명', _name, false),
+      ('로스터리', _roaster, false),
+      ('원산지 국가', _components.first.country, false),
+      ('지역', _components.first.region, false),
+      ('컵노트에 추가', _cupNotes, true),
+      ('메모', _memo, false),
+    ];
+    final picked = await showModalBottomSheet&lt;int&gt;(
+      context: context,
+      builder: (ctx) =&gt; SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 14, 18, 6),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text('‘$chip’ 어디에 넣을까요?',
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+            ),
+          ),
+          for (var i = 0; i &lt; targets.length; i++)
+            ListTile(
+              key: Key('assign-${targets[i].$1}'),
+              title: Text(targets[i].$1),
+              subtitle: Text(targets[i].$2.text.trim().isEmpty ? '비어있음' : targets[i].$2.text),
+              onTap: () =&gt; Navigator.pop(ctx, i),
+            ),
+        ]),
+      ),
+    );
+    if (picked == null || !mounted) return;
+    final (_, ctrl, append) = targets[picked];
+    setState(() {
+      if (append) {
+        final cur = ctrl.text.trim();
+        ctrl.text = cur.isEmpty ? chip : '$cur, $chip';
+      } else {
+        ctrl.text = chip;
+      }
+      _usedChips.add(chip);
+    });
+  }</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 3e: 4개 TextField에서 <code class="ic">focusNode:</code> 인자 제거</strong></li></ul>
+<p>제품명·로스터리(현 180·183행), 컵노트(227행), 메모(232행)의 <code class="ic">focusNode: _nameFocus</code>(등)를 <strong>삭제</strong>. 교체 후 4줄:</p>
+<pre class="code" data-lang="dart"><code>        TextField(key: const Key('field-name'), controller: _name,
+            decoration: const InputDecoration(labelText: '제품명 *')),</code></pre>
+<pre class="code" data-lang="dart"><code>        TextField(key: const Key('field-roaster'), controller: _roaster,
+            decoration: const InputDecoration(labelText: '로스터리')),</code></pre>
+<pre class="code" data-lang="dart"><code>        TextField(controller: _cupNotes,
+            decoration: InputDecoration(
+                labelText: '컵노트 (쉼표로 구분)', hintText: '블루베리, 자스민, 홍차',
+                helperText: _auto &amp;&amp; widget.draft!.cupNotes.isNotEmpty ? 'OCR 자동' : null)),</code></pre>
+<pre class="code" data-lang="dart"><code>        TextField(controller: _memo, maxLines: 3,
+            decoration: const InputDecoration(labelText: '메모')),</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 3f: 칩 패널 onTap 교체</strong></li></ul>
+<p><code class="ic">OcrChipsPanel</code> 호출(현 246행)의 <code class="ic">onTap: _assignChip</code>을 <code class="ic">onTap: _openAssignSheet</code>로:</p>
+<pre class="code" data-lang="dart"><code>          else if (widget.draft!.chips.isNotEmpty)
+            OcrChipsPanel(chips: widget.draft!.chips, used: _usedChips, onTap: _openAssignSheet),</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 3g: 지역 TextField에 key 추가</strong></li></ul>
+<p><code class="ic">_componentEditor</code>의 지역 TextField(현 288–289행)에 key를 단다:</p>
+<pre class="code" data-lang="dart"><code>          Expanded(child: TextField(
+              key: Key('field-region-$i'),
+              controller: comp.region,
+              decoration: const InputDecoration(labelText: '지역'))),</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 3h: <code class="ic">ocr_chips_panel.dart</code> 힌트·문서 문구 갱신</strong></li></ul>
+<p>문서 주석(현 4행)과 힌트 텍스트(현 21–22행)를 교체:</p>
+<pre class="code" data-lang="dart"><code>/// 인식된 텍스트 칩. 탭하면 '어디에 넣을지' 배정 시트가 열린다. 쓴 칩은 흐려짐.</code></pre>
+<pre class="code" data-lang="dart"><code>        Text('인식된 텍스트 — 칩을 누르면 어디에 넣을지 물어봐요',
+            style: TextStyle(fontSize: 11, color: c.cremaInk, fontWeight: FontWeight.w600)),</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 4: GREEN + analyze + 전체</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/widget/ocr_form_test.dart</code> Expected: 전체 PASS(유지 테스트 + 새 4개). Run: <code class="ic">flutter analyze</code> Expected: No issues (제거된 <code class="ic">_nameFocus</code> 등에 대한 미사용/미정의 참조가 하나도 남지 않았는지 확인). Run: <code class="ic">flutter test</code> Expected: 전체 green(기존에서 net: 포커스 테스트 1 제거 + 새 4 = +3).</p>
+<ul class="tasklist"><li class="task"><strong>Step 5: Commit</strong></li></ul>
+<pre class="code" data-lang="bash"><code>git add lib/features/beans/bean_form_screen.dart lib/features/beans/widgets/ocr_chips_panel.dart test/widget/ocr_form_test.dart
+git commit -m "feat(m3.1): chip-first assign sheet (all text fields, incl region); drop focus mechanism"</code></pre>
+<hr>
+<h2>Self-Review (계획 작성자 체크)</h2>
+<p><strong>Spec coverage</strong> (milestone-3.1-ux-design.md 대비):</p>
+<ul><li>§3.1 칩-먼저 시트 → Step 3d(_openAssignSheet) + 3f(onTap). ✅</li><li>§3.2 대상 6필드·규칙(append/replace)·자동값 포함 → _openAssignSheet의 targets + subtitle. ✅</li><li>§3.3 포커스 메커니즘 제거 → Step 3a/3b/3c/3e. ✅</li><li>§3.4 패널 힌트·지역 key → Step 3h·3g. ✅</li><li>§5 테스트(칩탭→시트·지역 배정·컵노트 추가·자동값 덮어쓰기, focus-routing 폐기) → Step 1. ✅</li></ul>
+<p><strong>Placeholder scan:</strong> TBD/TODO 없음. 모든 코드 단계에 실제 코드. ✅</p>
+<p><strong>Type consistency:</strong> <code class="ic">_openAssignSheet(String)</code>가 <code class="ic">OcrChipsPanel.onTap</code>(<code class="ic">void Function(String)</code>)에 호환(Future 반환이지만 tear-off는 <code class="ic">void</code> 컨텍스트에 할당 가능 — Dart는 <code class="ic">Future&lt;void&gt; Function(String)</code>을 <code class="ic">void Function(String)</code>로 허용). 시트 ListTile key <code class="ic">assign-{라벨}</code>가 테스트의 <code class="ic">Key('assign-지역')</code> 등과 일치. 지역 key <code class="ic">field-region-$i</code>가 테스트의 <code class="ic">field-region-0</code>과 일치. ✅</p>
+<p><strong>주의(구현 시):</strong></p>
+<ul><li><code class="ic">_openAssignSheet</code> tear-off를 <code class="ic">onTap</code>에 넘길 때 반환형 <code class="ic">Future&lt;void&gt;</code> → <code class="ic">void</code> 함수 타입 할당은 Dart에서 허용되나, 혹시 analyzer가 경고하면 <code class="ic">onTap: (chip) =&gt; _openAssignSheet(chip)</code> 로 래핑.</li><li>컵노트 필드엔 key가 없어 테스트가 <code class="ic">find.text('블루베리, 홍차')</code>로 확인 — 그 문자열은 화면에 유일(칩 '홍차'와 다름)하므로 findsOneWidget.</li><li>시트는 모달이라 대상 칸이 스크롤 밖이어도 배정됨(핵심). 단 테스트가 배정 후 필드 값을 읽으려면 필드가 트리에 있어야 하므로 뷰포트 확대(2400×4000, dpr 3.0) 유지.</li></ul>
+</article>

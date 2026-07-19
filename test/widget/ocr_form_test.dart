@@ -37,33 +37,87 @@ void main() {
     expect(find.text('프릳츠'), findsOneWidget);
   });
 
-  testWidgets('칩이 포커스된 칸으로 라우팅됨 (하드코딩 아님)', (t) async {
+  testWidgets('칩 탭 → 배정 시트가 대상 목록을 보여줌', (t) async {
     final db = testDatabase();
     addTearDown(db.close);
-    t.view.physicalSize = const Size(2400, 4000); // 칩 패널이 뷰포트 밖 → 마운트되도록 확장(위 테스트 주석 참고)
+    t.view.physicalSize = const Size(2400, 4000);
     t.view.devicePixelRatio = 3.0;
     addTearDown(t.view.reset);
     await t.pumpWidget(wrapApp(
-      const BeanFormScreen(draft: OcrDraft(chips: ['프릳츠', '블루보틀'])),
+      const BeanFormScreen(draft: OcrDraft(chips: ['Yirgacheffe'])),
       db: db,
     ));
     await t.pump();
 
-    // 로스터리 포커스 → 첫 칩
-    await t.tap(find.byKey(const Key('field-roaster')));
-    await t.pump();
-    await t.tap(find.byKey(const Key('chip-프릳츠')));
-    await t.pump();
-    expect(t.widget<TextField>(find.byKey(const Key('field-roaster'))).controller!.text, '프릳츠');
+    await t.tap(find.byKey(const Key('chip-Yirgacheffe')));
+    await t.pumpAndSettle();
 
-    // 제품명 포커스 → 둘째 칩 → 제품명에만, 로스터리는 그대로
-    await t.tap(find.byKey(const Key('field-name')));
+    expect(find.byKey(const Key('assign-지역')), findsOneWidget);
+    expect(find.byKey(const Key('assign-원산지 국가')), findsOneWidget);
+    expect(find.byKey(const Key('assign-컵노트에 추가')), findsOneWidget);
+  });
+
+  testWidgets('시트에서 지역 선택 → 지역 칸에 채워지고 칩 흐려짐', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    t.view.physicalSize = const Size(2400, 4000);
+    t.view.devicePixelRatio = 3.0;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(wrapApp(
+      const BeanFormScreen(draft: OcrDraft(chips: ['Yirgacheffe'])),
+      db: db,
+    ));
     await t.pump();
-    await t.tap(find.byKey(const Key('chip-블루보틀')));
+
+    await t.tap(find.byKey(const Key('chip-Yirgacheffe')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const Key('assign-지역')));
+    await t.pumpAndSettle();
+
+    expect(t.widget<TextField>(find.byKey(const Key('field-region-0'))).controller!.text, 'Yirgacheffe');
+    expect(t.widget<ActionChip>(find.byKey(const Key('chip-Yirgacheffe'))).onPressed, isNull);
+  });
+
+  testWidgets('시트에서 컵노트에 추가 → 기존 값에 append', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    t.view.physicalSize = const Size(2400, 4000);
+    t.view.devicePixelRatio = 3.0;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(wrapApp(
+      const BeanFormScreen(draft: OcrDraft(cupNotes: ['블루베리'], chips: ['홍차'])),
+      db: db,
+    ));
     await t.pump();
-    expect(t.widget<TextField>(find.byKey(const Key('field-name'))).controller!.text, '블루보틀');
-    expect(t.widget<TextField>(find.byKey(const Key('field-roaster'))).controller!.text, '프릳츠'); // 라우팅 증명
-    expect(t.widget<ActionChip>(find.byKey(const Key('chip-블루보틀'))).onPressed, isNull); // used
+
+    await t.tap(find.byKey(const Key('chip-홍차')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const Key('assign-컵노트에 추가')));
+    await t.pumpAndSettle();
+
+    expect(find.text('블루베리, 홍차'), findsOneWidget);
+  });
+
+  testWidgets('자동으로 찬 국가 칸도 시트에서 덮어쓸 수 있음', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    t.view.physicalSize = const Size(2400, 4000);
+    t.view.devicePixelRatio = 3.0;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(wrapApp(
+      const BeanFormScreen(draft: OcrDraft(country: 'Ethiopia', chips: ['Colombia'])),
+      db: db,
+    ));
+    await t.pump();
+
+    expect(t.widget<TextField>(find.byKey(const Key('field-country-0'))).controller!.text, 'Ethiopia');
+
+    await t.tap(find.byKey(const Key('chip-Colombia')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const Key('assign-원산지 국가')));
+    await t.pumpAndSettle();
+
+    expect(t.widget<TextField>(find.byKey(const Key('field-country-0'))).controller!.text, 'Colombia');
   });
 
   testWidgets('OCR 실패(빈 draft) → 안내 배너, 칩 패널 없음', (t) async {

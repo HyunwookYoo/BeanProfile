@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../theme.dart';
 
-/// 인식된 텍스트 칩. 활성(포커스) 텍스트 필드에 탭으로 배정. 쓴 칩은 흐려짐.
+/// 인식된 텍스트 칩. 탭하면 '어디에 넣을지' 배정 시트가 열린다. 쓴 칩은 흐려짐.
 class OcrChipsPanel extends StatelessWidget {
   const OcrChipsPanel({super.key, required this.chips, required this.used, required this.onTap});
   final List<String> chips;
@@ -18,7 +18,7 @@ class OcrChipsPanel extends StatelessWidget {
         border: Border.all(color: c.crema, style: BorderStyle.solid),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('인식된 텍스트 — 채울 칸을 탭한 뒤 칩을 누르세요',
+        Text('인식된 텍스트 — 칩을 누르면 어디에 넣을지 물어봐요',
             style: TextStyle(fontSize: 11, color: c.cremaInk, fontWeight: FontWeight.w600)),
         const SizedBox(height: 8),
         Wrap(spacing: 6, runSpacing: 6, children: [

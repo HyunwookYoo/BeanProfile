@@ -34,11 +34,6 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
   DateTime? _roastDate;
   final _components = [_ComponentDraft()];
   bool _saving = false;
-  final _nameFocus = FocusNode();
-  final _roasterFocus = FocusNode();
-  final _cupNotesFocus = FocusNode();
-  final _memoFocus = FocusNode();
-  TextEditingController? _activeField;
   final _usedChips = <String>{};
 
   @override
@@ -76,17 +71,11 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
       _roastDate = d.roastDate;
       if (d.cupNotes.isNotEmpty) _cupNotes.text = d.cupNotes.join(', ');
     }
-    _nameFocus.addListener(() { if (_nameFocus.hasFocus) _activeField = _name; });
-    _roasterFocus.addListener(() { if (_roasterFocus.hasFocus) _activeField = _roaster; });
-    _cupNotesFocus.addListener(() { if (_cupNotesFocus.hasFocus) _activeField = _cupNotes; });
-    _memoFocus.addListener(() { if (_memoFocus.hasFocus) _activeField = _memo; });
   }
 
   @override
   void dispose() {
     _name.dispose(); _roaster.dispose(); _cupNotes.dispose(); _memo.dispose();
-    _nameFocus.dispose(); _roasterFocus.dispose();
-    _cupNotesFocus.dispose(); _memoFocus.dispose();
     for (final c in _components) { c.dispose(); }
     super.dispose();
   }
@@ -97,21 +86,48 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
       .where((e) => e.isNotEmpty)
       .toList();
 
-  void _assignChip(String text) {
-    final target = _activeField;
-    if (target == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('먼저 채울 칸을 탭해서 선택하세요')));
-      return;
-    }
+  Future<void> _openAssignSheet(String chip) async {
+    // (라벨, 대상 컨트롤러, append 여부)
+    final targets = <(String, TextEditingController, bool)>[
+      ('제품명', _name, false),
+      ('로스터리', _roaster, false),
+      ('원산지 국가', _components.first.country, false),
+      ('지역', _components.first.region, false),
+      ('컵노트에 추가', _cupNotes, true),
+      ('메모', _memo, false),
+    ];
+    final picked = await showModalBottomSheet<int>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 14, 18, 6),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text('‘$chip’ 어디에 넣을까요?',
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+            ),
+          ),
+          for (var i = 0; i < targets.length; i++)
+            ListTile(
+              key: Key('assign-${targets[i].$1}'),
+              title: Text(targets[i].$1),
+              subtitle: Text(targets[i].$2.text.trim().isEmpty ? '비어있음' : targets[i].$2.text),
+              onTap: () => Navigator.pop(ctx, i),
+            ),
+        ]),
+      ),
+    );
+    if (picked == null || !mounted) return;
+    final (_, ctrl, append) = targets[picked];
     setState(() {
-      if (target == _cupNotes) {
-        final cur = _cupNotes.text.trim();
-        _cupNotes.text = cur.isEmpty ? text : '$cur, $text';
+      if (append) {
+        final cur = ctrl.text.trim();
+        ctrl.text = cur.isEmpty ? chip : '$cur, $chip';
       } else {
-        target.text = text;
+        ctrl.text = chip;
       }
-      _usedChips.add(text);
+      _usedChips.add(chip);
     });
   }
 
@@ -177,10 +193,10 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           children: [
-        TextField(key: const Key('field-name'), controller: _name, focusNode: _nameFocus,
+        TextField(key: const Key('field-name'), controller: _name,
             decoration: const InputDecoration(labelText: '제품명 *')),
         const SizedBox(height: 10),
-        TextField(key: const Key('field-roaster'), controller: _roaster, focusNode: _roasterFocus,
+        TextField(key: const Key('field-roaster'), controller: _roaster,
             decoration: const InputDecoration(labelText: '로스터리')),
         const SizedBox(height: 14),
         SegmentedButton<BeanType>(
@@ -224,12 +240,12 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
           ),
         ]),
         const SizedBox(height: 10),
-        TextField(controller: _cupNotes, focusNode: _cupNotesFocus,
+        TextField(controller: _cupNotes,
             decoration: InputDecoration(
                 labelText: '컵노트 (쉼표로 구분)', hintText: '블루베리, 자스민, 홍차',
                 helperText: _auto && widget.draft!.cupNotes.isNotEmpty ? 'OCR 자동' : null)),
         const SizedBox(height: 10),
-        TextField(controller: _memo, focusNode: _memoFocus, maxLines: 3,
+        TextField(controller: _memo, maxLines: 3,
             decoration: const InputDecoration(labelText: '메모')),
         if (widget.draft != null) ...[
           const SizedBox(height: 14),
@@ -243,7 +259,7 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
                   style: TextStyle(fontSize: 12, color: c.espresso)),
             )
           else if (widget.draft!.chips.isNotEmpty)
-            OcrChipsPanel(chips: widget.draft!.chips, used: _usedChips, onTap: _assignChip),
+            OcrChipsPanel(chips: widget.draft!.chips, used: _usedChips, onTap: _openAssignSheet),
         ],
           ],
         ),
@@ -285,7 +301,9 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
             ),
         ]),
         Row(children: [
-          Expanded(child: TextField(controller: comp.region,
+          Expanded(child: TextField(
+              key: Key('field-region-$i'),
+              controller: comp.region,
               decoration: const InputDecoration(labelText: '지역'))),
           const SizedBox(width: 10),
           Expanded(

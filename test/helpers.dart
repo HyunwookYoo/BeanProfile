@@ -2,6 +2,8 @@ import 'package:beanprofile/data/bean_repository.dart';
 import 'package:beanprofile/data/database.dart';
 import 'package:beanprofile/data/enums.dart';
 import 'package:beanprofile/providers.dart';
+import 'package:beanprofile/services/ocr_service.dart';
+import 'package:beanprofile/services/photo_service.dart';
 import 'package:beanprofile/theme.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -17,9 +19,13 @@ BeanRepository testRepository(AppDatabase db) => BeanRepository(db);
 ProviderContainer testContainer(AppDatabase db) =>
     ProviderContainer(overrides: [databaseProvider.overrideWithValue(db)]);
 
-/// 위젯 테스트용: 테마 + (선택) DB override로 화면을 감싼다.
-Widget wrapApp(Widget child, {AppDatabase? db}) => ProviderScope(
-      overrides: [if (db != null) databaseProvider.overrideWithValue(db)],
+/// 위젯 테스트용: 테마 + (선택) DB/OCR/Photo override로 화면을 감싼다.
+Widget wrapApp(Widget child, {AppDatabase? db, OcrService? ocr, PhotoService? photo}) => ProviderScope(
+      overrides: [
+        if (db != null) databaseProvider.overrideWithValue(db),
+        if (ocr != null) ocrServiceProvider.overrideWithValue(ocr),
+        if (photo != null) photoServiceProvider.overrideWithValue(photo),
+      ],
       child: MaterialApp(theme: AppTheme.light, home: child),
     );
 
@@ -65,4 +71,21 @@ extension BeanInputPhoto on BeanInput {
         roastDate: roastDate, cupNotes: cupNotes, memo: memo, components: components,
         photoPath: path,
       );
+}
+
+class FakeOcrService implements OcrService {
+  FakeOcrService(this.text);
+  final String text;
+  @override
+  Future<String> recognize(String imagePath) async => text;
+}
+
+class FakePhotoService implements PhotoService {
+  FakePhotoService({this.pickResult, this.persistResult = '/app/photos/persisted.jpg'});
+  final String? pickResult;
+  final String persistResult;
+  @override
+  Future<String?> pick({required bool fromCamera}) async => pickResult;
+  @override
+  Future<String> persist(String tempPath) async => persistResult;
 }

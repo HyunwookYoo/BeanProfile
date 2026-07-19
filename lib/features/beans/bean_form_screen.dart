@@ -4,10 +4,14 @@ import '../../data/enums.dart';
 import '../../data/models.dart';
 import '../../providers.dart';
 import '../../theme.dart';
+import 'ocr/ocr_draft.dart';
+import 'widgets/ocr_chips_panel.dart';
 
 class BeanFormScreen extends ConsumerStatefulWidget {
-  const BeanFormScreen({super.key, this.existing});
+  const BeanFormScreen({super.key, this.existing, this.draft, this.photoTempPath});
   final BeanDetail? existing;
+  final OcrDraft? draft;
+  final String? photoTempPath;
   @override
   ConsumerState<BeanFormScreen> createState() => _BeanFormScreenState();
 }
@@ -30,6 +34,12 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
   DateTime? _roastDate;
   final _components = [_ComponentDraft()];
   bool _saving = false;
+  final _nameFocus = FocusNode();
+  final _roasterFocus = FocusNode();
+  final _cupNotesFocus = FocusNode();
+  final _memoFocus = FocusNode();
+  TextEditingController? _activeField;
+  final _usedChips = <String>{};
 
   @override
   void initState() {
@@ -58,11 +68,25 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
         }));
       if (_components.isEmpty) _components.add(_ComponentDraft());
     }
+    final d = widget.draft;
+    if (e == null && d != null) {
+      if (d.country != null) _components.first.country.text = d.country!;
+      if (d.process != null) _components.first.process = d.process!;
+      _roast = d.roastLevel;
+      _roastDate = d.roastDate;
+      if (d.cupNotes.isNotEmpty) _cupNotes.text = d.cupNotes.join(', ');
+    }
+    _nameFocus.addListener(() { if (_nameFocus.hasFocus) _activeField = _name; });
+    _roasterFocus.addListener(() { if (_roasterFocus.hasFocus) _activeField = _roaster; });
+    _cupNotesFocus.addListener(() { if (_cupNotesFocus.hasFocus) _activeField = _cupNotes; });
+    _memoFocus.addListener(() { if (_memoFocus.hasFocus) _activeField = _memo; });
   }
 
   @override
   void dispose() {
     _name.dispose(); _roaster.dispose(); _cupNotes.dispose(); _memo.dispose();
+    _nameFocus.dispose(); _roasterFocus.dispose();
+    _cupNotesFocus.dispose(); _memoFocus.dispose();
     for (final c in _components) { c.dispose(); }
     super.dispose();
   }
@@ -73,6 +97,26 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
       .where((e) => e.isNotEmpty)
       .toList();
 
+  void _assignChip(String text) {
+    final target = _activeField;
+    if (target == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('먼저 채울 칸을 탭해서 선택하세요')));
+      return;
+    }
+    setState(() {
+      if (target == _cupNotes) {
+        final cur = _cupNotes.text.trim();
+        _cupNotes.text = cur.isEmpty ? text : '$cur, $text';
+      } else {
+        target.text = text;
+      }
+      _usedChips.add(text);
+    });
+  }
+
+  bool get _auto => widget.existing == null && widget.draft != null;
+
   Future<void> _save() async {
     if (_name.text.trim().isEmpty || _components.first.country.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -80,6 +124,10 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
       return;
     }
     setState(() => _saving = true);
+    String? photoPath = widget.existing?.bean.photoPath; // 편집 시 기존 사진 유지
+    if (widget.photoTempPath != null) {
+      photoPath = await ref.read(photoServiceProvider).persist(widget.photoTempPath!);
+    }
     final input = BeanInput(
       name: _name.text.trim(),
       roaster: _roaster.text.trim(),
@@ -98,6 +146,7 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
               ratioPercent: int.tryParse(c.ratio.text.trim()),
             ),
       ],
+      photoPath: photoPath,
     );
     try {
       final repo = ref.read(beanRepositoryProvider);
@@ -128,10 +177,11 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           children: [
-        TextField(key: const Key('field-name'), controller: _name,
+        TextField(key: const Key('field-name'), controller: _name, focusNode: _nameFocus,
             decoration: const InputDecoration(labelText: '제품명 *')),
         const SizedBox(height: 10),
-        TextField(controller: _roaster, decoration: const InputDecoration(labelText: '로스터리')),
+        TextField(key: const Key('field-roaster'), controller: _roaster, focusNode: _roasterFocus,
+            decoration: const InputDecoration(labelText: '로스터리')),
         const SizedBox(height: 14),
         SegmentedButton<BeanType>(
           segments: const [
@@ -152,14 +202,17 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
         const SizedBox(height: 8),
         DropdownButtonFormField<RoastLevel>(
           initialValue: _roast,
-          decoration: const InputDecoration(labelText: '로스팅 단계'),
+          decoration: InputDecoration(
+              labelText: '로스팅 단계',
+              helperText: _auto && widget.draft!.roastLevel != null ? 'OCR 자동' : null),
           items: [for (final r in RoastLevel.values) DropdownMenuItem(value: r, child: Text(r.label))],
           onChanged: (v) => setState(() => _roast = v),
         ),
         const SizedBox(height: 10),
         Row(children: [
           Expanded(child: Text(_roastDate == null ? '로스팅 날짜 없음'
-              : '로스팅 ${_roastDate!.toIso8601String().substring(0, 10)}')),
+              : '로스팅 ${_roastDate!.toIso8601String().substring(0, 10)}'
+                  '${_auto && widget.draft!.roastDate != null ? '  · OCR 자동' : ''}')),
           TextButton(
             onPressed: () async {
               final picked = await showDatePicker(context: context,
@@ -171,10 +224,27 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
           ),
         ]),
         const SizedBox(height: 10),
-        TextField(controller: _cupNotes,
-            decoration: const InputDecoration(labelText: '컵노트 (쉼표로 구분)', hintText: '블루베리, 자스민, 홍차')),
+        TextField(controller: _cupNotes, focusNode: _cupNotesFocus,
+            decoration: InputDecoration(
+                labelText: '컵노트 (쉼표로 구분)', hintText: '블루베리, 자스민, 홍차',
+                helperText: _auto && widget.draft!.cupNotes.isNotEmpty ? 'OCR 자동' : null)),
         const SizedBox(height: 10),
-        TextField(controller: _memo, maxLines: 3, decoration: const InputDecoration(labelText: '메모')),
+        TextField(controller: _memo, focusNode: _memoFocus, maxLines: 3,
+            decoration: const InputDecoration(labelText: '메모')),
+        if (widget.draft != null) ...[
+          const SizedBox(height: 14),
+          if (widget.draft!.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: c.cup, borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: c.appLine)),
+              child: Text('글자를 자동 인식하지 못했어요. 아래 항목을 직접 입력하거나 다시 촬영해 주세요.',
+                  style: TextStyle(fontSize: 12, color: c.espresso)),
+            )
+          else if (widget.draft!.chips.isNotEmpty)
+            OcrChipsPanel(chips: widget.draft!.chips, used: _usedChips, onTap: _assignChip),
+        ],
           ],
         ),
       ),
@@ -203,7 +273,9 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
             child: TextField(
               key: Key('field-country-$i'),
               controller: comp.country,
-              decoration: InputDecoration(labelText: i == 0 ? '원산지 국가 *' : '국가'),
+              decoration: InputDecoration(
+                  labelText: i == 0 ? '원산지 국가 *' : '국가',
+                  helperText: i == 0 && _auto && widget.draft!.country != null ? 'OCR 자동' : null),
             ),
           ),
           if (_type == BeanType.blend && _components.length > 1)

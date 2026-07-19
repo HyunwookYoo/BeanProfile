@@ -1,0 +1,154 @@
+<title>☕ BeanProfile — M3 설계: 사진 &amp; OCR 반자동 입력</title>
+<style>
+*{box-sizing:border-box}
+:root{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+  --font-sans:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Consolas,"Malgun Gothic",monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}}
+:root[data-theme="light"]{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+}
+:root[data-theme="dark"]{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-sans);line-height:1.7;-webkit-font-smoothing:antialiased}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.doc{max-width:880px;margin:0 auto;padding:44px 24px 96px}
+.crumb{font-family:var(--font-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:16px}
+h1{font-size:clamp(26px,4vw,38px);font-weight:800;letter-spacing:-.025em;line-height:1.2;margin:.1em 0 .5em;text-wrap:balance}
+h2{font-size:22px;font-weight:700;margin:2em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line);letter-spacing:-.01em;text-wrap:balance}
+h3{font-size:16.5px;font-weight:700;color:var(--accent-ink);margin:1.7em 0 .5em}
+h4{font-size:14px;font-weight:700;margin:1.3em 0 .4em}
+p{margin:.7em 0}
+a{color:var(--accent);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+strong{font-weight:700;color:var(--fg)}
+hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+code.ic{font-family:var(--font-mono);font-size:.85em;background:var(--ic-bg);color:var(--ic-fg);padding:1.5px 6px;border-radius:6px}
+pre.code{position:relative;background:var(--code-bg);color:var(--code-fg);border-radius:12px;padding:16px 18px;margin:1em 0;overflow-x:auto;border:1px solid rgba(0,0,0,.28)}
+pre.code code{font-family:var(--font-mono);font-size:12.75px;line-height:1.6;white-space:pre;color:inherit;background:none;padding:0}
+pre.code[data-lang]::before{content:attr(data-lang);position:absolute;top:9px;right:13px;font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(236,227,211,.42)}
+.tablewrap{overflow-x:auto;margin:1.1em 0}
+table{border-collapse:collapse;width:100%;font-size:13.75px}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--th);font-weight:700}
+tbody tr:nth-child(even){background:var(--surface)}
+blockquote{margin:1.1em 0;padding:11px 16px;border-left:3px solid var(--accent);background:var(--surface);border-radius:0 10px 10px 0;color:var(--muted)}
+blockquote strong{color:var(--fg)}
+ul,ol{margin:.7em 0;padding-left:1.4em}
+li{margin:.32em 0}
+ul.tasklist{list-style:none;padding-left:.15em}
+ul.tasklist li.task{position:relative;padding-left:30px;margin:.5em 0}
+ul.tasklist li.task::before{content:"";position:absolute;left:0;top:.18em;width:17px;height:17px;border:2px solid var(--accent);border-radius:5px;background:transparent}
+ul.tasklist li.task.done::before{content:"\2713";background:var(--accent);color:#fff;font-size:12px;font-weight:800;text-align:center;line-height:15px}
+</style>
+<article class="doc"><div class="crumb">BeanProfile · docs/plans</div>
+<h1>☕ BeanProfile — M3 설계: 사진 &amp; OCR 반자동 입력</h1>
+<div class="tablewrap"><table><thead><tr><th>항목</th><th>내용</th></tr></thead><tbody><tr><td>작성일</td><td>2026-07-19</td></tr><tr><td>상태</td><td>설계 승인(브레인스토밍) → 구현 계획(writing-plans) 대기</td></tr><tr><td>마일스톤</td><td>M3 (사진 &amp; OCR 리뷰)</td></tr><tr><td>선행</td><td>M2/M2.1 <strong>DONE</strong> · <code class="ic">v0.2.1</code></td></tr><tr><td>목표 버전</td><td><code class="ic">v0.3.0</code></td></tr><tr><td>목업</td><td><a href="../mockups/m3-photo-ocr.html"><code class="ic">../mockups/m3-photo-ocr.html</code></a> · <a href="https://claude.ai/code/artifact/f384ab78-3d8f-4a47-b8a6-ee29cf25e564">아티팩트</a></td></tr><tr><td>상위 문서</td><td>설계 <a href="../design.md"><code class="ic">../design.md</code></a> §5 · 로드맵 <a href="roadmap.md"><code class="ic">roadmap.md</code></a> · 배포 <a href="../deployment.md"><code class="ic">../deployment.md</code></a></td></tr></tbody></table></div>
+<hr>
+<h2>1. 목표 &amp; 범위</h2>
+<p><strong>커피 정보 사진</strong>(원두 봉투 인쇄물 또는 별도 정보 카드)을 촬영/선택하면, 온디바이스 OCR이 전체 텍스트를 읽고, 앱이 명확한 패턴만 자동으로 채운 <strong>폼 + 인식 칩</strong> 리뷰 화면에서 사용자가 확정해 원두를 추가한다. 촬영한 사진은 저장되어 리스트 카드 썸네일과 상세 화면에 표시된다. OCR이 실패해도 수동 입력으로 매끄럽게 이어진다.</p>
+<p>이번 마일스톤은 앱 <strong>최초의 네이티브 플러그인</strong>(카메라·OCR·파일)을 도입한다. 따라서 "무엇을 만드는가"만큼 <strong>"무엇을 어떻게 테스트하는가"</strong> 가 설계의 핵심이다(§3).</p>
+<h3>확정 결정 (브레인스토밍 2026-07-19)</h3>
+<div class="tablewrap"><table><thead><tr><th>#</th><th>결정</th><th>선택</th></tr></thead><tbody><tr><td>Q1</td><td>리뷰 화면</td><td><strong>기존 추가 폼(<code class="ic">bean_form_screen</code>) 확장</strong> — 자동채움 + 인식 칩 패널</td></tr><tr><td>Q2</td><td>사진 범위</td><td><strong>촬영 → 저장 → 표시</strong> (카드 썸네일 + 상세 사진)</td></tr><tr><td>Q3</td><td>CI 검증 시점</td><td><strong>초기 스파이크 빌드</strong> — 플러그인·권한을 먼저 기기 검증</td></tr><tr><td>Q4</td><td>상세 사진 배치</td><td><strong>이름 옆 컴팩트 썸네일</strong> (탭 → 전체화면). 풀폭 배너 아님</td></tr><tr><td>J1</td><td>이름·로스터리 자동추측</td><td><strong>안 함</strong> (오탐 위험 → 칩 배정/직접 입력)</td></tr><tr><td>J2</td><td>사진 저장 시점</td><td><strong>Copy-on-save</strong> (취소 시 고아 파일 없음)</td></tr><tr><td>J3</td><td>칩 배정 대상</td><td><strong>자유 텍스트 필드에만</strong> (날짜·enum은 피커)</td></tr></tbody></table></div>
+<hr>
+<h2>2. 용어 (문서·UI 공통)</h2>
+<p>"봉투"라는 단어는 단독으로 쓰지 않는다. OCR 소스가 봉투 인쇄물일 수도, 별도 정보 카드일 수도 있기 때문이다.</p>
+<div class="tablewrap"><table><thead><tr><th>개념</th><th>표기</th></tr></thead><tbody><tr><td>촬영/선택한 원본 이미지</td><td><strong>커피 정보 사진</strong> (또는 중립적으로 "사진")</td></tr><tr><td>소스를 지칭할 때</td><td><strong>봉투·정보 카드</strong> (열거)</td></tr><tr><td>OCR이 뽑은 글자 조각</td><td><strong>인식된 텍스트</strong></td></tr><tr><td>진입 동작 라벨</td><td><strong>촬영</strong> / <strong>갤러리에서 선택</strong> / <strong>직접 입력</strong> (명사 대신 동작 중심, 서브라인으로 보완)</td></tr></tbody></table></div>
+<hr>
+<h2>3. 아키텍처 &amp; 테스트 경계</h2>
+<p>호스트(Windows <code class="ic">flutter test</code>)에서 실행 불가능한 플러그인 호출을 <strong>얇은 인터페이스 뒤로 격리</strong>하고, 필드 추측 로직은 <strong>순수 Dart 파서</strong>로 분리한다. 이 경계가 M3 품질의 핵심이다.</p>
+<div class="tablewrap"><table><thead><tr><th>유닛</th><th>책임</th><th>테스트</th></tr></thead><tbody><tr><td><code class="ic">OcrService</code> (interface) + <code class="ic">MlkitOcrService</code></td><td>이미지 경로 → 인식 텍스트</td><td>기기 전용(가짜 주입)</td></tr><tr><td><code class="ic">PhotoService</code> (interface): <code class="ic">pick()</code> / <code class="ic">persist()</code></td><td>카메라·갤러리 선택(임시경로), 저장 시 문서폴더 복사</td><td>기기 전용(가짜 주입)</td></tr><tr><td><strong><code class="ic">parseOcrText(String) → OcrDraft</code></strong></td><td>인식 텍스트 → 필드 추측 + 칩</td><td><strong>순수 Dart 유닛 = TDD 심장</strong></td></tr><tr><td><code class="ic">bean_form_screen</code> 확장</td><td>draft 프리필 + 칩 배정 + 저장</td><td>위젯(가짜 draft/service)</td></tr><tr><td>리스트 카드·상세 썸네일</td><td><code class="ic">photoPath</code> 렌더</td><td>위젯</td></tr></tbody></table></div>
+<p>인터페이스 스케치:</p>
+<pre class="code" data-lang="dart"><code>// lib/services/ocr_service.dart
+abstract class OcrService {
+  /// 온디바이스 OCR로 [imagePath]의 전체 텍스트를 인식한다.
+  Future&lt;String&gt; recognize(String imagePath);
+}
+
+// lib/services/photo_service.dart
+abstract class PhotoService {
+  /// 카메라(fromCamera=true) 또는 갤러리에서 이미지를 고른다.
+  /// 반환: 임시 파일 경로, 취소 시 null.
+  Future&lt;String?&gt; pick({required bool fromCamera});
+
+  /// 임시 이미지를 앱 문서 디렉터리로 복사하고 영구 경로를 반환한다.
+  Future&lt;String&gt; persist(String tempPath);
+}</code></pre>
+<p>Riverpod로 주입해 테스트에서 가짜로 교체한다:</p>
+<pre class="code" data-lang="dart"><code>// lib/providers.dart
+final ocrServiceProvider = Provider&lt;OcrService&gt;((ref) =&gt; MlkitOcrService());
+final photoServiceProvider = Provider&lt;PhotoService&gt;((ref) =&gt; ImagePickerPhotoService());</code></pre>
+<ul><li><code class="ic">MlkitOcrService</code>는 <code class="ic">TextRecognizer(script: TextRecognitionScript.korean)</code>를 감싼다(한글 스크립트 모델이 라틴 문자도 인식).</li><li><code class="ic">ImagePickerPhotoService</code>는 <code class="ic">image_picker</code>(선택) + <code class="ic">path_provider</code>(문서 디렉터리 복사)를 감싼다.</li></ul>
+<hr>
+<h2>4. 데이터 흐름</h2>
+<pre class="code"><code>원두 리스트 FAB(+) → 바텀시트 [촬영 / 갤러리에서 선택 / 직접 입력]
+  촬영·갤러리 → PhotoService.pick() → 임시경로(취소면 종료)
+             → OcrService.recognize(임시경로) → 원문 텍스트
+             → parseOcrText(원문) → OcrDraft
+             → BeanFormScreen(draft, photoTempPath) : 자동값 하이라이트 + 인식 칩 패널
+  직접 입력   → BeanFormScreen(빈 폼)  ← 기존 M1 경로 그대로
+저장 시 → (photoTempPath 있으면) PhotoService.persist() → 문서폴더 영구경로
+        → createBean(BeanInput{ ..., photoPath: 영구경로 })
+표시 → 리스트 카드 썸네일 · 상세 컴팩트 썸네일(탭 → 전체화면)</code></pre>
+<p><strong>Copy-on-save (J2):</strong> <code class="ic">pick()</code>은 <code class="ic">image_picker</code>의 임시 캐시 경로를 그대로 쓰고, 문서폴더 복사(<code class="ic">persist</code>)는 <strong>저장 버튼을 눌렀을 때만</strong> 일어난다. 리뷰 화면에서 취소하면 문서폴더에 파일이 남지 않는다.</p>
+<hr>
+<h2>5. OCR 파서 명세 (순수 Dart)</h2>
+<p><code class="ic">parseOcrText(String rawText) → OcrDraft</code>. 설계 §5의 자동추측 5종만 채우고, 나머지는 칩으로 넘긴다. 이름·로스터리는 자동추측하지 않는다(J1).</p>
+<pre class="code" data-lang="dart"><code>// lib/features/beans/ocr/ocr_draft.dart
+class OcrDraft {
+  final String? country;        // 원산지 사전 매칭
+  final DateTime? roastDate;    // 날짜 정규식
+  final RoastLevel? roastLevel; // 키워드
+  final Process? process;       // 키워드
+  final List&lt;String&gt; cupNotes;  // "Notes:" 라벨 뒤
+  final List&lt;String&gt; chips;     // 배정 대기 텍스트 조각(줄 단위)
+  const OcrDraft({
+    this.country,
+    this.roastDate,
+    this.roastLevel,
+    this.process,
+    this.cupNotes = const [],
+    this.chips = const [],
+  });
+}</code></pre>
+<p>추측 규칙(시드 값 — 구현 시 확장 가능):</p>
+<div class="tablewrap"><table><thead><tr><th>필드</th><th>방법</th><th>시드</th></tr></thead><tbody><tr><td>country</td><td>원산지 사전 매칭(영/한, 대소문자 무시). 첫 매칭만 채우고 나머지는 칩</td><td>Ethiopia/에티오피아, Colombia/콜롬비아, Kenya/케냐, Brazil/브라질, Guatemala/과테말라, Costa Rica/코스타리카, Panama/파나마, Honduras/온두라스, Indonesia/인도네시아, Rwanda/르완다, Burundi/부룬디, El Salvador/엘살바도르, Peru/페루, Nicaragua/니카라과, Yemen/예멘, Tanzania/탄자니아, Mexico/멕시코, Uganda/우간다, Bolivia/볼리비아, Ecuador/에콰도르</td></tr><tr><td>roastDate</td><td>정규식, 첫 유효 날짜</td><td><code class="ic">YYYY[.\-/]M[.\-/]D</code>, <code class="ic">YY[.\-/]M[.\-/]D</code>, <code class="ic">YYYY년 M월 D일</code></td></tr><tr><td>roastLevel</td><td>키워드 → enum</td><td>Light/라이트, LightMedium/라이트미디엄, Medium/미디엄·시티, MediumDark/미디엄다크·풀시티, Dark/다크·프렌치</td></tr><tr><td>process</td><td>키워드 → enum</td><td>Washed/워시드/수세식, Natural/내추럴/건식, Honey/허니, Anaerobic/무산소·애너로빅, 그 외 Other</td></tr><tr><td>cupNotes</td><td>라벨 라인 뒤를 <code class="ic">,</code> <code class="ic">/</code> <code class="ic">·</code> <code class="ic">、</code>로 분리</td><td>라벨: <code class="ic">Notes</code> / <code class="ic">Cup Notes</code> / <code class="ic">Tasting Notes</code> / <code class="ic">컵노트</code> / <code class="ic">노트</code> / <code class="ic">향미</code> (뒤에 <code class="ic">:</code> 또는 <code class="ic">：</code>)</td></tr><tr><td>chips</td><td>비어있지 않은 모든 줄(trim·중복제거)</td><td>—</td></tr></tbody></table></div>
+<hr>
+<h2>6. 폼 확장 UX (<code class="ic">bean_form_screen</code>)</h2>
+<p><code class="ic">BeanFormScreen</code>에 선택적 인자 <code class="ic">OcrDraft? draft</code>, <code class="ic">String? photoTempPath</code>를 추가한다. draft가 있을 때만 OCR 전용 UI가 렌더된다.</p>
+<ul><li><strong>프리필 + 하이라이트:</strong> draft의 자동값을 필드에 채우고, "OCR이 채운 값"을 앰버 배지(✓ 자동)로 표시.</li><li><strong>인식 칩 패널(<code class="ic">OcrChipsPanel</code>):</strong> 하단에 <code class="ic">draft.chips</code>를 탭 가능한 칩으로 나열. draft 없으면 렌더 안 함.</li><li><strong>배정 인터랙션(J3):</strong> 자유 <strong>텍스트 필드에 포커스</strong> → <strong>칩 탭</strong> → 그 필드에 칩 텍스트가 채워지고, 쓴 칩은 흐려진다(used). 포커스된 텍스트 필드가 없으면 칩 탭은 무시(힌트 표시).</li><li><strong>경계:</strong> 칩 배정 대상은 자유 텍스트 필드뿐(제품명·로스터리·지역·농장·품종·고도·메모·컵노트). 날짜·로스팅단계·가공방식 같은 <strong>구조화 필드는 파서 자동값</strong>을 기존 피커로 수정한다.</li><li><strong>OCR 실패(인식 0건):</strong> 칩 패널 대신 안내 배너("글자를 자동 인식하지 못했어요…")를 띄우고 빈 폼으로 이어간다. 사진은 유지.</li></ul>
+<p><code class="ic">bean_form_screen</code>이 비대해지지 않도록 OCR 칩 패널은 별도 위젯(<code class="ic">OcrChipsPanel</code>)으로 분리한다.</p>
+<hr>
+<h2>7. 사진 저장 · 표시</h2>
+<ul><li><strong>모델:</strong> <code class="ic">BeanInput</code>에 <code class="ic">String? photoPath</code>를 추가한다. <code class="ic">createBean</code>/<code class="ic">updateBean</code>이 이 값을 기록한다(<code class="ic">Bean.photoPath</code> 컬럼은 이미 존재 → <strong>마이그레이션 불필요</strong>).</li><li><strong>저장:</strong> 저장 시 <code class="ic">photoTempPath</code>가 있으면 <code class="ic">PhotoService.persist()</code>로 문서폴더에 복사하고 영구 경로를 <code class="ic">photoPath</code>에 넣는다.</li><li><strong>리스트 카드:</strong> leading 썸네일 — 사진 있으면 <code class="ic">Image.file</code>, 없으면 기본 아이콘 플레이스홀더. 카드 레이아웃은 M1/M2 그대로.</li><li><strong>상세 화면(Q4):</strong> 이름 옆 <strong>컴팩트 썸네일</strong>(탭 → 전체화면 뷰어). 사진 없으면 플레이스홀더. 모노 스펙시트 정체성 유지를 위해 풀폭 배너는 쓰지 않는다.</li></ul>
+<hr>
+<h2>8. 진입 &amp; 화면 상태</h2>
+<ul><li><strong>진입:</strong> 원두 리스트 FAB(+) → <code class="ic">showModalBottomSheet</code> 3옵션.</li><li><strong>촬영</strong> — <code class="ic">봉투·정보 카드를 찍어 자동 인식</code> → <code class="ic">pick(fromCamera: true)</code></li><li><strong>갤러리에서 선택</strong> — <code class="ic">저장된 사진에서</code> → <code class="ic">pick(fromCamera: false)</code></li><li><strong>직접 입력</strong> — <code class="ic">사진 없이 수동으로</code> → 기존 빈 폼</li><li><strong>성공:</strong> 자동값 하이라이트 + 인식 칩 패널(§6).</li><li><strong>실패:</strong> 안내 배너 + 빈 폼(사진 유지).</li><li>목업의 A~E 화면이 이 상태들을 그대로 반영한다.</li></ul>
+<hr>
+<h2>9. 권한 &amp; CI 스파이크</h2>
+<p>M3는 M0 이후 가장 무거운 iOS 빌드 변경이다(ML Kit 파드 + 모델). <strong>맥이 없고 CI macOS 러너가 유일한 맥</strong>이므로, 파이프라인이 깨지면 iOS 빌드가 불가능해진다. 따라서 <strong>첫 태스크를 스파이크로</strong> 둔다.</p>
+<ul><li><strong>iOS</strong> <code class="ic">ios/Runner/Info.plist</code>: <code class="ic">NSCameraUsageDescription</code>, <code class="ic">NSPhotoLibraryUsageDescription</code> (한국어 문구). ML Kit 파드 해소를 위해 <strong>Podfile iOS 최소버전 상향이 필요할 수 있음</strong>(스파이크가 확인·고정).</li><li><strong>Android</strong> <code class="ic">AndroidManifest.xml</code>: 카메라 권한(코드 크로스플랫폼 유지용; CI 검증은 iOS만).</li><li><strong>스파이크(Task 1):</strong> 플러그인 3종 + 권한 + seam(<code class="ic">OcrService</code>/<code class="ic">PhotoService</code>) + 최소 디버그 화면("사진 → OCR → 원문 표시")만 넣고, <strong>pre-release 태그로 CI가 설치 가능한 <code class="ic">.ipa</code>를 만드는지, 기기에서 OCR이 도는지 먼저 검증</strong>한다. seam은 유지, 디버그 화면은 이후 실플로우로 교체.</li></ul>
+<hr>
+<h2>10. 파일 영향</h2>
+<p><strong>신규</strong></p>
+<ul><li><code class="ic">lib/services/ocr_service.dart</code> — <code class="ic">OcrService</code> + <code class="ic">MlkitOcrService</code></li><li><code class="ic">lib/services/photo_service.dart</code> — <code class="ic">PhotoService</code> + <code class="ic">ImagePickerPhotoService</code></li><li><code class="ic">lib/features/beans/ocr/ocr_draft.dart</code> — <code class="ic">OcrDraft</code></li><li><code class="ic">lib/features/beans/ocr/ocr_parser.dart</code> — <code class="ic">parseOcrText</code></li><li><code class="ic">lib/features/beans/widgets/ocr_chips_panel.dart</code> — 인식 칩 패널</li><li><code class="ic">lib/features/beans/add_bean_sheet.dart</code> — FAB 바텀시트(촬영/갤러리/직접)</li></ul>
+<p><strong>수정</strong></p>
+<ul><li><code class="ic">pubspec.yaml</code> — <code class="ic">google_mlkit_text_recognition</code> · <code class="ic">image_picker</code> · <code class="ic">path_provider</code></li><li><code class="ic">lib/data/models.dart</code> — <code class="ic">BeanInput.photoPath</code></li><li><code class="ic">lib/data/bean_repository.dart</code> — <code class="ic">createBean</code>/<code class="ic">updateBean</code>에 <code class="ic">photoPath</code> 반영</li><li><code class="ic">lib/providers.dart</code> — <code class="ic">ocrServiceProvider</code> · <code class="ic">photoServiceProvider</code></li><li><code class="ic">lib/features/beans/bean_form_screen.dart</code> — <code class="ic">draft</code>/<code class="ic">photoTempPath</code> 인자, 프리필·하이라이트, 칩 패널, 저장 시 persist</li><li><code class="ic">lib/features/beans/bean_list_screen.dart</code> — FAB → 바텀시트, 카드 썸네일</li><li><code class="ic">lib/features/beans/widgets/bean_card.dart</code> — leading 썸네일(사진/플레이스홀더)</li><li><code class="ic">lib/features/beans/bean_detail_screen.dart</code> — 컴팩트 썸네일(탭 → 전체화면)</li><li><code class="ic">ios/Runner/Info.plist</code> · <code class="ic">android/app/src/main/AndroidManifest.xml</code> — 권한</li></ul>
+<hr>
+<h2>11. 테스트 전략 (docs/testing.md 3계층 · <code class="ic">test/helpers</code> 재사용)</h2>
+<ul><li><strong>유닛(대량 · TDD 심장):</strong> <code class="ic">parseOcrText</code> — 국가 hit/miss, 날짜 포맷 3종, 로스팅/가공 키워드, 컵노트 라벨 분리, 칩 추출·중복제거. 각 추측기가 독립적으로 검증됨.</li><li><strong>데이터:</strong> <code class="ic">photoPath</code>가 <code class="ic">createBean</code>/<code class="ic">updateBean</code>/<code class="ic">watchBeanDetail</code>을 왕복(drift, sqlite3.dll 호스트).</li><li><strong>위젯:</strong> 폼 프리필·앰버 하이라이트, 칩 패널 렌더, 포커스→칩탭 채움·used 처리, 저장 시 <code class="ic">photoPath</code> 포함 <code class="ic">BeanInput</code>(가짜 <code class="ic">PhotoService</code>), 바텀시트 3옵션, 카드 썸네일(사진/플레이스홀더), 실패 배너.</li><li><strong>기기 전용(호스트 불가):</strong> <code class="ic">image_picker</code> · ML Kit 인식 · <code class="ic">path_provider</code> — 스파이크(Task 1) + 최종 DoD에서 검증. 문서에 명시.</li></ul>
+<hr>
+<h2>12. 스코프 밖 (이번 아님)</h2>
+<ul><li>사진 편집/크롭/회전, 여러 장 첨부.</li><li>블렌드 다국가 자동 다중배정(첫 매칭만 자동, 나머지는 칩).</li><li>OCR 인식 언어 토글(한글 스크립트 모델 고정).</li><li>사진 포함 JSON 백업(M5).</li><li>사진 교체 시 옛 파일 정리(고아 파일 — 후속).</li><li>name/roaster 휴리스틱 자동추측.</li></ul>
+<hr>
+<h2>13. 완료 기준 (DoD)</h2>
+<ul><li><code class="ic">flutter analyze</code> 0 · <code class="ic">flutter test</code> 전체 green · 파서 유닛 커버리지 확보.</li><li><strong>기기에서:</strong> 촬영/갤러리 → OCR → 자동필드 + 칩 배정 → 저장 → 리스트 카드·상세에 사진 표시. OCR 실패 시 배너 + 수동 입력으로 이어짐.</li><li>태스크별 SDD 리뷰 + opus 최종 리뷰 통과 → <code class="ic">v0.3.0</code> 태그 → AltStore 설치·동작 확인.</li></ul>
+</article>

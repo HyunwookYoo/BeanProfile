@@ -1,0 +1,428 @@
+<title>BeanProfile — M3 사진 & OCR 목업</title>
+<style>
+  :root{
+    /* Board (themeable) — light */
+    --bg:#E7E1D6; --fg:#2B2019; --muted:#7A6F62; --line:#D6CEC0;
+    --surface:#F3EFE8; --surface-2:#EEE8DE; --accent:#A66A24; --accent-soft:#EAD9BE;
+    --shadow:0 18px 40px -18px rgba(60,42,24,.45), 0 4px 12px -6px rgba(60,42,24,.25);
+
+    /* App (fixed across themes — the phones are "screenshots" of the app's light theme) */
+    --espresso:#2B2019; --oat:#ECE6DB; --cup:#FCFBF8; --cup-2:#F4EFE6;
+    --crema:#B67B2E; --crema-ink:#8A5A18; --cherry:#9E3B2D;
+    --app-muted:#8C8172; --app-line:#E4DED2; --app-line-2:#EDE8DD;
+    --good:#5E7355;
+
+    --font-sans:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --font-mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#1B1510; --fg:#EDE5D8; --muted:#9C9081; --line:#332A21;
+      --surface:#241D16; --surface-2:#2B231B; --accent:#D89A46; --accent-soft:#3A2C18;
+      --shadow:0 20px 46px -18px rgba(0,0,0,.7), 0 4px 14px -6px rgba(0,0,0,.5);
+    }
+  }
+  :root[data-theme="light"]{
+    --bg:#E7E1D6; --fg:#2B2019; --muted:#7A6F62; --line:#D6CEC0;
+    --surface:#F3EFE8; --surface-2:#EEE8DE; --accent:#A66A24; --accent-soft:#EAD9BE;
+    --shadow:0 18px 40px -18px rgba(60,42,24,.45), 0 4px 12px -6px rgba(60,42,24,.25);
+  }
+  :root[data-theme="dark"]{
+    --bg:#1B1510; --fg:#EDE5D8; --muted:#9C9081; --line:#332A21;
+    --surface:#241D16; --surface-2:#2B231B; --accent:#D89A46; --accent-soft:#3A2C18;
+    --shadow:0 20px 46px -18px rgba(0,0,0,.7), 0 4px 14px -6px rgba(0,0,0,.5);
+  }
+
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-sans);
+    -webkit-font-smoothing:antialiased;line-height:1.5}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+  .board{max-width:1240px;margin:0 auto;padding:40px 24px 72px}
+  .head-eyebrow{font-family:var(--font-mono);font-size:12px;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--accent);margin:0 0 10px}
+  .head-title{font-size:clamp(26px,4vw,42px);font-weight:800;letter-spacing:-.025em;
+    margin:0;text-wrap:balance}
+  .head-sub{color:var(--muted);max-width:66ch;margin:12px 0 0;font-size:15px}
+
+  /* step strip */
+  .steps{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:24px 0 6px;
+    padding:13px 15px;background:var(--surface);border:1px solid var(--line);border-radius:14px}
+  .steps .s{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600}
+  .steps .s .n{width:20px;height:20px;border-radius:6px;background:var(--accent);color:#fff;
+    font-family:var(--font-mono);font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex:none}
+  .steps .arrow{color:var(--muted);opacity:.7}
+
+  .legend{display:flex;flex-wrap:wrap;gap:8px 18px;margin:10px 0 4px;
+    padding:14px 16px;background:var(--surface);border:1px solid var(--line);border-radius:14px}
+  .legend b{font-weight:700}
+  .legend span{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
+  .sw{width:13px;height:13px;border-radius:4px;display:inline-block;flex:none}
+
+  .screens{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));
+    gap:16px 20px;margin-top:26px;justify-items:center}
+  .screen-card{width:100%;max-width:360px;display:flex;flex-direction:column;align-items:center}
+  .screen-head{width:100%;display:flex;align-items:baseline;gap:10px;margin:0 4px 12px}
+  .screen-idx{font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--accent)}
+  .screen-name{font-weight:700;font-size:16px}
+  .screen-cap{width:100%;margin:14px 4px 8px;color:var(--muted);font-size:12.5px}
+  .screen-cap li{margin:3px 0}
+  .screen-cap ul{margin:6px 0 0;padding-left:16px}
+  .screen-cap .k{color:var(--fg);font-weight:600}
+
+  /* ---------- Phone ---------- */
+  .phone{width:320px;height:664px;border-radius:40px;background:#0d0a07;
+    padding:9px;box-shadow:var(--shadow);flex:none;position:relative}
+  .screen{position:relative;width:100%;height:100%;border-radius:32px;overflow:hidden;
+    background:var(--oat);color:var(--espresso);display:flex;flex-direction:column;font-size:14px}
+  .statusbar{height:34px;flex:none;display:flex;align-items:center;justify-content:space-between;
+    padding:0 20px;font-family:var(--font-mono);font-size:12px;font-weight:600;color:var(--espresso)}
+  .statusbar .dots{display:flex;gap:4px;align-items:center}
+  .statusbar .dots i{width:6px;height:6px;border-radius:50%;background:var(--espresso);opacity:.55}
+
+  .appbar{flex:none;display:flex;align-items:center;gap:10px;padding:6px 16px 12px}
+  .appbar h1{font-size:20px;font-weight:800;letter-spacing:-.02em;margin:0;flex:1}
+  .appbar .sub{font-family:var(--font-mono);font-size:11px;color:var(--app-muted);font-weight:600}
+  .iconbtn{width:34px;height:34px;border-radius:11px;border:1px solid var(--app-line);
+    background:var(--cup);display:flex;align-items:center;justify-content:center;color:var(--espresso);flex:none}
+  .iconbtn.ghost{border:none;background:transparent}
+  .body{flex:1;overflow:hidden;padding:0 16px}
+
+  svg{display:block}
+  .ico{width:18px;height:18px;stroke:currentColor;stroke-width:1.8;fill:none;
+    stroke-linecap:round;stroke-linejoin:round}
+
+  /* bean list card */
+  .bean{display:flex;gap:12px;padding:12px;border-radius:16px;background:var(--cup);
+    border:1px solid var(--app-line);margin-bottom:10px}
+  .thumb{width:52px;height:64px;border-radius:10px;flex:none;
+    background:linear-gradient(150deg,#c9a15f,#7c5a2c 60%,#4b3618);position:relative;overflow:hidden}
+  .thumb::after{content:"";position:absolute;inset:0;
+    background:radial-gradient(circle at 50% 30%,rgba(255,255,255,.28),transparent 55%)}
+  .thumb.k::before{content:"";position:absolute;left:8px;right:8px;top:14px;height:20px;
+    border-radius:4px;background:rgba(255,255,255,.16)}
+  .thumb.empty{background:var(--cup-2);border:1px solid var(--app-line);display:flex;align-items:center;justify-content:center}
+  .thumb.empty::after{display:none}
+  .thumb.empty .ico{width:22px;height:22px;stroke:var(--app-muted);opacity:.85}
+  .bean .info{flex:1;min-width:0}
+  .bean .nm{font-weight:700;font-size:14.5px;letter-spacing:-.01em;line-height:1.25}
+  .bean .ro{font-size:11.5px;color:var(--app-muted);margin-top:1px}
+  .bean .meta{display:flex;align-items:center;gap:8px;margin-top:7px;flex-wrap:wrap}
+  .badge{font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:6px;
+    background:var(--accent-soft);color:var(--crema-ink);font-family:var(--font-mono)}
+  .badge.blend{background:#e7ded0;color:#6b5836}
+  .notechips{display:flex;gap:5px;margin-top:8px;flex-wrap:wrap}
+  .nchip{font-size:10.5px;padding:2px 8px;border-radius:999px;background:var(--cup-2);
+    border:1px solid var(--app-line-2);color:#6b6053}
+
+  .stars{color:var(--crema);letter-spacing:1px;font-size:13px}
+  .stars .e{color:#d9cdb8}
+  .rate{display:inline-flex;align-items:center;gap:5px}
+  .rate b{font-family:var(--font-mono);font-size:12.5px;font-weight:700}
+  .count{font-family:var(--font-mono);font-size:11px;color:var(--app-muted)}
+
+  .fab{position:absolute;right:18px;bottom:18px;width:54px;height:54px;border-radius:18px;
+    background:var(--crema);color:#fff;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 10px 22px -6px rgba(150,100,30,.6)}
+  .fab .ico{stroke:#fff;stroke-width:2.4;width:24px;height:24px}
+
+  /* fields (OCR review) */
+  .sectlabel{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--app-muted);margin:2px 0 9px;font-weight:700}
+  .field{background:var(--cup);border:1px solid var(--app-line);border-radius:12px;
+    padding:8px 11px;margin-bottom:8px;position:relative}
+  .field .lb{font-size:10.5px;color:var(--app-muted);font-weight:600}
+  .field .vl{font-size:13.5px;font-weight:600;margin-top:1px}
+  .field .vl.mono{font-family:var(--font-mono);font-size:12px}
+  .field .vl.empty{color:#bdb2a1;font-weight:500}
+  .field.auto{border-color:var(--crema);background:linear-gradient(0deg,var(--accent-soft),var(--cup) 42%)}
+  .field.auto .lb{color:var(--crema-ink)}
+  .field .lb .tick{float:right;color:var(--crema);font-family:var(--font-mono);font-weight:700}
+  .field.focus{border-color:var(--crema);box-shadow:0 0 0 3px var(--accent-soft)}
+  .field.focus .vl.empty{color:var(--crema-ink)}
+  .field .to{position:absolute;right:9px;bottom:8px;font-size:9.5px;font-weight:700;color:var(--crema-ink);font-family:var(--font-mono)}
+  .caret::after{content:"";display:inline-block;width:2px;height:14px;background:var(--crema);margin-left:1px;vertical-align:-2px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .grid2 .field{margin-bottom:0}
+
+  /* photo header (review + detail) */
+  .photo{height:96px;border-radius:14px;margin-bottom:12px;position:relative;overflow:hidden;
+    background:linear-gradient(120deg,#c19a58,#7a5a2e 55%,#4a3518);
+    display:flex;align-items:flex-end;justify-content:flex-end;padding:8px}
+  .photo::before{content:"";position:absolute;left:16px;right:16px;top:22px;height:30px;border-radius:6px;background:rgba(255,255,255,.13)}
+  .photo::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 42% 26%,rgba(255,255,255,.22),transparent 55%)}
+  .photo .tag{position:relative;font-size:10.5px;color:#fff;background:rgba(0,0,0,.42);padding:4px 10px;border-radius:999px;font-weight:600;display:inline-flex;gap:6px;align-items:center}
+  .photo .tag .ico{width:13px;height:13px;stroke:#fff;stroke-width:2}
+
+  /* assign chips */
+  .assign{margin:12px 0 6px;padding:11px;border:1px dashed var(--crema);border-radius:12px;background:var(--cup)}
+  .assign .hint{font-size:11px;color:var(--crema-ink);margin-bottom:8px;font-weight:600;display:flex;align-items:center;gap:6px}
+  .assign .hint .ico{width:13px;height:13px;stroke:var(--crema-ink)}
+  .frag{display:flex;flex-wrap:wrap;gap:6px}
+  .frag .f{font-size:11.5px;padding:5px 10px;border-radius:8px;background:var(--cup-2);
+    border:1px solid var(--app-line);color:var(--espresso);font-weight:600}
+  .frag .f.mono{font-family:var(--font-mono);font-size:11px}
+  .frag .f.tap{background:var(--crema);color:#fff;border-color:var(--crema);position:relative}
+  .frag .f.tap::after{content:"탭";position:absolute;top:-8px;right:-7px;background:var(--espresso);color:var(--oat);
+    font-size:8.5px;font-weight:700;padding:1px 5px;border-radius:6px;font-family:var(--font-mono)}
+  .frag .f.used{opacity:.4;text-decoration:line-through}
+
+  .banner{display:flex;gap:9px;align-items:flex-start;padding:10px 12px;border-radius:12px;
+    background:var(--cup-2);border:1px solid var(--app-line);margin-bottom:12px;font-size:11.5px;color:#6b6053}
+  .banner .ico{width:16px;height:16px;stroke:var(--crema-ink);flex:none;margin-top:1px}
+  .banner b{color:var(--espresso)}
+
+  .cta{margin-top:4px;height:46px;border-radius:14px;background:var(--espresso);color:var(--oat);
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px}
+  .cta.crema{background:var(--crema);color:#fff}
+  .savenote{font-size:10px;color:var(--app-muted);text-align:center;margin-top:7px;line-height:1.4}
+
+  /* detail spec sheet */
+  .hero{display:flex;gap:13px;margin-bottom:14px}
+  .hero .thumb{width:66px;height:82px}
+  .hero .nm{font-size:17px;font-weight:800;letter-spacing:-.02em;line-height:1.2}
+  .hero .ro{font-size:12px;color:var(--app-muted);margin-top:2px}
+  .spec{background:var(--cup);border:1px solid var(--app-line);border-radius:14px;overflow:hidden;margin-bottom:12px}
+  .spec .row{display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--app-line-2);font-size:12.5px}
+  .spec .row:last-child{border-bottom:none}
+  .spec .row .k{color:var(--app-muted)}
+  .spec .row .v{font-weight:600;font-family:var(--font-mono);font-size:12px}
+  .zoom{position:absolute;right:6px;bottom:6px;width:22px;height:22px;border-radius:7px;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center}
+  .zoom .ico{width:12px;height:12px;stroke:#fff;stroke-width:2}
+
+  /* bottom sheet */
+  .scrim{position:absolute;inset:0;background:rgba(20,14,8,.36)}
+  .dim{filter:saturate(.6) brightness(.98);opacity:.5}
+  .sheet{position:absolute;left:0;right:0;bottom:0;background:var(--cup);
+    border-radius:20px 20px 0 0;padding:8px 14px 16px;box-shadow:0 -12px 30px -10px rgba(0,0,0,.35)}
+  .sheet .grip{width:38px;height:4px;border-radius:3px;background:var(--app-line);margin:6px auto 12px}
+  .sheet .stitle{font-weight:800;font-size:15px;margin:0 4px 12px}
+  .opt{display:flex;align-items:center;gap:12px;padding:12px;border-radius:14px;
+    border:1px solid var(--app-line);background:var(--cup);margin-bottom:8px}
+  .opt .oic{width:40px;height:40px;border-radius:12px;flex:none;display:flex;align-items:center;justify-content:center;
+    background:var(--accent-soft);color:var(--crema-ink)}
+  .opt.primary{border-color:var(--crema)}
+  .opt.primary .oic{background:var(--crema);color:#fff}
+  .opt .oic .ico{width:20px;height:20px}
+  .opt .ot{font-weight:700;font-size:13.5px}
+  .opt .od{font-size:11px;color:var(--app-muted);margin-top:1px}
+
+  /* decision callouts */
+  .decisions{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin:26px 0 6px}
+  .dcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+  .dcard .tag{font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);font-weight:700}
+  .dcard h4{margin:6px 0 5px;font-size:13.5px}
+  .dcard p{margin:0;font-size:12px;color:var(--muted);line-height:1.55}
+  .dcard p b{color:var(--fg)}
+
+  .board-foot{margin-top:30px;color:var(--muted);font-size:12.5px;border-top:1px solid var(--line);
+    padding-top:18px;max-width:74ch}
+  .board-foot code{font-family:var(--font-mono);background:var(--surface);padding:1px 6px;border-radius:5px}
+</style>
+
+<div class="board">
+  <header>
+    <p class="head-eyebrow">BeanProfile · M3 · PHOTO &amp; OCR</p>
+    <h1 class="head-title">사진 촬영 · 썸네일 · OCR 반자동 리뷰</h1>
+    <p class="head-sub">M3에서 새로 생기는 화면·상태를 확정하기 위한 목업입니다. 기존 커핑랩 테마·컴포넌트를 그대로 씁니다. "무엇이 어디에, 인터랙션은 어떻게"에 집중해 보세요 — 데이터는 예시입니다.</p>
+  </header>
+
+  <div class="steps" aria-label="추가 흐름">
+    <span class="s"><span class="n">+</span>리스트 FAB</span><span class="arrow">→</span>
+    <span class="s"><span class="n">1</span>바텀시트</span><span class="arrow">→</span>
+    <span class="s"><span class="n">2</span>촬영 / 갤러리</span><span class="arrow">→</span>
+    <span class="s"><span class="n">3</span>OCR 인식</span><span class="arrow">→</span>
+    <span class="s"><span class="n">4</span>리뷰 · 칩 배정</span><span class="arrow">→</span>
+    <span class="s"><span class="n">5</span>저장</span><span class="arrow">→</span>
+    <span class="s"><span class="n">6</span>카드 · 상세 썸네일</span>
+  </div>
+
+  <div class="legend">
+    <span><i class="sw" style="background:var(--accent-soft);border:1px solid var(--crema)"></i>OCR <b>자동 채움</b> 필드(앰버)</span>
+    <span><i class="sw" style="background:#fff;border:1px solid var(--crema);box-shadow:0 0 0 2px var(--accent-soft)"></i><b>활성(포커스)</b> 필드</span>
+    <span><i class="sw" style="background:var(--crema)"></i>탭할 <b>칩</b> · 강조</span>
+    <span><i class="sw" style="background:var(--cup-2);border:1px dashed var(--crema)"></i>배정 대기 <b>인식 칩</b></span>
+  </div>
+
+  <section class="screens">
+
+    <!-- A. 진입 바텀시트 -->
+    <article class="screen-card">
+      <div class="screen-head"><span class="screen-idx">A</span><span class="screen-name">원두 추가 — 진입</span></div>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i></span></div>
+        <div class="appbar dim"><div style="flex:1"><h1>내 원두</h1><div class="sub">24 원두 · 68 시음</div></div></div>
+        <div class="body dim">
+          <div class="bean"><div class="thumb"></div><div class="info"><div class="nm">에티오피아 예가체프 코체레</div><div class="ro">프릳츠 커피 · 워시드</div><div class="meta"><span class="rate"><span class="stars">★★★★<span class="e">★</span></span><b>4.5</b></span></div></div></div>
+          <div class="bean"><div class="thumb k"></div><div class="info"><div class="nm">콜롬비아 핑크 버번</div><div class="ro">모모스 커피 · 내추럴</div><div class="meta"><span class="rate"><span class="stars">★★★★★</span><b>4.7</b></span></div></div></div>
+        </div>
+        <div class="scrim"></div>
+        <div class="sheet">
+          <div class="grip"></div>
+          <p class="stitle">원두 추가</p>
+          <div class="opt primary">
+            <div class="oic"><svg class="ico" viewBox="0 0 24 24"><path d="M4 8l2-3h12l2 3v10H4z"/><circle cx="12" cy="12" r="3.4"/></svg></div>
+            <div><div class="ot">촬영</div><div class="od">봉투·정보 카드를 찍어 자동 인식</div></div>
+          </div>
+          <div class="opt">
+            <div class="oic"><svg class="ico" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M5 17l4.5-4 3 2.5L17 11l2 2.5"/></svg></div>
+            <div><div class="ot">갤러리에서 선택</div><div class="od">저장된 사진에서</div></div>
+          </div>
+          <div class="opt">
+            <div class="oic"><svg class="ico" viewBox="0 0 24 24"><path d="M4 20h4L18 10l-4-4L4 16z"/><path d="M13 7l4 4"/></svg></div>
+            <div><div class="ot">직접 입력</div><div class="od">사진 없이 수동으로</div></div>
+          </div>
+        </div>
+      </div></div>
+      <div class="screen-cap"><span class="k">결정 포인트</span>
+        <ul><li>FAB <b>＋</b> → 3갈래 시트. <span class="k">직접 입력</span>은 기존 M1 수동 폼 그대로(무OCR 폴백).</li><li>촬영/갤러리 → 사진 선택 후 OCR 실행.</li></ul>
+      </div>
+    </article>
+
+    <!-- B. OCR 리뷰 (핵심) -->
+    <article class="screen-card">
+      <div class="screen-head"><span class="screen-idx">B</span><span class="screen-name">OCR 리뷰 · 칩 배정 ★</span></div>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i></span></div>
+        <div class="appbar">
+          <button class="iconbtn ghost" aria-label="뒤로"><svg class="ico" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+          <h1 style="font-size:18px;flex:1">정보 확인</h1>
+        </div>
+        <div class="body">
+          <div class="photo"><span class="tag"><svg class="ico" viewBox="0 0 24 24"><path d="M4 8l2-3h12l2 3v10H4z"/><circle cx="12" cy="12" r="3.2"/></svg>바꾸기</span></div>
+
+          <div class="sectlabel">자동 인식됨 — 확인만</div>
+          <div class="field auto"><div class="lb">원산지 국가 <span class="tick">✓ 자동</span></div><div class="vl">Ethiopia</div></div>
+          <div class="grid2">
+            <div class="field auto"><div class="lb">가공방식 <span class="tick">✓</span></div><div class="vl">Washed</div></div>
+            <div class="field auto"><div class="lb">로스팅일 <span class="tick">✓</span></div><div class="vl mono">2026-07-02</div></div>
+          </div>
+
+          <div class="sectlabel" style="margin-top:12px">직접 채우기</div>
+          <div class="grid2">
+            <div class="field"><div class="lb">제품명</div><div class="vl">예가체프 코체레</div></div>
+            <div class="field focus"><div class="lb">로스터리</div><div class="vl empty caret">입력…</div><span class="to">← 여기 채움</span></div>
+          </div>
+
+          <div class="assign">
+            <div class="hint"><svg class="ico" viewBox="0 0 24 24"><path d="M4 8l2-3h12l2 3v10H4z"/><circle cx="12" cy="12" r="3"/></svg>인식된 텍스트 — 활성 필드에 <b style="margin:0 3px">탭</b>해 배정</div>
+            <div class="frag">
+              <span class="f tap">프릳츠</span><span class="f used">코체레</span><span class="f mono">G1</span>
+              <span class="f">Heirloom</span><span class="f mono">1,900–2,100m</span>
+              <span class="f">블루베리</span><span class="f">자스민</span><span class="f">홍차</span>
+            </div>
+          </div>
+          <div class="cta">저장</div>
+          <div class="savenote">저장 시 사진을 앱 보관함에 복사 · 취소하면 남기지 않음</div>
+        </div>
+      </div></div>
+      <div class="screen-cap"><span class="k">핵심 인터랙션</span>
+        <ul><li><span class="k">2단 구조</span>: 위=자동 채운 필드(앰버·✓), 아래=인식 칩.</li><li>텍스트 필드를 <span class="k">포커스</span>(로스터리) → 칩(<b>프릳츠</b>) <span class="k">탭</span> → 그 필드에 채워짐. 쓴 칩은 흐려짐.</li><li>날짜·가공·로스팅단계 등 <span class="k">구조화 필드는 파서 자동값</span>을 피커로 수정(칩 배정 대상 아님).</li></ul>
+      </div>
+    </article>
+
+    <!-- C. OCR 실패 폴백 -->
+    <article class="screen-card">
+      <div class="screen-head"><span class="screen-idx">C</span><span class="screen-name">OCR 실패 → 직접 입력</span></div>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i></span></div>
+        <div class="appbar">
+          <button class="iconbtn ghost" aria-label="뒤로"><svg class="ico" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+          <h1 style="font-size:18px;flex:1">정보 확인</h1>
+        </div>
+        <div class="body">
+          <div class="photo"><span class="tag"><svg class="ico" viewBox="0 0 24 24"><path d="M4 8l2-3h12l2 3v10H4z"/><circle cx="12" cy="12" r="3.2"/></svg>바꾸기</span></div>
+          <div class="banner"><svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg><div><b>글자를 자동 인식하지 못했어요.</b> 아래에 직접 입력하거나, 더 밝은 곳에서 다시 촬영해 보세요.</div></div>
+
+          <div class="sectlabel">원두 정보</div>
+          <div class="field"><div class="lb">제품명</div><div class="vl empty">탭하여 입력…</div></div>
+          <div class="grid2">
+            <div class="field"><div class="lb">로스터리</div><div class="vl empty">입력…</div></div>
+            <div class="field"><div class="lb">원산지 국가</div><div class="vl empty">입력…</div></div>
+          </div>
+          <div class="grid2" style="margin-top:8px">
+            <div class="field"><div class="lb">가공방식</div><div class="vl empty">선택…</div></div>
+            <div class="field"><div class="lb">로스팅일</div><div class="vl empty">선택…</div></div>
+          </div>
+          <div class="cta" style="margin-top:12px">저장</div>
+          <div class="savenote">인식 실패해도 흐름은 그대로 — 수동 입력으로 매끄럽게 이어짐</div>
+        </div>
+      </div></div>
+      <div class="screen-cap"><span class="k">결정 포인트</span>
+        <ul><li>인식 0건이면 칩 패널 대신 <span class="k">안내 배너 + 빈 폼</span>. 사진은 유지.</li><li>설계 §5의 "OCR 실패해도 수동 입력으로 이어진다" 실현.</li></ul>
+      </div>
+    </article>
+
+    <!-- D. 리스트 썸네일 (사진 유/무) -->
+    <article class="screen-card">
+      <div class="screen-head"><span class="screen-idx">D</span><span class="screen-name">리스트 — 썸네일</span></div>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i></span></div>
+        <div class="appbar"><div style="flex:1"><h1>내 원두</h1><div class="sub">24 원두 · 68 시음</div></div>
+          <button class="iconbtn" aria-label="검색"><svg class="ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg></button></div>
+        <div class="body">
+          <div class="bean"><div class="thumb"></div>
+            <div class="info"><div class="nm">에티오피아 예가체프 코체레</div><div class="ro">프릳츠 커피 · 워시드</div>
+              <div class="meta"><span class="rate"><span class="stars">★★★★<span class="e">★</span></span><b>4.5</b></span><span class="count">시음 6</span></div>
+              <div class="notechips"><span class="nchip">블루베리</span><span class="nchip">자스민</span></div></div></div>
+          <div class="bean"><div class="thumb empty"><svg class="ico" viewBox="0 0 24 24"><path d="M6 3h9l3 3v15H6z"/><path d="M9 8h6M9 12h6M9 16h4"/></svg></div>
+            <div class="info"><div class="nm">콜롬비아 핑크 버번 내추럴</div><div class="ro">모모스 커피 · 내추럴</div>
+              <div class="meta"><span class="rate"><span class="stars">★★★★★</span><b>4.7</b></span><span class="count">시음 2</span></div>
+              <div class="notechips"><span class="nchip">딸기</span><span class="nchip">복숭아</span></div></div></div>
+          <div class="bean"><div class="thumb"></div>
+            <div class="info"><div class="nm">수프리모 하우스 블렌드</div><div class="ro">테라로사</div>
+              <div class="meta"><span class="badge blend">BLEND</span><span class="rate"><span class="stars">★★★★<span class="e">★</span></span><b>3.8</b></span></div>
+              <div class="notechips"><span class="nchip">다크초콜릿</span></div></div></div>
+        </div>
+        <div class="fab"><svg class="ico" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></div>
+      </div></div>
+      <div class="screen-cap"><span class="k">결정 포인트</span>
+        <ul><li>사진 있으면 <span class="k">썸네일</span>, 없으면 <span class="k">기본 아이콘 플레이스홀더</span>(2번째 카드).</li><li>레이아웃은 M1/M2 카드 그대로 — leading 썸네일만 사진화.</li></ul>
+      </div>
+    </article>
+
+    <!-- E. 상세 사진 -->
+    <article class="screen-card">
+      <div class="screen-head"><span class="screen-idx">E</span><span class="screen-name">상세 — 사진 배치</span></div>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i></span></div>
+        <div class="appbar">
+          <button class="iconbtn ghost" aria-label="뒤로"><svg class="ico" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+          <h1 style="font-size:17px;flex:1">원두 상세</h1>
+          <button class="iconbtn ghost" aria-label="편집"><svg class="ico" viewBox="0 0 24 24"><path d="M4 20h4L18 10l-4-4L4 16z"/><path d="M13 7l4 4"/></svg></button>
+        </div>
+        <div class="body">
+          <div class="hero">
+            <div class="thumb" style="position:relative"><div class="zoom"><svg class="ico" viewBox="0 0 24 24"><path d="M4 9V4h5M20 15v5h-5"/></svg></div></div>
+            <div>
+              <div class="nm">에티오피아<br>예가체프 코체레</div>
+              <div class="ro">프릳츠 커피</div>
+              <div class="meta" style="margin-top:8px"><span class="badge">SINGLE</span><span class="rate"><span class="stars">★★★★<span class="e">★</span></span><b>4.5</b></span><span class="count">시음 6</span></div>
+            </div>
+          </div>
+          <div class="spec">
+            <div class="row"><span class="k">원산지</span><span class="v">Ethiopia · Yirgacheffe</span></div>
+            <div class="row"><span class="k">농장/스테이션</span><span class="v">Koichere W.S.</span></div>
+            <div class="row"><span class="k">품종</span><span class="v">Heirloom</span></div>
+            <div class="row"><span class="k">가공 · 고도</span><span class="v">Washed · 1,900m</span></div>
+            <div class="row"><span class="k">로스팅</span><span class="v">2026-07-02 · Light-Med</span></div>
+          </div>
+          <div class="notechips"><span class="nchip">블루베리</span><span class="nchip">자스민</span><span class="nchip">홍차</span></div>
+        </div>
+      </div></div>
+      <div class="screen-cap"><span class="k">결정 포인트</span>
+        <ul><li>제안: <span class="k">모노 스펙시트 정체성</span> 유지 → 이름 옆 <span class="k">썸네일(탭 → 크게)</span>. 데이터 우선 앱에 맞음.</li><li>대안: 상단 <b>풀폭 사진 배너</b>(더 사진 중심). 선호 알려주세요.</li></ul>
+      </div>
+    </article>
+
+  </section>
+
+  <div class="decisions">
+    <div class="dcard"><span class="tag">판단 ①</span><h4>이름 · 로스터리 자동추측 안 함</h4><p>어떤 줄이든 이름일 수 있어 오탐 위험 → <b>칩으로 배정하거나 직접 입력</b>. 국가·날짜·가공·로스팅단계·컵노트만 자동.</p></div>
+    <div class="dcard"><span class="tag">판단 ②</span><h4>Copy-on-save</h4><p>촬영본은 <b>임시 경로</b>로 두고 저장할 때만 앱 보관함으로 복사 → <b>취소 시 고아 파일 없음</b>.</p></div>
+    <div class="dcard"><span class="tag">판단 ③</span><h4>칩 → 텍스트 필드만</h4><p>칩은 문자열이라 이름·로스터리·지역·농장·품종·고도·메모·컵노트에만 배정. 날짜·enum은 <b>피커</b>로.</p></div>
+    <div class="dcard"><span class="tag">확인 요청</span><h4>상세 사진 = 썸네일 vs 배너</h4><p>스펙시트 정체성을 위해 <b>옆 썸네일</b>을 제안(E). 풀폭 배너를 원하면 바꿉니다.</p></div>
+  </div>
+
+  <p class="board-foot">이 목업은 <b>M3 UI/UX 확정용</b>입니다. 소스: <code>docs/mockups/m3-photo-ocr.html</code>. 피드백(진입 시트 문구/순서, 리뷰 2단 인터랙션, 칩 배정 방식, 썸네일 플레이스홀더, 상세 사진 = 썸네일/배너 등) 주시면 반영하고, 확정되면 <code>docs/plans/milestone-3-design.md</code>(+html)로 문서화한 뒤 구현 계획(writing-plans)으로 넘어갑니다.</p>
+</div>

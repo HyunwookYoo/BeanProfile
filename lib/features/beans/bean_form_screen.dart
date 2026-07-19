@@ -124,31 +124,31 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
       return;
     }
     setState(() => _saving = true);
-    String? photoPath = widget.existing?.bean.photoPath; // 편집 시 기존 사진 유지
-    if (widget.photoTempPath != null) {
-      photoPath = await ref.read(photoServiceProvider).persist(widget.photoTempPath!);
-    }
-    final input = BeanInput(
-      name: _name.text.trim(),
-      roaster: _roaster.text.trim(),
-      type: _type,
-      roastLevel: _roast,
-      roastDate: _roastDate,
-      cupNotes: _parseNotes(),
-      memo: _memo.text.trim().isEmpty ? null : _memo.text.trim(),
-      components: [
-        for (final c in _components)
-          if (c.country.text.trim().isNotEmpty)
-            ComponentInput(
-              country: c.country.text.trim(),
-              region: c.region.text.trim().isEmpty ? null : c.region.text.trim(),
-              process: c.process,
-              ratioPercent: int.tryParse(c.ratio.text.trim()),
-            ),
-      ],
-      photoPath: photoPath,
-    );
     try {
+      String? photoPath = widget.existing?.bean.photoPath; // 편집 시 기존 사진 유지
+      if (widget.photoTempPath != null) {
+        photoPath = await ref.read(photoServiceProvider).persist(widget.photoTempPath!);
+      }
+      final input = BeanInput(
+        name: _name.text.trim(),
+        roaster: _roaster.text.trim(),
+        type: _type,
+        roastLevel: _roast,
+        roastDate: _roastDate,
+        cupNotes: _parseNotes(),
+        memo: _memo.text.trim().isEmpty ? null : _memo.text.trim(),
+        components: [
+          for (final c in _components)
+            if (c.country.text.trim().isNotEmpty)
+              ComponentInput(
+                country: c.country.text.trim(),
+                region: c.region.text.trim().isEmpty ? null : c.region.text.trim(),
+                process: c.process,
+                ratioPercent: int.tryParse(c.ratio.text.trim()),
+              ),
+        ],
+        photoPath: photoPath,
+      );
       final repo = ref.read(beanRepositoryProvider);
       if (widget.existing == null) {
         await repo.createBean(input);

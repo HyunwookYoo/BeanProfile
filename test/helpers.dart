@@ -81,11 +81,15 @@ class FakeOcrService implements OcrService {
 }
 
 class FakePhotoService implements PhotoService {
-  FakePhotoService({this.pickResult, this.persistResult = '/app/photos/persisted.jpg'});
+  FakePhotoService({this.pickResult, this.persistResult = '/app/photos/persisted.jpg', this.throwOnPersist = false});
   final String? pickResult;
   final String persistResult;
+  final bool throwOnPersist;
   @override
   Future<String?> pick({required bool fromCamera}) async => pickResult;
   @override
-  Future<String> persist(String tempPath) async => persistResult;
+  Future<String> persist(String tempPath) async {
+    if (throwOnPersist) throw Exception('persist failed');
+    return persistResult;
+  }
 }

@@ -107,4 +107,28 @@ void main() {
     // (_isShuttingDown short-circuit) — same fix as test/widget/bean_form_test.dart.
     await db.close();
   });
+
+  testWidgets('사진 저장(persist) 실패 시 폼에 머물고 에러 안내 (막다른 길 아님)', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    await t.pumpWidget(wrapApp(
+      const BeanFormScreen(
+        draft: OcrDraft(country: 'Ethiopia'),
+        photoTempPath: '/tmp/pick.jpg',
+      ),
+      db: db,
+      photo: FakePhotoService(throwOnPersist: true),
+    ));
+    await t.pump();
+
+    await t.enterText(find.byKey(const Key('field-name')), '예가체프');
+    await t.tap(find.byKey(const Key('save-bean')));
+    await t.pump();                                   // _save 비동기 실행 시작
+    await t.pump(const Duration(milliseconds: 300));  // catch→setState/SnackBar 반영
+    // (pumpAndSettle는 SnackBar 자동 닫힘 타이머 때문에 멈출 수 있어 쓰지 않음)
+
+    expect(find.byType(BeanFormScreen), findsOneWidget);       // 폼 유지(pop 안 됨)
+    expect(find.textContaining('저장에 실패'), findsOneWidget);  // 에러 안내
+    expect(t.widget<FilledButton>(find.byKey(const Key('save-bean'))).onPressed, isNotNull); // 재활성화
+  });
 }

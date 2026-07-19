@@ -74,10 +74,16 @@ extension BeanInputPhoto on BeanInput {
 }
 
 class FakeOcrService implements OcrService {
-  FakeOcrService(this.text);
-  final String text;
+  FakeOcrService.lines(this._lines);
+  factory FakeOcrService.text(String text) => FakeOcrService.lines([
+        for (final (i, t) in _splitText(text).indexed)
+          OcrLine(t, left: 0, top: i * 10.0, right: 100, bottom: i * 10.0 + 10),
+      ]);
+  final List<OcrLine> _lines;
   @override
-  Future<String> recognize(String imagePath) async => text;
+  Future<List<OcrLine>> recognize(String imagePath) async => _lines;
+  static List<String> _splitText(String s) =>
+      s.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
 }
 
 class FakePhotoService implements PhotoService {

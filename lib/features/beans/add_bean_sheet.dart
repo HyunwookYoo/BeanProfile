@@ -62,8 +62,8 @@ Future<OcrDraft?> _recognize(BuildContext context, WidgetRef ref, String path) a
       barrierDismissible: false,
       builder: (_) => const Center(child: CircularProgressIndicator()));
   try {
-    final text = await ref.read(ocrServiceProvider).recognize(path);
-    return parseOcrText(text);
+    final lines = await ref.read(ocrServiceProvider).recognize(path);
+    return parseOcr(lines);
   } finally {
     if (context.mounted) Navigator.of(context).pop(); // 스피너 닫기
   }

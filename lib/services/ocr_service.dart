@@ -13,21 +13,29 @@ class OcrLine {
 
 /// 온디바이스 OCR seam. 실검증은 기기 전용(호스트 테스트에선 가짜 주입).
 abstract class OcrService {
-  /// [imagePath] 이미지의 전체 인식 텍스트를 반환한다. 실패/빈 이미지면 ''.
-  Future<String> recognize(String imagePath);
+  /// 이미지의 인식 라인들. 실패/빈 이미지면 빈 리스트.
+  Future<List<OcrLine>> recognize(String imagePath);
 }
 
 class MlkitOcrService implements OcrService {
   TextRecognizer? _recognizer;
 
   @override
-  Future<String> recognize(String imagePath) async {
+  Future<List<OcrLine>> recognize(String imagePath) async {
     try {
       _recognizer ??= TextRecognizer(script: TextRecognitionScript.korean);
       final result = await _recognizer!.processImage(InputImage.fromFilePath(imagePath));
-      return result.text;
+      return [
+        for (final block in result.blocks)
+          for (final line in block.lines)
+            OcrLine(line.text,
+                left: line.boundingBox.left,
+                top: line.boundingBox.top,
+                right: line.boundingBox.right,
+                bottom: line.boundingBox.bottom),
+      ];
     } catch (_) {
-      return ''; // 인식 실패/모델 미다운로드 → 빈 문자열(폼의 '자동 인식 실패' 배너로 이어짐)
+      return const []; // 인식 실패/모델 미다운로드 → 빈 리스트(폼의 '자동 인식 실패' 배너로 이어짐)
     }
   }
 }

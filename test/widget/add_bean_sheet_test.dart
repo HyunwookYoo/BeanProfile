@@ -45,7 +45,7 @@ void main() {
     await t.pumpWidget(wrapApp(
       const BeanListScreen(),
       db: db,
-      ocr: FakeOcrService('Ethiopia\nWashed\nNotes: 블루베리'),
+      ocr: FakeOcrService.text('Ethiopia\nWashed\nNotes: 블루베리'),
       photo: FakePhotoService(pickResult: '/tmp/pick.jpg'),
     ));
     await t.pump();
@@ -95,7 +95,7 @@ void main() {
     await t.pumpWidget(wrapApp(
       const BeanListScreen(),
       db: db,
-      ocr: FakeOcrService(''), // 인식 실패 → 빈 텍스트
+      ocr: FakeOcrService.text(''), // 인식 실패 → 빈 라인
       photo: FakePhotoService(pickResult: '/tmp/pick.jpg'),
     ));
     await t.pump(const Duration(milliseconds: 300));

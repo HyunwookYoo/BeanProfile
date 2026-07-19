@@ -18,11 +18,11 @@ void main() {
     final file = File('${dir.path}/ocr_card_ko.png');
     await file.writeAsBytes(bytes.buffer.asUint8List());
 
-    final text = await MlkitOcrService().recognize(file.path);
+    final lines = await MlkitOcrService().recognize(file.path);
     // ignore: avoid_print
-    print('===OCR_TEXT_START===\n$text\n===OCR_TEXT_END===');
+    print('===OCR_TEXT_START===\n$lines\n===OCR_TEXT_END===');
 
-    final d = parseOcrText(text);
+    final d = parseOcr(lines);
     // ignore: avoid_print
     print('PARSED name=${d.name} | roaster=${d.roaster} | country=${d.country} '
         '| region=${d.region} | process=${d.process} | roast=${d.roastLevel} '
@@ -31,7 +31,7 @@ void main() {
     print('CHIPS=${d.chips}');
 
     // 실제 ML Kit OCR → 파서가 8개 필드를 모두 채우는지(회귀 가드).
-    expect(text, isNotEmpty);
+    expect(lines, isNotEmpty);
     expect(d.name, '예가체프 코체레');
     expect(d.roaster, '아우어사이드');
     expect(d.country, 'Ethiopia');
@@ -40,5 +40,24 @@ void main() {
     expect(d.roastLevel, RoastLevel.lightMedium);
     expect(d.roastDate, DateTime(2026, 7, 10));
     expect(d.cupNotes, ['블루베리', '자스민', '홍차']);
+  });
+
+  // 대조군: 원본(콜론 없는 스타일) 카드 — 라벨 필드가 안 잡히는지 확인(출력만).
+  testWidgets('OCR 프로브: 원본(콜론없음) 카드 → 파서', (tester) async {
+    final bytes = await rootBundle.load('assets/test/ocr_card_orig.png');
+    final dir = await getTemporaryDirectory();
+    final file = File('${dir.path}/ocr_card_orig.png');
+    await file.writeAsBytes(bytes.buffer.asUint8List());
+
+    final lines = await MlkitOcrService().recognize(file.path);
+    // ignore: avoid_print
+    print('===ORIG_TEXT_START===\n$lines\n===ORIG_TEXT_END===');
+    final d = parseOcr(lines);
+    // ignore: avoid_print
+    print('ORIG_PARSED name=${d.name} | roaster=${d.roaster} | country=${d.country} '
+        '| region=${d.region} | process=${d.process} | roast=${d.roastLevel} '
+        '| date=${d.roastDate} | notes=${d.cupNotes}');
+
+    expect(lines, isNotEmpty);
   });
 }

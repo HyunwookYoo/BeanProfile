@@ -55,6 +55,19 @@ dev_dependencies:
   drift_dev: ^2.31.0
   build_runner: ^2.15.1
   async: ^2.13.1
+  flutter_launcher_icons: ^0.14.4
+
+# 앱 아이콘 (적응형): iOS 라이트=icon(A2 오트) / 다크=icon_dark(A 에스프레소) / 틴티드 자동, Android=icon_dark(A).
+flutter_launcher_icons:
+  image_path: "assets/icon/icon.png"
+  remove_alpha_ios: true
+  ios: true
+  image_path_ios: "assets/icon/icon.png"
+  image_path_ios_dark_transparent: "assets/icon/icon_dark.png"
+  image_path_ios_tinted_grayscale: "assets/icon/icon_tinted.png"
+  android: true
+  image_path_android: "assets/icon/icon_dark.png"
+  min_sdk_android: 21
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

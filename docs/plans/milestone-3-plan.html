@@ -1,0 +1,1201 @@
+<title>M3 사진 &amp; OCR 반자동 입력 — 구현 계획</title>
+<style>
+*{box-sizing:border-box}
+:root{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+  --font-sans:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Consolas,"Malgun Gothic",monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}}
+:root[data-theme="light"]{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+}
+:root[data-theme="dark"]{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-sans);line-height:1.7;-webkit-font-smoothing:antialiased}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.doc{max-width:880px;margin:0 auto;padding:44px 24px 96px}
+.crumb{font-family:var(--font-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:16px}
+h1{font-size:clamp(26px,4vw,38px);font-weight:800;letter-spacing:-.025em;line-height:1.2;margin:.1em 0 .5em;text-wrap:balance}
+h2{font-size:22px;font-weight:700;margin:2em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line);letter-spacing:-.01em;text-wrap:balance}
+h3{font-size:16.5px;font-weight:700;color:var(--accent-ink);margin:1.7em 0 .5em}
+h4{font-size:14px;font-weight:700;margin:1.3em 0 .4em}
+p{margin:.7em 0}
+a{color:var(--accent);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+strong{font-weight:700;color:var(--fg)}
+hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+code.ic{font-family:var(--font-mono);font-size:.85em;background:var(--ic-bg);color:var(--ic-fg);padding:1.5px 6px;border-radius:6px}
+pre.code{position:relative;background:var(--code-bg);color:var(--code-fg);border-radius:12px;padding:16px 18px;margin:1em 0;overflow-x:auto;border:1px solid rgba(0,0,0,.28)}
+pre.code code{font-family:var(--font-mono);font-size:12.75px;line-height:1.6;white-space:pre;color:inherit;background:none;padding:0}
+pre.code[data-lang]::before{content:attr(data-lang);position:absolute;top:9px;right:13px;font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(236,227,211,.42)}
+.tablewrap{overflow-x:auto;margin:1.1em 0}
+table{border-collapse:collapse;width:100%;font-size:13.75px}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--th);font-weight:700}
+tbody tr:nth-child(even){background:var(--surface)}
+blockquote{margin:1.1em 0;padding:11px 16px;border-left:3px solid var(--accent);background:var(--surface);border-radius:0 10px 10px 0;color:var(--muted)}
+blockquote strong{color:var(--fg)}
+ul,ol{margin:.7em 0;padding-left:1.4em}
+li{margin:.32em 0}
+ul.tasklist{list-style:none;padding-left:.15em}
+ul.tasklist li.task{position:relative;padding-left:30px;margin:.5em 0}
+ul.tasklist li.task::before{content:"";position:absolute;left:0;top:.18em;width:17px;height:17px;border:2px solid var(--accent);border-radius:5px;background:transparent}
+ul.tasklist li.task.done::before{content:"\2713";background:var(--accent);color:#fff;font-size:12px;font-weight:800;text-align:center;line-height:15px}
+</style>
+<article class="doc"><div class="crumb">BeanProfile · docs/plans</div>
+<h1>M3 사진 &amp; OCR 반자동 입력 — 구현 계획</h1>
+<blockquote><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code class="ic">- [ ]</code>) syntax for tracking.</blockquote>
+<p><strong>Goal:</strong> 커피 정보 사진(봉투·정보 카드)을 촬영/선택 → 온디바이스 OCR → 자동 채운 폼 + 인식 칩 리뷰 → 저장 → 카드·상세에 사진 표시.</p>
+<p><strong>Architecture:</strong> 플러그인(ML Kit·image_picker·path_provider) 호출은 <code class="ic">OcrService</code>/<code class="ic">PhotoService</code> 인터페이스 뒤로 격리(Riverpod 주입, 테스트에서 가짜 교체). 필드 추측은 순수 Dart <code class="ic">parseOcrText</code>로 분리(TDD 심장). 리뷰 화면은 기존 <code class="ic">bean_form_screen</code>을 확장. 사진은 저장 시에만 문서폴더로 복사(copy-on-save).</p>
+<p><strong>Tech Stack:</strong> Flutter 3.44.6 / Dart 3.12.2 · drift 2.31 · flutter_riverpod 3.3.2 · google_mlkit_text_recognition · image_picker · path_provider · 테스트 flutter_test(+ sqlite3.dll 호스트).</p>
+<h2>Global Constraints</h2>
+<ul><li><strong>한국어 UI</strong>: 사용자 노출 문자열은 모두 한국어.</li><li><strong>오프라인·로컬 전용</strong>: 네트워크 없음, 모든 데이터 기기 내 drift(SQLite). 사진은 앱 문서 디렉터리, 경로만 DB.</li><li><strong>iOS 우선 배포</strong>: AltStore. Android 코드는 유지하되 CI 검증은 iOS만. Bundle ID <code class="ic">com.hyunwook.beanprofile</code> 영구, repo public, 서명 시크릿 커밋 금지.</li><li><strong>플러그인은 호스트 테스트 불가</strong>: <code class="ic">image_picker</code>·ML Kit·<code class="ic">path_provider</code> 호출은 seam 뒤로 격리 → 테스트는 가짜 주입, 실검증은 기기. 파서는 순수 Dart.</li><li><strong>테스트 규약</strong>: docs/testing.md 3계층, 공유 <code class="ic">test/helpers.dart</code> 재사용, Windows sqlite3.dll, CI. <code class="ic">flutter analyze</code> 0 유지.</li><li><strong>용어</strong>: "촬영 / 커피 정보 사진 / 인식된 텍스트". "봉투" 단독 사용 금지(→ "봉투·정보 카드").</li><li><strong>커밋 트레일러</strong>: 매 커밋 끝에 <code class="ic">Co-Authored-By: Claude Opus 4.8 (1M context) &lt;noreply@anthropic.com&gt;</code>. main 직접 커밋(트렁크).</li><li><strong>DRY · YAGNI · TDD · 잦은 커밋.</strong></li></ul>
+<hr>
+<h2>File Structure</h2>
+<p><strong>신규</strong></p>
+<ul><li><code class="ic">lib/services/ocr_service.dart</code> — <code class="ic">OcrService</code>(interface) + <code class="ic">MlkitOcrService</code></li><li><code class="ic">lib/services/photo_service.dart</code> — <code class="ic">PhotoService</code>(interface) + <code class="ic">ImagePickerPhotoService</code></li><li><code class="ic">lib/features/beans/ocr/ocr_draft.dart</code> — <code class="ic">OcrDraft</code> 값 객체</li><li><code class="ic">lib/features/beans/ocr/ocr_parser.dart</code> — <code class="ic">parseOcrText(String) → OcrDraft</code></li><li><code class="ic">lib/features/beans/widgets/bean_thumbnail.dart</code> — 사진 썸네일(카드·상세 공용)</li><li><code class="ic">lib/features/beans/widgets/ocr_chips_panel.dart</code> — 인식 칩 패널</li><li><code class="ic">lib/features/beans/debug_ocr_screen.dart</code> — <strong>임시</strong> 스파이크 디버그 화면(Task 6에서 삭제)</li><li><code class="ic">lib/features/beans/add_bean_sheet.dart</code> — 추가 진입 바텀시트 + 촬영→OCR→폼 배선</li></ul>
+<p><strong>수정</strong></p>
+<ul><li><code class="ic">pubspec.yaml</code> · <code class="ic">ios/Runner/Info.plist</code> · <code class="ic">ios/Podfile</code> · <code class="ic">android/app/src/main/AndroidManifest.xml</code></li><li><code class="ic">lib/providers.dart</code> — <code class="ic">ocrServiceProvider</code> · <code class="ic">photoServiceProvider</code></li><li><code class="ic">lib/data/models.dart</code> — <code class="ic">BeanInput.photoPath</code></li><li><code class="ic">lib/data/bean_repository.dart</code> — <code class="ic">createBean</code>/<code class="ic">updateBean</code>에 <code class="ic">photoPath</code></li><li><code class="ic">lib/features/beans/widgets/bean_card.dart</code> — leading 썸네일</li><li><code class="ic">lib/features/beans/bean_detail_screen.dart</code> — 헤더 컴팩트 썸네일(탭→전체화면)</li><li><code class="ic">lib/features/beans/bean_form_screen.dart</code> — <code class="ic">draft</code>/<code class="ic">photoTempPath</code>, 프리필·하이라이트·칩·persist</li><li><code class="ic">lib/features/beans/bean_list_screen.dart</code> — FAB → 바텀시트(+Task1 임시 디버그 진입)</li><li><code class="ic">test/helpers.dart</code> — <code class="ic">FakeOcrService</code>/<code class="ic">FakePhotoService</code> + <code class="ic">wrapApp</code> override 확장</li></ul>
+<p><strong>태스크 순서:</strong> 1(스파이크)→[체크포인트 C1: 기기검증]→2(파서)→3(photoPath 데이터)→4(사진 표시)→5(폼 확장)→6(진입 배선)→[최종 리뷰 + finishing].</p>
+<hr>
+<h3>Task 1: 스파이크 — 플러그인 · 권한 · seam · 디버그 화면</h3>
+<p><strong>목적:</strong> M0 이후 가장 무거운 iOS 빌드 변경(ML Kit)을 <strong>먼저</strong> 기기 검증한다. 파서·폼 없이, "사진 → OCR → 원문 표시"만 되는 최소 경로 + 격리 인터페이스를 세운다.</p>
+<p><strong>Files:</strong></p>
+<ul><li>Modify: <code class="ic">pubspec.yaml</code>, <code class="ic">ios/Runner/Info.plist</code>, <code class="ic">ios/Podfile</code>, <code class="ic">android/app/src/main/AndroidManifest.xml</code>, <code class="ic">lib/providers.dart</code>, <code class="ic">lib/features/beans/bean_list_screen.dart</code></li><li>Create: <code class="ic">lib/services/ocr_service.dart</code>, <code class="ic">lib/services/photo_service.dart</code>, <code class="ic">lib/features/beans/debug_ocr_screen.dart</code>, <code class="ic">test/unit/services_wiring_test.dart</code></li></ul>
+<p><strong>Interfaces (Produces):</strong></p>
+<ul><li><code class="ic">abstract class OcrService { Future&lt;String&gt; recognize(String imagePath); }</code></li><li><code class="ic">abstract class PhotoService { Future&lt;String?&gt; pick({required bool fromCamera}); Future&lt;String&gt; persist(String tempPath); }</code></li><li><code class="ic">final ocrServiceProvider = Provider&lt;OcrService&gt;(...)</code>, <code class="ic">final photoServiceProvider = Provider&lt;PhotoService&gt;(...)</code></li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 1: 플러그인 추가</strong></li></ul>
+<p>Run: <code class="ic">flutter pub add google_mlkit_text_recognition image_picker path_provider</code> Expected: <code class="ic">pubspec.yaml</code> dependencies에 3종 추가, <code class="ic">flutter pub get</code> 성공. 결과 예시:</p>
+<pre class="code" data-lang="yaml"><code>  google_mlkit_text_recognition: ^0.15.0
+  image_picker: ^1.1.2
+  path_provider: ^2.1.5</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 2: seam 인터페이스 + 구현 작성 (<code class="ic">lib/services/ocr_service.dart</code>)</strong></li></ul>
+<p>플러그인 객체는 <strong>지연 생성</strong>(생성자에서 네이티브 채널을 건드리지 않게) — 그래야 호스트에서 provider read가 안전하다.</p>
+<pre class="code" data-lang="dart"><code>import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+
+/// 온디바이스 OCR seam. 실검증은 기기 전용(호스트 테스트에선 가짜 주입).
+abstract class OcrService {
+  /// [imagePath] 이미지의 전체 인식 텍스트를 반환한다. 실패/빈 이미지면 ''.
+  Future&lt;String&gt; recognize(String imagePath);
+}
+
+class MlkitOcrService implements OcrService {
+  TextRecognizer? _recognizer;
+
+  @override
+  Future&lt;String&gt; recognize(String imagePath) async {
+    _recognizer ??= TextRecognizer(script: TextRecognitionScript.korean);
+    final result = await _recognizer!.processImage(InputImage.fromFilePath(imagePath));
+    return result.text;
+  }
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 3: seam 인터페이스 + 구현 작성 (<code class="ic">lib/services/photo_service.dart</code>)</strong></li></ul>
+<pre class="code" data-lang="dart"><code>import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+
+/// 사진 선택/보관 seam. 실검증은 기기 전용(호스트 테스트에선 가짜 주입).
+abstract class PhotoService {
+  /// 카메라(fromCamera=true) 또는 갤러리에서 이미지를 고른다.
+  /// 반환: 임시 파일 경로, 취소 시 null.
+  Future&lt;String?&gt; pick({required bool fromCamera});
+
+  /// 임시 이미지를 앱 문서 디렉터리(photos/)로 복사하고 영구 경로를 반환한다.
+  Future&lt;String&gt; persist(String tempPath);
+}
+
+class ImagePickerPhotoService implements PhotoService {
+  final ImagePicker _picker = ImagePicker();
+
+  @override
+  Future&lt;String?&gt; pick({required bool fromCamera}) async {
+    final x = await _picker.pickImage(
+      source: fromCamera ? ImageSource.camera : ImageSource.gallery,
+      imageQuality: 85,
+    );
+    return x?.path;
+  }
+
+  @override
+  Future&lt;String&gt; persist(String tempPath) async {
+    final dir = await getApplicationDocumentsDirectory();
+    final photos = Directory('${dir.path}/photos');
+    if (!await photos.exists()) await photos.create(recursive: true);
+    final ext = tempPath.contains('.') ? tempPath.split('.').last : 'jpg';
+    final dest = '${photos.path}/${DateTime.now().millisecondsSinceEpoch}.$ext';
+    await File(tempPath).copy(dest);
+    return dest;
+  }
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 4: providers 추가 (<code class="ic">lib/providers.dart</code>)</strong></li></ul>
+<p>파일 끝에 추가하고 import 2줄을 상단에 추가:</p>
+<pre class="code" data-lang="dart"><code>import 'services/ocr_service.dart';
+import 'services/photo_service.dart';</code></pre>
+<pre class="code" data-lang="dart"><code>final ocrServiceProvider = Provider&lt;OcrService&gt;((ref) =&gt; MlkitOcrService());
+final photoServiceProvider = Provider&lt;PhotoService&gt;((ref) =&gt; ImagePickerPhotoService());</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 5: 실패하는 배선 스모크 테스트 (<code class="ic">test/unit/services_wiring_test.dart</code>)</strong></li></ul>
+<pre class="code" data-lang="dart"><code>import 'package:beanprofile/providers.dart';
+import 'package:beanprofile/services/ocr_service.dart';
+import 'package:beanprofile/services/photo_service.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  test('providers가 실제 서비스 구현으로 해석되고 생성이 네이티브를 안 건드린다', () {
+    final c = ProviderContainer();
+    addTearDown(c.dispose);
+    expect(c.read(ocrServiceProvider), isA&lt;MlkitOcrService&gt;());
+    expect(c.read(photoServiceProvider), isA&lt;ImagePickerPhotoService&gt;());
+  });
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 6: RED 확인</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/unit/services_wiring_test.dart</code> Expected: FAIL (컴파일 에러 — providers/서비스 미정의). Step 2–4가 이미 있으면 바로 PASS일 수 있음; 그 경우 이 태스크의 TDD는 Step 7 디버그 화면이 아니라 배선 확인이 목적이므로 PASS로 간주하고 진행.</p>
+<ul class="tasklist"><li class="task"><strong>Step 7: 임시 디버그 화면 (<code class="ic">lib/features/beans/debug_ocr_screen.dart</code>)</strong> — Task 6에서 삭제</li></ul>
+<pre class="code" data-lang="dart"><code>import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../providers.dart';
+
+/// 스파이크 전용 임시 화면: 사진 → OCR → 원문 표시. Task 6에서 제거.
+class DebugOcrScreen extends ConsumerStatefulWidget {
+  const DebugOcrScreen({super.key});
+  @override
+  ConsumerState&lt;DebugOcrScreen&gt; createState() =&gt; _DebugOcrScreenState();
+}
+
+class _DebugOcrScreenState extends ConsumerState&lt;DebugOcrScreen&gt; {
+  String _text = '아직 없음';
+  bool _busy = false;
+
+  Future&lt;void&gt; _run(bool camera) async {
+    setState(() =&gt; _busy = true);
+    try {
+      final path = await ref.read(photoServiceProvider).pick(fromCamera: camera);
+      if (path == null) { setState(() { _busy = false; _text = '취소됨'; }); return; }
+      final text = await ref.read(ocrServiceProvider).recognize(path);
+      setState(() { _busy = false; _text = text.isEmpty ? '(인식 텍스트 없음)' : text; });
+    } catch (e) {
+      setState(() { _busy = false; _text = '오류: $e'; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('OCR 디버그(임시)')),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          FilledButton(onPressed: _busy ? null : () =&gt; _run(true), child: const Text('촬영')),
+          const SizedBox(height: 8),
+          OutlinedButton(onPressed: _busy ? null : () =&gt; _run(false), child: const Text('갤러리')),
+          const SizedBox(height: 16),
+          if (_busy) const Center(child: CircularProgressIndicator()),
+          Expanded(child: SingleChildScrollView(child: SelectableText(_text))),
+        ]),
+      ),
+    );
+  }
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 8: bean_list에 임시 디버그 진입 추가 (<code class="ic">lib/features/beans/bean_list_screen.dart</code>)</strong></li></ul>
+<p><code class="ic">import 'debug_ocr_screen.dart';</code> 추가하고, AppBar에 임시 액션을 단다(Task 6에서 제거):</p>
+<pre class="code" data-lang="dart"><code>      appBar: AppBar(
+        title: const Text('내 원두', style: TextStyle(fontWeight: FontWeight.w800)),
+        actions: [
+          IconButton(
+            key: const Key('debug-ocr'),
+            icon: const Icon(Icons.bug_report_outlined),
+            onPressed: () =&gt; Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) =&gt; const DebugOcrScreen())),
+          ),
+        ],
+      ),</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 9: iOS 권한 (<code class="ic">ios/Runner/Info.plist</code>)</strong> — <code class="ic">&lt;dict&gt;</code> 안에 추가</li></ul>
+<pre class="code" data-lang="xml"><code>	&lt;key&gt;NSCameraUsageDescription&lt;/key&gt;
+	&lt;string&gt;원두 봉투·정보 카드를 촬영해 정보를 자동으로 인식하는 데 사용해요.&lt;/string&gt;
+	&lt;key&gt;NSPhotoLibraryUsageDescription&lt;/key&gt;
+	&lt;string&gt;저장된 사진에서 원두 정보를 불러오는 데 사용해요.&lt;/string&gt;</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 10: iOS 최소 버전 (<code class="ic">ios/Podfile</code>)</strong> — 최상단 platform 라인을 활성화</li></ul>
+<pre class="code" data-lang="ruby"><code>platform :ios, '15.0'</code></pre>
+<p>주: <code class="ic">pod install</code>이 더 높은 최소버전(예: 15.5)을 요구하면 그 값으로 올린다(스파이크가 정확한 값을 노출). Xcode 프로젝트의 <code class="ic">IPHONEOS_DEPLOYMENT_TARGET</code>도 동일하게 맞춘다.</p>
+<ul class="tasklist"><li class="task"><strong>Step 11: Android 권한 (<code class="ic">android/app/src/main/AndroidManifest.xml</code>)</strong> — <code class="ic">&lt;manifest&gt;</code> 안, <code class="ic">&lt;application&gt;</code> 위</li></ul>
+<pre class="code" data-lang="xml"><code>    &lt;uses-permission android:name="android.permission.CAMERA" /&gt;</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 12: GREEN + analyze</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/unit/services_wiring_test.dart</code> Expected: PASS Run: <code class="ic">flutter analyze</code> Expected: No issues. (임시 디버그 화면·진입은 의도된 임시 코드로 남겨둔다.)</p>
+<ul class="tasklist"><li class="task"><strong>Step 13: Commit</strong></li></ul>
+<pre class="code" data-lang="bash"><code>git add pubspec.yaml pubspec.lock lib/services/ lib/features/beans/debug_ocr_screen.dart lib/features/beans/bean_list_screen.dart lib/providers.dart test/unit/services_wiring_test.dart ios/ android/
+git commit -m "feat(m3): plugins + OCR/Photo service seams + spike debug screen"</code></pre>
+<hr>
+<h3>✅ 체크포인트 C1 — 스파이크 기기 검증 (컨트롤러 + 사용자)</h3>
+<p>SDD 태스크가 아니라 <strong>파이프라인 게이트</strong>다. Task 1 커밋 후, 나머지 작업 전에:</p>
+<ol><li>스파이크 pre-release 태그 푸시(예: <code class="ic">v0.3.0-spike.1</code>) → <code class="ic">release.yml</code>이 미서명 <code class="ic">.ipa</code> 빌드.</li><li>iOS 버전 문자열이 문제되면(비수치 접미사) 수치 임시 태그(예: <code class="ic">v0.2.9</code>)로 폴백.</li><li>CI가 <strong>설치 가능한 <code class="ic">.ipa</code>를 성공적으로 만들었는지</strong>(ML Kit 파드/최소버전 해소) 확인 — 실패 시 Podfile/deployment target을 고쳐 재빌드.</li><li>사용자가 AltStore로 설치 → 디버그 화면에서 <strong>촬영/갤러리 → OCR 원문 표시</strong>가 기기에서 동작하는지 확인.</li><li>통과해야 Task 2로 진행. 여기서 막히면 iOS 빌드 자체가 불가능하므로 <strong>여기서 먼저 해결</strong>한다.</li></ol>
+<hr>
+<h3>Task 2: OCR 파서 (순수 Dart · TDD 심장)</h3>
+<p><strong>Files:</strong></p>
+<ul><li>Create: <code class="ic">lib/features/beans/ocr/ocr_draft.dart</code>, <code class="ic">lib/features/beans/ocr/ocr_parser.dart</code>, <code class="ic">test/unit/ocr_parser_test.dart</code></li></ul>
+<p><strong>Interfaces:</strong></p>
+<ul><li>Consumes: <code class="ic">RoastLevel</code>, <code class="ic">Process</code> (lib/data/enums.dart)</li><li>Produces: <code class="ic">class OcrDraft { String? country; DateTime? roastDate; RoastLevel? roastLevel; Process? process; List&lt;String&gt; cupNotes; List&lt;String&gt; chips; bool get isEmpty; }</code> · <code class="ic">OcrDraft parseOcrText(String rawText)</code></li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 1: 값 객체 (<code class="ic">lib/features/beans/ocr/ocr_draft.dart</code>)</strong></li></ul>
+<pre class="code" data-lang="dart"><code>import '../../../data/enums.dart';
+
+/// OCR 원문에서 추측한 필드 초안 + 배정 대기 칩.
+class OcrDraft {
+  final String? country;
+  final DateTime? roastDate;
+  final RoastLevel? roastLevel;
+  final Process? process;
+  final List&lt;String&gt; cupNotes;
+  final List&lt;String&gt; chips;
+  const OcrDraft({
+    this.country,
+    this.roastDate,
+    this.roastLevel,
+    this.process,
+    this.cupNotes = const [],
+    this.chips = const [],
+  });
+
+  /// 자동 채운 값도, 배정할 칩도 하나도 없음(= OCR 실패/빈 이미지).
+  bool get isEmpty =&gt;
+      country == null &amp;&amp;
+      roastDate == null &amp;&amp;
+      roastLevel == null &amp;&amp;
+      process == null &amp;&amp;
+      cupNotes.isEmpty &amp;&amp;
+      chips.isEmpty;
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 2: 실패 테스트 (<code class="ic">test/unit/ocr_parser_test.dart</code>)</strong></li></ul>
+<pre class="code" data-lang="dart"><code>import 'package:beanprofile/data/enums.dart';
+import 'package:beanprofile/features/beans/ocr/ocr_parser.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  group('country', () {
+    test('영문/한글 원산지를 표준 표기로', () {
+      expect(parseOcrText('Ethiopia Yirgacheffe G1').country, 'Ethiopia');
+      expect(parseOcrText('에티오피아 예가체프').country, 'Ethiopia');
+      expect(parseOcrText('Costa Rica Tarrazu').country, 'Costa Rica');
+    });
+    test('원산지 아니면 null', () {
+      expect(parseOcrText('Fritz Coffee Company').country, isNull);
+    });
+  });
+
+  group('roastDate', () {
+    test('여러 포맷', () {
+      expect(parseOcrText('Roasted: 2026-07-02').roastDate, DateTime(2026, 7, 2));
+      expect(parseOcrText('로스팅 2026.07.02').roastDate, DateTime(2026, 7, 2));
+      expect(parseOcrText('2026년 7월 2일 로스팅').roastDate, DateTime(2026, 7, 2));
+      expect(parseOcrText('26/07/02').roastDate, DateTime(2026, 7, 2));
+    });
+    test('말이 안 되는 숫자는 무시', () {
+      expect(parseOcrText('lot 99.99.99').roastDate, isNull);
+    });
+  });
+
+  group('roastLevel', () {
+    test('복합어가 단일어보다 우선', () {
+      expect(parseOcrText('Light-Medium roast').roastLevel, RoastLevel.lightMedium);
+      expect(parseOcrText('Full City').roastLevel, RoastLevel.mediumDark);
+      expect(parseOcrText('미디엄 로스팅').roastLevel, RoastLevel.medium);
+      expect(parseOcrText('다크').roastLevel, RoastLevel.dark);
+    });
+  });
+
+  group('process', () {
+    test('영/한 키워드', () {
+      expect(parseOcrText('Washed').process, Process.washed);
+      expect(parseOcrText('내추럴').process, Process.natural);
+      expect(parseOcrText('Honey process').process, Process.honey);
+      expect(parseOcrText('Anaerobic').process, Process.anaerobic);
+    });
+  });
+
+  group('cupNotes', () {
+    test('라벨 뒤를 구분자로 분리', () {
+      expect(parseOcrText('Notes: Blueberry, Jasmine, Black Tea').cupNotes,
+          ['Blueberry', 'Jasmine', 'Black Tea']);
+      expect(parseOcrText('컵노트: 블루베리 · 자스민').cupNotes, ['블루베리', '자스민']);
+    });
+    test('라벨 없으면 빈 리스트', () {
+      expect(parseOcrText('Ethiopia').cupNotes, isEmpty);
+    });
+  });
+
+  group('chips &amp; isEmpty', () {
+    test('비어있지 않은 줄을 중복제거해 칩으로', () {
+      final d = parseOcrText('프릳츠\n\nG1\n프릳츠');
+      expect(d.chips, ['프릳츠', 'G1']);
+    });
+    test('빈 입력은 isEmpty', () {
+      expect(parseOcrText('').isEmpty, isTrue);
+      expect(parseOcrText('   \n  ').isEmpty, isTrue);
+    });
+    test('실제 라벨 종합', () {
+      final d = parseOcrText(
+          'Fritz Coffee\nEthiopia Yirgacheffe\nWashed\nRoasted 2026.07.02\nNotes: Blueberry, Jasmine');
+      expect(d.country, 'Ethiopia');
+      expect(d.process, Process.washed);
+      expect(d.roastDate, DateTime(2026, 7, 2));
+      expect(d.cupNotes, ['Blueberry', 'Jasmine']);
+      expect(d.chips, contains('Fritz Coffee'));
+    });
+  });
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 3: RED 확인</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/unit/ocr_parser_test.dart</code> Expected: FAIL (<code class="ic">parseOcrText</code> 미정의 — 컴파일 에러)</p>
+<ul class="tasklist"><li class="task"><strong>Step 4: 파서 구현 (<code class="ic">lib/features/beans/ocr/ocr_parser.dart</code>)</strong></li></ul>
+<p>키워드 맵은 <strong>삽입 순서가 중요</strong>(복합어를 단일어보다 먼저).</p>
+<pre class="code" data-lang="dart"><code>import '../../../data/enums.dart';
+import 'ocr_draft.dart';
+
+/// 원산지 사전: 소문자 키워드 → 표준 표기. 복합어(Costa Rica)를 먼저.
+const Map&lt;String, String&gt; _countries = {
+  'costa rica': 'Costa Rica', '코스타리카': 'Costa Rica',
+  'el salvador': 'El Salvador', '엘살바도르': 'El Salvador',
+  'ethiopia': 'Ethiopia', '에티오피아': 'Ethiopia',
+  'colombia': 'Colombia', '콜롬비아': 'Colombia',
+  'kenya': 'Kenya', '케냐': 'Kenya',
+  'brazil': 'Brazil', '브라질': 'Brazil',
+  'guatemala': 'Guatemala', '과테말라': 'Guatemala',
+  'panama': 'Panama', '파나마': 'Panama',
+  'honduras': 'Honduras', '온두라스': 'Honduras',
+  'indonesia': 'Indonesia', '인도네시아': 'Indonesia',
+  'rwanda': 'Rwanda', '르완다': 'Rwanda',
+  'burundi': 'Burundi', '부룬디': 'Burundi',
+  'peru': 'Peru', '페루': 'Peru',
+  'nicaragua': 'Nicaragua', '니카라과': 'Nicaragua',
+  'yemen': 'Yemen', '예멘': 'Yemen',
+  'tanzania': 'Tanzania', '탄자니아': 'Tanzania',
+  'mexico': 'Mexico', '멕시코': 'Mexico',
+  'uganda': 'Uganda', '우간다': 'Uganda',
+  'bolivia': 'Bolivia', '볼리비아': 'Bolivia',
+  'ecuador': 'Ecuador', '에콰도르': 'Ecuador',
+};
+
+/// 복합어(라이트미디엄·미디엄다크·풀시티)를 단일어보다 먼저.
+const Map&lt;String, RoastLevel&gt; _roastKeywords = {
+  '라이트미디엄': RoastLevel.lightMedium, 'light medium': RoastLevel.lightMedium,
+  'light-medium': RoastLevel.lightMedium, 'cinnamon': RoastLevel.lightMedium,
+  '미디엄다크': RoastLevel.mediumDark, 'medium dark': RoastLevel.mediumDark,
+  'medium-dark': RoastLevel.mediumDark, 'full city': RoastLevel.mediumDark, '풀시티': RoastLevel.mediumDark,
+  '미디엄': RoastLevel.medium, 'medium': RoastLevel.medium, 'city': RoastLevel.medium, '시티': RoastLevel.medium,
+  '라이트': RoastLevel.light, 'light': RoastLevel.light,
+  '다크': RoastLevel.dark, 'dark': RoastLevel.dark, 'french': RoastLevel.dark, 'italian': RoastLevel.dark,
+};
+
+const Map&lt;String, Process&gt; _processKeywords = {
+  '워시드': Process.washed, 'washed': Process.washed, '수세식': Process.washed,
+  '내추럴': Process.natural, 'natural': Process.natural, '건식': Process.natural,
+  '허니': Process.honey, 'honey': Process.honey,
+  '무산소': Process.anaerobic, 'anaerobic': Process.anaerobic, '애너로빅': Process.anaerobic,
+};
+
+final List&lt;RegExp&gt; _datePatterns = [
+  RegExp(r'(20\d{2})[.\-/](\d{1,2})[.\-/](\d{1,2})'),      // 2026-07-02
+  RegExp(r'(\d{4})\s*년\s*(\d{1,2})\s*월\s*(\d{1,2})\s*일'), // 2026년 7월 2일
+  RegExp(r'(\d{2})[.\-/](\d{1,2})[.\-/](\d{1,2})'),        // 26.07.02
+];
+
+final RegExp _noteLabel = RegExp(
+  r'^(cup\s*notes?|tasting\s*notes?|notes?|컵\s*노트|노트|향미)\s*[:：]\s*(.+)$',
+  caseSensitive: false,
+);
+
+OcrDraft parseOcrText(String rawText) {
+  final lines = rawText
+      .split('\n')
+      .map((l) =&gt; l.trim())
+      .where((l) =&gt; l.isNotEmpty)
+      .toList();
+  final lower = rawText.toLowerCase();
+  return OcrDraft(
+    country: _firstMatch(lower, _countries),
+    roastDate: _matchDate(rawText),
+    roastLevel: _firstMatch(lower, _roastKeywords),
+    process: _firstMatch(lower, _processKeywords),
+    cupNotes: _matchCupNotes(lines),
+    chips: _dedupe(lines),
+  );
+}
+
+T? _firstMatch&lt;T&gt;(String lower, Map&lt;String, T&gt; table) {
+  for (final e in table.entries) {
+    if (lower.contains(e.key)) return e.value;
+  }
+  return null;
+}
+
+DateTime? _matchDate(String text) {
+  for (final re in _datePatterns) {
+    final m = re.firstMatch(text);
+    if (m == null) continue;
+    var year = int.parse(m.group(1)!);
+    if (year &lt; 100) year += 2000;
+    final month = int.parse(m.group(2)!);
+    final day = int.parse(m.group(3)!);
+    if (month &lt; 1 || month &gt; 12 || day &lt; 1 || day &gt; 31) continue;
+    return DateTime(year, month, day);
+  }
+  return null;
+}
+
+List&lt;String&gt; _matchCupNotes(List&lt;String&gt; lines) {
+  for (final line in lines) {
+    final m = _noteLabel.firstMatch(line);
+    if (m != null) {
+      return m.group(2)!
+          .split(RegExp(r'[,/·、]'))
+          .map((s) =&gt; s.trim())
+          .where((s) =&gt; s.isNotEmpty)
+          .toList();
+    }
+  }
+  return const [];
+}
+
+List&lt;String&gt; _dedupe(List&lt;String&gt; lines) {
+  final seen = &lt;String&gt;{};
+  final out = &lt;String&gt;[];
+  for (final l in lines) {
+    if (seen.add(l)) out.add(l);
+  }
+  return out;
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 5: GREEN 확인</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/unit/ocr_parser_test.dart</code> Expected: PASS (모든 그룹)</p>
+<ul class="tasklist"><li class="task"><strong>Step 6: Commit</strong></li></ul>
+<pre class="code" data-lang="bash"><code>git add lib/features/beans/ocr/ test/unit/ocr_parser_test.dart
+git commit -m "feat(m3): pure-Dart OCR field parser (country/date/roast/process/notes/chips)"</code></pre>
+<hr>
+<h3>Task 3: <code class="ic">BeanInput.photoPath</code> 데이터 왕복</h3>
+<p><strong>Files:</strong></p>
+<ul><li>Modify: <code class="ic">lib/data/models.dart</code>, <code class="ic">lib/data/bean_repository.dart</code></li><li>Test: <code class="ic">test/unit/photo_path_repository_test.dart</code></li></ul>
+<p><strong>Interfaces:</strong></p>
+<ul><li>Produces: <code class="ic">BeanInput({..., String? photoPath})</code> (기존 필드 유지, 마지막에 optional 추가) — <code class="ic">Bean.photoPath</code> 컬럼은 이미 존재.</li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 1: 실패 테스트 (<code class="ic">test/unit/photo_path_repository_test.dart</code>)</strong></li></ul>
+<pre class="code" data-lang="dart"><code>import 'package:beanprofile/data/enums.dart';
+import 'package:beanprofile/data/models.dart';
+import 'package:flutter_test/flutter_test.dart';
+import '../helpers.dart';
+
+void main() {
+  test('photoPath가 create/update/watchBeanDetail을 왕복한다', () async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    final repo = testRepository(db);
+
+    final id = await repo.createBean(BeanInput(
+      name: '예가체프', roaster: '프릳츠', type: BeanType.singleOrigin,
+      roastLevel: null, roastDate: null, cupNotes: const [], memo: null,
+      components: [const ComponentInput(country: 'Ethiopia')],
+      photoPath: '/app/photos/a.jpg',
+    ));
+
+    var detail = await repo.getBeanDetail(id);
+    expect(detail!.bean.photoPath, '/app/photos/a.jpg');
+
+    await repo.updateBean(id, BeanInput(
+      name: '예가체프', roaster: '프릳츠', type: BeanType.singleOrigin,
+      roastLevel: null, roastDate: null, cupNotes: const [], memo: null,
+      components: [const ComponentInput(country: 'Ethiopia')],
+      photoPath: '/app/photos/b.jpg',
+    ));
+    detail = await repo.getBeanDetail(id);
+    expect(detail!.bean.photoPath, '/app/photos/b.jpg');
+  });
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 2: RED 확인</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/unit/photo_path_repository_test.dart</code> Expected: FAIL (<code class="ic">BeanInput</code>에 <code class="ic">photoPath</code> 이름 인자 없음 — 컴파일 에러)</p>
+<ul class="tasklist"><li class="task"><strong>Step 3: <code class="ic">BeanInput</code>에 필드 추가 (<code class="ic">lib/data/models.dart</code>)</strong></li></ul>
+<p><code class="ic">class BeanInput</code>에 필드와 생성자 인자를 <strong>마지막에 optional</strong>로 추가(기존 호출부 유지):</p>
+<pre class="code" data-lang="dart"><code>class BeanInput {
+  final String name;
+  final String roaster;
+  final BeanType type;
+  final RoastLevel? roastLevel;
+  final DateTime? roastDate;
+  final List&lt;String&gt; cupNotes;
+  final String? memo;
+  final List&lt;ComponentInput&gt; components;
+  final String? photoPath;
+  const BeanInput({
+    required this.name,
+    required this.roaster,
+    required this.type,
+    required this.roastLevel,
+    required this.roastDate,
+    required this.cupNotes,
+    required this.memo,
+    required this.components,
+    this.photoPath,
+  });
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 4: 저장소에 반영 (<code class="ic">lib/data/bean_repository.dart</code>)</strong></li></ul>
+<p><code class="ic">createBean</code>의 <code class="ic">BeansCompanion.insert(...)</code>에 추가:</p>
+<pre class="code" data-lang="dart"><code>            memo: Value(input.memo),
+            photoPath: Value(input.photoPath),
+            createdAt: DateTime.now(),</code></pre>
+<p><code class="ic">updateBean</code>의 <code class="ic">BeansCompanion(...)</code>에 추가:</p>
+<pre class="code" data-lang="dart"><code>          memo: Value(input.memo),
+          photoPath: Value(input.photoPath),</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 5: GREEN 확인</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/unit/photo_path_repository_test.dart</code> Expected: PASS Run: <code class="ic">flutter test</code> Expected: 전체 PASS(기존 39 + 신규). <code class="ic">BeanInput</code> 변경이 기존 호출부를 깨지 않음(optional).</p>
+<ul class="tasklist"><li class="task"><strong>Step 6: Commit</strong></li></ul>
+<pre class="code" data-lang="bash"><code>git add lib/data/models.dart lib/data/bean_repository.dart test/unit/photo_path_repository_test.dart
+git commit -m "feat(m3): persist BeanInput.photoPath through create/update"</code></pre>
+<hr>
+<h3>Task 4: 사진 표시 — 카드 썸네일 + 상세 컴팩트 썸네일</h3>
+<p><strong>Files:</strong></p>
+<ul><li>Create: <code class="ic">lib/features/beans/widgets/bean_thumbnail.dart</code>, <code class="ic">test/widget/bean_thumbnail_test.dart</code></li><li>Modify: <code class="ic">lib/features/beans/widgets/bean_card.dart</code>, <code class="ic">lib/features/beans/bean_detail_screen.dart</code></li><li>Test: <code class="ic">test/widget/detail_photo_test.dart</code></li></ul>
+<p><strong>Interfaces:</strong></p>
+<ul><li>Produces: <code class="ic">class BeanThumbnail extends StatelessWidget { BeanThumbnail({String? photoPath, double width, double height}) }</code></li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 1: 썸네일 위젯 (<code class="ic">lib/features/beans/widgets/bean_thumbnail.dart</code>)</strong></li></ul>
+<pre class="code" data-lang="dart"><code>import 'dart:io';
+import 'package:flutter/material.dart';
+import '../../../theme.dart';
+
+/// 원두 사진 썸네일. photoPath 없으면 문서 아이콘 플레이스홀더.
+class BeanThumbnail extends StatelessWidget {
+  const BeanThumbnail({super.key, required this.photoPath, this.width = 48, this.height = 60});
+  final String? photoPath;
+  final double width;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    final radius = BorderRadius.circular(10);
+    Widget placeholder(IconData icon) =&gt; Container(
+          width: width,
+          height: height,
+          decoration: BoxDecoration(
+            color: c.oat, borderRadius: radius, border: Border.all(color: c.appLine)),
+          child: Icon(icon, color: c.appMuted, size: width * 0.42),
+        );
+    if (photoPath == null) return placeholder(Icons.description_outlined);
+    return ClipRRect(
+      borderRadius: radius,
+      child: Image.file(
+        File(photoPath!),
+        width: width, height: height, fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) =&gt; placeholder(Icons.broken_image_outlined),
+      ),
+    );
+  }
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 2: 썸네일 실패 테스트 (<code class="ic">test/widget/bean_thumbnail_test.dart</code>)</strong></li></ul>
+<pre class="code" data-lang="dart"><code>import 'package:beanprofile/features/beans/widgets/bean_thumbnail.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import '../helpers.dart';
+
+void main() {
+  testWidgets('photoPath 없으면 아이콘 플레이스홀더, Image 없음', (t) async {
+    await t.pumpWidget(wrapApp(const BeanThumbnail(photoPath: null)));
+    expect(find.byIcon(Icons.description_outlined), findsOneWidget);
+    expect(find.byType(Image), findsNothing);
+  });
+
+  testWidgets('photoPath 있으면 Image.file 렌더', (t) async {
+    await t.pumpWidget(wrapApp(const BeanThumbnail(photoPath: '/no/such/file.jpg')));
+    expect(find.byType(Image), findsOneWidget);
+  });
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 3: RED 확인</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/widget/bean_thumbnail_test.dart</code> Expected: FAIL (<code class="ic">BeanThumbnail</code> 미정의). Step 1이 이미 있으면 PASS — 그대로 진행.</p>
+<ul class="tasklist"><li class="task"><strong>Step 4: 카드에 썸네일 (<code class="ic">lib/features/beans/widgets/bean_card.dart</code>)</strong></li></ul>
+<p><code class="ic">import 'bean_thumbnail.dart';</code> 추가. 기존 <code class="ic">child: Column(...)</code>을 <code class="ic">Row</code>로 감싸 leading 썸네일을 둔다:</p>
+<pre class="code" data-lang="dart"><code>        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          BeanThumbnail(photoPath: bean.photoPath),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(bean.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+              const SizedBox(height: 2),
+              Text([bean.roaster, summary.originLabel].where((e) =&gt; e != null &amp;&amp; e.isNotEmpty).join(' · '),
+                  style: TextStyle(fontSize: 12, color: c.appMuted)),
+              const SizedBox(height: 8),
+              Row(children: [
+                if (bean.type == BeanType.blend) ...[
+                  _Badge(text: 'BLEND', color: c.cremaInk),
+                  const SizedBox(width: 8),
+                ],
+                StarRating(value: summary.avgRating),
+                const Spacer(),
+                Text('시음 ${summary.tastingCount}', style: monoStyle(size: 11, color: c.appMuted)),
+              ]),
+              if (bean.cupNotes.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Wrap(spacing: 5, runSpacing: 5, children: [
+                  for (final n in bean.cupNotes.take(4)) _Note(text: n, color: c),
+                ]),
+              ],
+            ]),
+          ),
+        ]),</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 5: 상세 헤더 썸네일 실패 테스트 (<code class="ic">test/widget/detail_photo_test.dart</code>)</strong></li></ul>
+<pre class="code" data-lang="dart"><code>import 'package:beanprofile/features/beans/bean_detail_screen.dart';
+import 'package:beanprofile/features/beans/widgets/bean_thumbnail.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import '../helpers.dart';
+
+void main() {
+  testWidgets('사진 있는 원두 상세: 헤더 썸네일 탭 → 전체화면 Image', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    final repo = testRepository(db);
+    final id = await repo.createBean(sampleSingle().copyWithPhoto('/no/such/file.jpg'));
+
+    await t.pumpWidget(wrapApp(BeanDetailScreen(beanId: id), db: db));
+    await t.pump(); // 스트림 첫 방출
+    await t.pump();
+
+    expect(find.byType(BeanThumbnail), findsOneWidget);
+    await t.tap(find.byType(BeanThumbnail));
+    await t.pumpAndSettle();
+    // 전체화면 다이얼로그의 Image
+    expect(find.byType(Image), findsWidgets);
+    await t.pump(const Duration(milliseconds: 200)); // autoDispose-pop 데드락 회피
+  });
+}</code></pre>
+<p><code class="ic">sampleSingle().copyWithPhoto(...)</code> 헬퍼가 필요하므로 Step 6에서 <code class="ic">test/helpers.dart</code>에 확장 메서드를 추가한다.</p>
+<ul class="tasklist"><li class="task"><strong>Step 6: 헬퍼에 photo 확장 (<code class="ic">test/helpers.dart</code>)</strong></li></ul>
+<p>파일 끝에 추가:</p>
+<pre class="code" data-lang="dart"><code>extension BeanInputPhoto on BeanInput {
+  BeanInput copyWithPhoto(String path) =&gt; BeanInput(
+        name: name, roaster: roaster, type: type, roastLevel: roastLevel,
+        roastDate: roastDate, cupNotes: cupNotes, memo: memo, components: components,
+        photoPath: path,
+      );
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 7: 상세 헤더에 썸네일 (<code class="ic">lib/features/beans/bean_detail_screen.dart</code>)</strong></li></ul>
+<p><code class="ic">import 'widgets/bean_thumbnail.dart';</code> 추가. <code class="ic">_DetailBody.build</code>의 상단(이름/로스터리/평점) 블록을 Row로 감싸 썸네일을 왼쪽에 둔다. 기존:</p>
+<pre class="code" data-lang="dart"><code>    return ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 24), children: [
+      Text(bean.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+      const SizedBox(height: 2),
+      Text([bean.roaster, bean.type.label].where((e) =&gt; e.isNotEmpty).join(' · '),
+          style: TextStyle(color: c.appMuted)),
+      const SizedBox(height: 8),
+      Row(children: [
+        StarRating(value: detail.avgRating),
+        const SizedBox(width: 10),
+        Text('시음 ${detail.tastingCount}회',
+            style: TextStyle(color: c.appMuted, fontSize: 12)),
+      ]),
+      const SizedBox(height: 14),</code></pre>
+<p>를 아래로 교체:</p>
+<pre class="code" data-lang="dart"><code>    return ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 24), children: [
+      Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        GestureDetector(
+          onTap: bean.photoPath == null ? null : () =&gt; _showFullPhoto(context, bean.photoPath!),
+          child: BeanThumbnail(photoPath: bean.photoPath, width: 56, height: 70),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(bean.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 2),
+            Text([bean.roaster, bean.type.label].where((e) =&gt; e.isNotEmpty).join(' · '),
+                style: TextStyle(color: c.appMuted)),
+            const SizedBox(height: 8),
+            Row(children: [
+              StarRating(value: detail.avgRating),
+              const SizedBox(width: 10),
+              Text('시음 ${detail.tastingCount}회',
+                  style: TextStyle(color: c.appMuted, fontSize: 12)),
+            ]),
+          ]),
+        ),
+      ]),
+      const SizedBox(height: 14),</code></pre>
+<p>그리고 <code class="ic">_DetailBody</code>에 전체화면 뷰어 메서드를 추가(<code class="ic">dart:io</code> import 필요):</p>
+<pre class="code" data-lang="dart"><code>  void _showFullPhoto(BuildContext context, String path) {
+    showDialog(
+      context: context,
+      builder: (_) =&gt; Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: const EdgeInsets.all(12),
+        child: InteractiveViewer(
+          child: Image.file(File(path), fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) =&gt; const SizedBox(
+                  height: 200, child: Center(child: Icon(Icons.broken_image_outlined, color: Colors.white54)))),
+        ),
+      ),
+    );
+  }</code></pre>
+<p>파일 상단에 <code class="ic">import 'dart:io';</code> 추가.</p>
+<ul class="tasklist"><li class="task"><strong>Step 8: GREEN + analyze</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/widget/bean_thumbnail_test.dart test/widget/detail_photo_test.dart</code> Expected: PASS Run: <code class="ic">flutter test</code> Expected: 전체 PASS (기존 카드/상세 위젯 테스트가 Row 재구성에도 통과 — 텍스트 finder 유지) Run: <code class="ic">flutter analyze</code> Expected: No issues.</p>
+<ul class="tasklist"><li class="task"><strong>Step 9: Commit</strong></li></ul>
+<pre class="code" data-lang="bash"><code>git add lib/features/beans/widgets/bean_thumbnail.dart lib/features/beans/widgets/bean_card.dart lib/features/beans/bean_detail_screen.dart test/helpers.dart test/widget/bean_thumbnail_test.dart test/widget/detail_photo_test.dart
+git commit -m "feat(m3): show bean photo thumbnail on card + detail (tap to fullscreen)"</code></pre>
+<hr>
+<h3>Task 5: 폼 확장 — draft 프리필 · 하이라이트 · 칩 배정 · persist</h3>
+<p><strong>Files:</strong></p>
+<ul><li>Create: <code class="ic">lib/features/beans/widgets/ocr_chips_panel.dart</code>, <code class="ic">test/widget/ocr_form_test.dart</code></li><li>Modify: <code class="ic">lib/features/beans/bean_form_screen.dart</code>, <code class="ic">test/helpers.dart</code></li></ul>
+<p><strong>Interfaces:</strong></p>
+<ul><li>Consumes: <code class="ic">OcrDraft</code>, <code class="ic">parseOcrText</code>(Task 2) · <code class="ic">photoServiceProvider.persist</code>(Task 1) · <code class="ic">BeanInput.photoPath</code>(Task 3)</li><li>Produces: <code class="ic">BeanFormScreen({BeanDetail? existing, OcrDraft? draft, String? photoTempPath})</code> · <code class="ic">class OcrChipsPanel</code></li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 1: 칩 패널 위젯 (<code class="ic">lib/features/beans/widgets/ocr_chips_panel.dart</code>)</strong></li></ul>
+<pre class="code" data-lang="dart"><code>import 'package:flutter/material.dart';
+import '../../../theme.dart';
+
+/// 인식된 텍스트 칩. 활성(포커스) 텍스트 필드에 탭으로 배정. 쓴 칩은 흐려짐.
+class OcrChipsPanel extends StatelessWidget {
+  const OcrChipsPanel({super.key, required this.chips, required this.used, required this.onTap});
+  final List&lt;String&gt; chips;
+  final Set&lt;String&gt; used;
+  final void Function(String) onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return Container(
+      padding: const EdgeInsets.all(11),
+      decoration: BoxDecoration(
+        color: c.cup, borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: c.crema, style: BorderStyle.solid),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('인식된 텍스트 — 채울 칸을 탭한 뒤 칩을 누르세요',
+            style: TextStyle(fontSize: 11, color: c.cremaInk, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        Wrap(spacing: 6, runSpacing: 6, children: [
+          for (final chip in chips)
+            ActionChip(
+              key: Key('chip-$chip'),
+              label: Text(chip),
+              onPressed: used.contains(chip) ? null : () =&gt; onTap(chip),
+              backgroundColor: used.contains(chip) ? c.oat : c.cup2,
+            ),
+        ]),
+      ]),
+    );
+  }
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 2: 헬퍼 확장 — 가짜 서비스 + wrapApp override (<code class="ic">test/helpers.dart</code>)</strong></li></ul>
+<p>상단 import에 추가:</p>
+<pre class="code" data-lang="dart"><code>import 'package:beanprofile/services/ocr_service.dart';
+import 'package:beanprofile/services/photo_service.dart';</code></pre>
+<p><code class="ic">wrapApp</code>을 교체(ocr/photo override 추가 — optional이라 기존 호출 호환):</p>
+<pre class="code" data-lang="dart"><code>Widget wrapApp(Widget child, {AppDatabase? db, OcrService? ocr, PhotoService? photo}) =&gt; ProviderScope(
+      overrides: [
+        if (db != null) databaseProvider.overrideWithValue(db),
+        if (ocr != null) ocrServiceProvider.overrideWithValue(ocr),
+        if (photo != null) photoServiceProvider.overrideWithValue(photo),
+      ],
+      child: MaterialApp(theme: AppTheme.light, home: child),
+    );</code></pre>
+<p>파일 끝에 가짜 추가:</p>
+<pre class="code" data-lang="dart"><code>class FakeOcrService implements OcrService {
+  FakeOcrService(this.text);
+  final String text;
+  @override
+  Future&lt;String&gt; recognize(String imagePath) async =&gt; text;
+}
+
+class FakePhotoService implements PhotoService {
+  FakePhotoService({this.pickResult, this.persistResult = '/app/photos/persisted.jpg'});
+  final String? pickResult;
+  final String persistResult;
+  @override
+  Future&lt;String?&gt; pick({required bool fromCamera}) async =&gt; pickResult;
+  @override
+  Future&lt;String&gt; persist(String tempPath) async =&gt; persistResult;
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 3: 폼 확장 실패 테스트 (<code class="ic">test/widget/ocr_form_test.dart</code>)</strong></li></ul>
+<pre class="code" data-lang="dart"><code>import 'package:beanprofile/data/enums.dart';
+import 'package:beanprofile/features/beans/bean_form_screen.dart';
+import 'package:beanprofile/features/beans/ocr/ocr_draft.dart';
+import 'package:beanprofile/features/beans/widgets/ocr_chips_panel.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import '../helpers.dart';
+
+void main() {
+  testWidgets('draft 프리필 + OCR 자동 하이라이트 + 칩 렌더', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    await t.pumpWidget(wrapApp(
+      const BeanFormScreen(
+        draft: OcrDraft(
+          country: 'Ethiopia',
+          process: Process.washed,
+          cupNotes: ['블루베리'],
+          chips: ['프릳츠', 'G1'],
+        ),
+      ),
+      db: db,
+    ));
+    await t.pump();
+
+    expect(find.text('Ethiopia'), findsOneWidget);         // 국가 프리필
+    expect(find.text('블루베리'), findsOneWidget);           // 컵노트 프리필
+    expect(find.text('OCR 자동'), findsWidgets);            // 하이라이트
+    expect(find.byType(OcrChipsPanel), findsOneWidget);
+    expect(find.text('프릳츠'), findsOneWidget);
+  });
+
+  testWidgets('칸 포커스 후 칩 탭 → 그 칸에 채워지고 칩은 비활성', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    await t.pumpWidget(wrapApp(
+      const BeanFormScreen(draft: OcrDraft(chips: ['프릳츠'])),
+      db: db,
+    ));
+    await t.pump();
+
+    await t.tap(find.byKey(const Key('field-roaster')));   // 로스터리 포커스
+    await t.pump();
+    await t.tap(find.byKey(const Key('chip-프릳츠')));
+    await t.pump();
+
+    expect(find.widgetWithText(TextField, '프릳츠'), findsOneWidget); // 로스터리에 채워짐
+    final chip = t.widget&lt;ActionChip&gt;(find.byKey(const Key('chip-프릳츠')));
+    expect(chip.onPressed, isNull);                        // used → 비활성
+  });
+
+  testWidgets('OCR 실패(빈 draft) → 안내 배너, 칩 패널 없음', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    await t.pumpWidget(wrapApp(const BeanFormScreen(draft: OcrDraft()), db: db));
+    await t.pump();
+
+    expect(find.textContaining('자동 인식하지 못했'), findsOneWidget);
+    expect(find.byType(OcrChipsPanel), findsNothing);
+  });
+
+  testWidgets('저장 시 photoTempPath를 persist해 photoPath로 저장', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    final repo = testRepository(db);
+    await t.pumpWidget(wrapApp(
+      const BeanFormScreen(
+        draft: OcrDraft(country: 'Ethiopia'),
+        photoTempPath: '/tmp/pick.jpg',
+      ),
+      db: db,
+      photo: FakePhotoService(persistResult: '/app/photos/saved.jpg'),
+    ));
+    await t.pump();
+
+    await t.enterText(find.byKey(const Key('field-name')), '예가체프');
+    await t.tap(find.byKey(const Key('save-bean')));
+    await t.pumpAndSettle();
+
+    final summaries = await repo.watchBeanSummaries().first;
+    expect(summaries.single.bean.photoPath, '/app/photos/saved.jpg');
+  });
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 4: RED 확인</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/widget/ocr_form_test.dart</code> Expected: FAIL (<code class="ic">draft</code>/<code class="ic">photoTempPath</code> 인자 없음, 배너/칩 미구현)</p>
+<ul class="tasklist"><li class="task"><strong>Step 5: 폼 확장 구현 (<code class="ic">lib/features/beans/bean_form_screen.dart</code>)</strong></li></ul>
+<p>상단 import에 추가:</p>
+<pre class="code" data-lang="dart"><code>import 'ocr/ocr_draft.dart';
+import 'widgets/ocr_chips_panel.dart';</code></pre>
+<p>생성자·필드 교체:</p>
+<pre class="code" data-lang="dart"><code>class BeanFormScreen extends ConsumerStatefulWidget {
+  const BeanFormScreen({super.key, this.existing, this.draft, this.photoTempPath});
+  final BeanDetail? existing;
+  final OcrDraft? draft;
+  final String? photoTempPath;
+  @override
+  ConsumerState&lt;BeanFormScreen&gt; createState() =&gt; _BeanFormScreenState();
+}</code></pre>
+<p>State에 필드 추가(기존 필드 아래):</p>
+<pre class="code" data-lang="dart"><code>  final _nameFocus = FocusNode();
+  final _roasterFocus = FocusNode();
+  final _cupNotesFocus = FocusNode();
+  final _memoFocus = FocusNode();
+  TextEditingController? _activeField;
+  final _usedChips = &lt;String&gt;{};</code></pre>
+<p><code class="ic">initState</code>의 <code class="ic">if (e != null) {...}</code> 블록 <strong>뒤에</strong>(닫는 <code class="ic">}</code> 다음) 프리필 + 포커스 배선 추가:</p>
+<pre class="code" data-lang="dart"><code>    final d = widget.draft;
+    if (e == null &amp;&amp; d != null) {
+      if (d.country != null) _components.first.country.text = d.country!;
+      if (d.process != null) _components.first.process = d.process!;
+      _roast = d.roastLevel;
+      _roastDate = d.roastDate;
+      if (d.cupNotes.isNotEmpty) _cupNotes.text = d.cupNotes.join(', ');
+    }
+    _nameFocus.addListener(() { if (_nameFocus.hasFocus) _activeField = _name; });
+    _roasterFocus.addListener(() { if (_roasterFocus.hasFocus) _activeField = _roaster; });
+    _cupNotesFocus.addListener(() { if (_cupNotesFocus.hasFocus) _activeField = _cupNotes; });
+    _memoFocus.addListener(() { if (_memoFocus.hasFocus) _activeField = _memo; });</code></pre>
+<p><code class="ic">dispose</code>에 focus node 해제 추가:</p>
+<pre class="code" data-lang="dart"><code>    _nameFocus.dispose(); _roasterFocus.dispose();
+    _cupNotesFocus.dispose(); _memoFocus.dispose();</code></pre>
+<p>칩 배정 메서드 추가(예: <code class="ic">_save</code> 위):</p>
+<pre class="code" data-lang="dart"><code>  void _assignChip(String text) {
+    final target = _activeField;
+    if (target == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('먼저 채울 칸을 탭해서 선택하세요')));
+      return;
+    }
+    setState(() {
+      if (target == _cupNotes) {
+        final cur = _cupNotes.text.trim();
+        _cupNotes.text = cur.isEmpty ? text : '$cur, $text';
+      } else {
+        target.text = text;
+      }
+      _usedChips.add(text);
+    });
+  }
+
+  bool get _auto =&gt; widget.existing == null &amp;&amp; widget.draft != null;</code></pre>
+<p><code class="ic">_save</code>에서 사진 경로를 해석해 <code class="ic">BeanInput</code>에 넣는다. 기존 <code class="ic">setState(() =&gt; _saving = true);</code> 다음에:</p>
+<pre class="code" data-lang="dart"><code>    String? photoPath = widget.existing?.bean.photoPath; // 편집 시 기존 사진 유지
+    if (widget.photoTempPath != null) {
+      photoPath = await ref.read(photoServiceProvider).persist(widget.photoTempPath!);
+    }</code></pre>
+<p>그리고 <code class="ic">BeanInput(...)</code>의 <code class="ic">components: [...]</code> 다음에 <code class="ic">photoPath: photoPath,</code> 추가.</p>
+<p>폼 필드에 key/focus/하이라이트를 단다. <code class="ic">_name</code> TextField에 focusNode:</p>
+<pre class="code" data-lang="dart"><code>        TextField(key: const Key('field-name'), controller: _name, focusNode: _nameFocus,
+            decoration: const InputDecoration(labelText: '제품명 *')),</code></pre>
+<p><code class="ic">_roaster</code> TextField:</p>
+<pre class="code" data-lang="dart"><code>        TextField(key: const Key('field-roaster'), controller: _roaster, focusNode: _roasterFocus,
+            decoration: const InputDecoration(labelText: '로스터리')),</code></pre>
+<p>로스팅 단계 Dropdown에 하이라이트 helper:</p>
+<pre class="code" data-lang="dart"><code>        DropdownButtonFormField&lt;RoastLevel&gt;(
+          initialValue: _roast,
+          decoration: InputDecoration(
+              labelText: '로스팅 단계',
+              helperText: _auto &amp;&amp; widget.draft!.roastLevel != null ? 'OCR 자동' : null),
+          items: [for (final r in RoastLevel.values) DropdownMenuItem(value: r, child: Text(r.label))],
+          onChanged: (v) =&gt; setState(() =&gt; _roast = v),
+        ),</code></pre>
+<p>로스팅 날짜 Row의 Expanded 텍스트 옆에 자동 표시(있을 때):</p>
+<pre class="code" data-lang="dart"><code>        Row(children: [
+          Expanded(child: Text(_roastDate == null ? '로스팅 날짜 없음'
+              : '로스팅 ${_roastDate!.toIso8601String().substring(0, 10)}'
+                  '${_auto &amp;&amp; widget.draft!.roastDate != null ? '  · OCR 자동' : ''}')),
+          TextButton(
+            onPressed: () async {
+              final picked = await showDatePicker(context: context,
+                  firstDate: DateTime(2015), lastDate: DateTime(2100),
+                  initialDate: DateTime.now());
+              if (picked != null) setState(() =&gt; _roastDate = picked);
+            },
+            child: const Text('날짜 선택'),
+          ),
+        ]),</code></pre>
+<p>컵노트 TextField에 focusNode + 하이라이트:</p>
+<pre class="code" data-lang="dart"><code>        TextField(controller: _cupNotes, focusNode: _cupNotesFocus,
+            decoration: InputDecoration(
+                labelText: '컵노트 (쉼표로 구분)', hintText: '블루베리, 자스민, 홍차',
+                helperText: _auto &amp;&amp; widget.draft!.cupNotes.isNotEmpty ? 'OCR 자동' : null)),</code></pre>
+<p>메모 TextField에 focusNode:</p>
+<pre class="code" data-lang="dart"><code>        TextField(controller: _memo, focusNode: _memoFocus, maxLines: 3,
+            decoration: const InputDecoration(labelText: '메모')),</code></pre>
+<p>메모 필드 <strong>다음에</strong>(ListView children 끝 부분) 칩 패널/배너를 추가:</p>
+<pre class="code" data-lang="dart"><code>        if (widget.draft != null) ...[
+          const SizedBox(height: 14),
+          if (widget.draft!.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: c.cup2, borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: c.appLine)),
+              child: Text('글자를 자동 인식하지 못했어요. 아래 항목을 직접 입력하거나 다시 촬영해 주세요.',
+                  style: TextStyle(fontSize: 12, color: c.espresso)),
+            )
+          else if (widget.draft!.chips.isNotEmpty)
+            OcrChipsPanel(chips: widget.draft!.chips, used: _usedChips, onTap: _assignChip),
+        ],</code></pre>
+<p>첫 원산지 국가 필드(<code class="ic">_componentEditor</code>의 country TextField)에 하이라이트를 달려면 <code class="ic">i == 0</code>일 때 helperText:</p>
+<pre class="code" data-lang="dart"><code>            child: TextField(
+              key: Key('field-country-$i'),
+              controller: comp.country,
+              decoration: InputDecoration(
+                  labelText: i == 0 ? '원산지 국가 *' : '국가',
+                  helperText: i == 0 &amp;&amp; _auto &amp;&amp; widget.draft!.country != null ? 'OCR 자동' : null),
+            ),</code></pre>
+<p>주: <code class="ic">context.colors</code>의 <code class="ic">cup2</code>가 없으면 테마에 있는 대응 토큰(예: <code class="ic">c.cup</code>)으로 대체. 배너 배경은 시각적 강조가 목적이므로 팀 토큰에 맞춘다.</p>
+<ul class="tasklist"><li class="task"><strong>Step 6: GREEN 확인</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/widget/ocr_form_test.dart</code> Expected: PASS (4개) Run: <code class="ic">flutter test</code> Expected: 전체 PASS(기존 폼 테스트 포함 — key/focus 추가는 비파괴적) Run: <code class="ic">flutter analyze</code> Expected: No issues.</p>
+<ul class="tasklist"><li class="task"><strong>Step 7: Commit</strong></li></ul>
+<pre class="code" data-lang="bash"><code>git add lib/features/beans/bean_form_screen.dart lib/features/beans/widgets/ocr_chips_panel.dart test/helpers.dart test/widget/ocr_form_test.dart
+git commit -m "feat(m3): OCR draft prefill + highlight + chip-assign + copy-on-save in bean form"</code></pre>
+<hr>
+<h3>Task 6: 진입 바텀시트 + 실플로우 배선 (디버그 화면 제거)</h3>
+<p><strong>Files:</strong></p>
+<ul><li>Create: <code class="ic">lib/features/beans/add_bean_sheet.dart</code>, <code class="ic">test/widget/add_bean_sheet_test.dart</code></li><li>Modify: <code class="ic">lib/features/beans/bean_list_screen.dart</code></li><li>Delete: <code class="ic">lib/features/beans/debug_ocr_screen.dart</code></li></ul>
+<p><strong>Interfaces:</strong></p>
+<ul><li>Consumes: <code class="ic">photoServiceProvider.pick</code>, <code class="ic">ocrServiceProvider.recognize</code>(Task 1) · <code class="ic">parseOcrText</code>(Task 2) · <code class="ic">BeanFormScreen(draft:, photoTempPath:)</code>(Task 5)</li><li>Produces: <code class="ic">Future&lt;void&gt; showAddBeanSheet(BuildContext context, WidgetRef ref)</code></li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 1: 바텀시트 + 배선 (<code class="ic">lib/features/beans/add_bean_sheet.dart</code>)</strong></li></ul>
+<pre class="code" data-lang="dart"><code>import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../providers.dart';
+import 'ocr/ocr_draft.dart';
+import 'ocr/ocr_parser.dart';
+import 'bean_form_screen.dart';
+
+enum _AddChoice { camera, gallery, manual }
+
+/// FAB에서 호출: 촬영/갤러리 → OCR → 폼, 또는 직접 입력.
+Future&lt;void&gt; showAddBeanSheet(BuildContext context, WidgetRef ref) async {
+  final choice = await showModalBottomSheet&lt;_AddChoice&gt;(
+    context: context,
+    builder: (_) =&gt; SafeArea(
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        ListTile(
+          key: const Key('add-camera'),
+          leading: const Icon(Icons.photo_camera_outlined),
+          title: const Text('촬영'),
+          subtitle: const Text('봉투·정보 카드를 찍어 자동 인식'),
+          onTap: () =&gt; Navigator.pop(context, _AddChoice.camera),
+        ),
+        ListTile(
+          key: const Key('add-gallery'),
+          leading: const Icon(Icons.image_outlined),
+          title: const Text('갤러리에서 선택'),
+          subtitle: const Text('저장된 사진에서'),
+          onTap: () =&gt; Navigator.pop(context, _AddChoice.gallery),
+        ),
+        ListTile(
+          key: const Key('add-manual'),
+          leading: const Icon(Icons.edit_outlined),
+          title: const Text('직접 입력'),
+          subtitle: const Text('사진 없이 수동으로'),
+          onTap: () =&gt; Navigator.pop(context, _AddChoice.manual),
+        ),
+      ]),
+    ),
+  );
+  if (choice == null || !context.mounted) return;
+
+  if (choice == _AddChoice.manual) {
+    await Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) =&gt; const BeanFormScreen()));
+    return;
+  }
+
+  final tempPath =
+      await ref.read(photoServiceProvider).pick(fromCamera: choice == _AddChoice.camera);
+  if (tempPath == null || !context.mounted) return;
+
+  final draft = await _recognize(context, ref, tempPath);
+  if (draft == null || !context.mounted) return;
+
+  await Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) =&gt; BeanFormScreen(draft: draft, photoTempPath: tempPath)));
+}
+
+Future&lt;OcrDraft?&gt; _recognize(BuildContext context, WidgetRef ref, String path) async {
+  showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) =&gt; const Center(child: CircularProgressIndicator()));
+  try {
+    final text = await ref.read(ocrServiceProvider).recognize(path);
+    return parseOcrText(text);
+  } finally {
+    if (context.mounted) Navigator.of(context).pop(); // 스피너 닫기
+  }
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 2: 실패 테스트 (<code class="ic">test/widget/add_bean_sheet_test.dart</code>)</strong></li></ul>
+<pre class="code" data-lang="dart"><code>import 'package:beanprofile/features/beans/bean_form_screen.dart';
+import 'package:beanprofile/features/beans/bean_list_screen.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import '../helpers.dart';
+
+void main() {
+  testWidgets('FAB → 시트 3옵션', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    await t.pumpWidget(wrapApp(const BeanListScreen(), db: db));
+    await t.pump();
+    await t.tap(find.byType(FloatingActionButton));
+    await t.pumpAndSettle();
+    expect(find.byKey(const Key('add-camera')), findsOneWidget);
+    expect(find.byKey(const Key('add-gallery')), findsOneWidget);
+    expect(find.byKey(const Key('add-manual')), findsOneWidget);
+  });
+
+  testWidgets('직접 입력 → 빈 폼', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    await t.pumpWidget(wrapApp(const BeanListScreen(), db: db));
+    await t.pump();
+    await t.tap(find.byType(FloatingActionButton));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const Key('add-manual')));
+    await t.pumpAndSettle();
+    expect(find.byType(BeanFormScreen), findsOneWidget);
+    expect(find.text('원두 추가'), findsWidgets); // AppBar 타이틀
+  });
+
+  testWidgets('촬영 → OCR(가짜) → 폼 프리필', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    await t.pumpWidget(wrapApp(
+      const BeanListScreen(),
+      db: db,
+      ocr: FakeOcrService('Ethiopia\nWashed\nNotes: 블루베리'),
+      photo: FakePhotoService(pickResult: '/tmp/pick.jpg'),
+    ));
+    await t.pump();
+    await t.tap(find.byType(FloatingActionButton));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const Key('add-camera')));
+    await t.pumpAndSettle();
+    expect(find.byType(BeanFormScreen), findsOneWidget);
+    expect(find.text('Ethiopia'), findsOneWidget);
+  });
+
+  testWidgets('촬영 취소(pick=null) → 폼 안 열림', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    await t.pumpWidget(wrapApp(
+      const BeanListScreen(),
+      db: db,
+      photo: FakePhotoService(pickResult: null),
+    ));
+    await t.pump();
+    await t.tap(find.byType(FloatingActionButton));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const Key('add-camera')));
+    await t.pumpAndSettle();
+    expect(find.byType(BeanFormScreen), findsNothing);
+  });
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 3: RED 확인</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/widget/add_bean_sheet_test.dart</code> Expected: FAIL (<code class="ic">showAddBeanSheet</code> 미배선 — FAB가 아직 폼으로 직행, 시트 key 없음)</p>
+<ul class="tasklist"><li class="task"><strong>Step 4: bean_list 배선 교체 + 디버그 제거 (<code class="ic">lib/features/beans/bean_list_screen.dart</code>)</strong></li></ul>
+<p><code class="ic">import 'debug_ocr_screen.dart';</code> 제거, <code class="ic">import 'add_bean_sheet.dart';</code> 추가. AppBar의 임시 <code class="ic">debug-ocr</code> 액션(Task 1 Step 8) 제거 → 원래 AppBar로:</p>
+<pre class="code" data-lang="dart"><code>      appBar: AppBar(title: const Text('내 원두', style: TextStyle(fontWeight: FontWeight.w800))),</code></pre>
+<p>FAB onPressed 교체:</p>
+<pre class="code" data-lang="dart"><code>      floatingActionButton: FloatingActionButton(
+        onPressed: () =&gt; showAddBeanSheet(context, ref),
+        backgroundColor: context.colors.crema,
+        child: const Icon(Icons.add, color: Colors.white),
+      ),</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 5: 디버그 화면 파일 삭제</strong></li></ul>
+<pre class="code" data-lang="bash"><code>git rm lib/features/beans/debug_ocr_screen.dart</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 6: GREEN + analyze + 전체</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/widget/add_bean_sheet_test.dart</code> Expected: PASS (4개) Run: <code class="ic">flutter analyze</code> Expected: No issues (디버그 화면 참조 제거 확인). Run: <code class="ic">flutter test</code> Expected: 전체 PASS.</p>
+<ul class="tasklist"><li class="task"><strong>Step 7: Commit</strong></li></ul>
+<pre class="code" data-lang="bash"><code>git add lib/features/beans/add_bean_sheet.dart lib/features/beans/bean_list_screen.dart test/widget/add_bean_sheet_test.dart
+git commit -m "feat(m3): add-bean sheet (camera/gallery/manual) wired to OCR flow; drop debug screen"</code></pre>
+<hr>
+<h3>최종: 전체 브랜치 리뷰 + finishing</h3>
+<ul class="tasklist"><li class="task"><strong>opus 최종 리뷰</strong>: <code class="ic">scripts/review-package &lt;M3 BASE&gt; HEAD</code>로 패키지 생성 → superpowers:requesting-code-review의 code-reviewer(opus)로 전체 diff 리뷰. BASE = Task 1 직전 커밋(= <code class="ic">cf841f9</code> 다음). Global Constraints + 누적 Minor를 렌즈로 전달.</li><li class="task"><strong>Critical/Important 수정</strong>: 단일 fix 서브에이전트에 전체 findings 전달 → 재리뷰.</li><li class="task"><strong>finishing-a-development-branch</strong>: <code class="ic">flutter test</code> 전체 green 확인 → main 유지(트렁크) → 사용자에게 <code class="ic">push + v0.3.0 태그</code> 확인.</li><li class="task"><strong>DoD 기기 검증</strong>: <code class="ic">v0.3.0</code> 태그 → CI <code class="ic">.ipa</code> → AltStore 설치 → 촬영/갤러리→OCR→칩 배정→저장→카드·상세 사진, OCR 실패 폴백까지 기기에서 확인.</li></ul>
+<hr>
+<h2>Self-Review (계획 작성자 체크)</h2>
+<p><strong>Spec coverage</strong> (milestone-3-design.md 대비):</p>
+<ul><li>§3 아키텍처/테스트 경계 → Task 1(seams·providers), Task 2(파서). ✅</li><li>§4 데이터 흐름 → Task 6(진입→pick→recognize→parse→form), Task 5(persist-on-save). ✅</li><li>§5 파서 5종 + 칩 → Task 2. ✅</li><li>§6 폼 확장(프리필·하이라이트·칩·경계·실패배너) → Task 5. ✅</li><li>§7 사진 저장·표시(photoPath·카드·상세) → Task 3 + Task 4. ✅</li><li>§8 진입/상태(시트·성공·실패) → Task 6 + Task 5. ✅</li><li>§9 권한·CI 스파이크 → Task 1 + 체크포인트 C1. ✅</li><li>§11 3계층 테스트 → 각 Task 테스트(유닛/데이터/위젯) + 기기 전용 명시. ✅</li></ul>
+<p><strong>Placeholder scan:</strong> TBD/TODO 없음. 모든 코드 단계에 실제 코드. ✅</p>
+<p><strong>Type consistency:</strong> <code class="ic">OcrDraft</code> 필드·<code class="ic">parseOcrText</code> 시그니처가 Task 2 정의와 Task 5/6 사용에서 일치. <code class="ic">BeanInput.photoPath</code>(Task 3) → Task 5 save·Task 4 표시에서 일관. <code class="ic">OcrService</code>/<code class="ic">PhotoService</code> 메서드명(<code class="ic">recognize</code>/<code class="ic">pick</code>/<code class="ic">persist</code>)이 Task 1 정의와 Task 5/6·헬퍼 가짜에서 일치. <code class="ic">BeanFormScreen({existing, draft, photoTempPath})</code>가 Task 5 정의와 Task 6 사용에서 일치. ✅</p>
+<p><strong>주의 노트(구현 시):</strong></p>
+<ul><li>파서 키워드 맵은 <strong>삽입 순서 의존</strong>(복합어 먼저). 리뷰어에게 순서가 스펙임을 전달.</li><li><code class="ic">c.cup2</code> 등 테마 토큰명이 실제와 다르면 존재하는 토큰으로 대체(하이라이트/배너 배경은 시각 목적).</li><li>위젯 테스트에서 drift 스트림 watch → teardown 전 <code class="ic">db.close</code>/<code class="ic">pump</code> 주의(M2 T6 교훈): 상세/리스트 pump 테스트는 마지막에 <code class="ic">await t.pump(Duration(milliseconds:200))</code>.</li><li>스파이크 태그 버전 문자열이 iOS에서 거부되면 수치 임시 태그로 폴백(C1).</li></ul>
+</article>

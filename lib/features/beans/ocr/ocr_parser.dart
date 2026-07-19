@@ -116,6 +116,34 @@ String? _valueFor(List<OcrLine> lines, OcrLine label) {
   return best?.text.trim();
 }
 
+/// 제품명=상단 최대폰트 줄, 로스터리=그 위 작은 줄. 균일 텍스트면 (null,null)로 오채움 회피.
+(String?, String?) _titleEyebrow(List<OcrLine> lines) {
+  final real = lines.where((l) => l.text.trim().isNotEmpty).toList();
+  if (real.length < 2) return (null, null);
+  final hs = real.map((l) => l.height).toList()..sort();
+  final n = hs.length;
+  final medianH = n.isOdd ? hs[n ~/ 2] : (hs[n ~/ 2 - 1] + hs[n ~/ 2]) / 2;
+  if (medianH <= 0) return (null, null);
+  var title = real.first;
+  for (final l in real) {
+    if (l.height > title.height) title = l;
+  }
+  if (title.height < 1.3 * medianH) return (null, null);
+  final minTop = real.map((l) => l.top).reduce((a, b) => a < b ? a : b);
+  final maxBottom = real.map((l) => l.bottom).reduce((a, b) => a > b ? a : b);
+  if (title.top > minTop + 0.45 * (maxBottom - minTop)) return (null, null);
+  OcrLine? eyebrow;
+  for (final l in real) {
+    if (identical(l, title)) continue;
+    final above = l.bottom <= title.top + 0.3 * title.height;
+    final xOverlap = l.left <= title.right && l.right >= title.left;
+    if (above && xOverlap && l.height < title.height) {
+      if (eyebrow == null || l.bottom > eyebrow.bottom) eyebrow = l;
+    }
+  }
+  return (title.text.trim(), eyebrow?.text.trim());
+}
+
 List<String> _splitNotes(String s) => s
     .split(RegExp(r'[,/·、]'))
     .map((e) => e.trim())
@@ -132,9 +160,10 @@ OcrDraft parseOcr(List<OcrLine> lines) {
   final cupSpatial = _spatialValue(lines, _cupTokens);
   var cupNotes = cupSpatial == null ? const <String>[] : _splitNotes(cupSpatial);
 
-  // 4.2 타이포 제목/이브로우 (Task 2에서 채움)
-  String? name;
-  String? roaster;
+  // 4.2 타이포 제목/이브로우
+  final te = _titleEyebrow(lines);
+  String? name = te.$1;
+  String? roaster = te.$2;
 
   // 4.3 콜론/키워드 폴백
   name ??= _firstLabel(texts, _nameLabel);

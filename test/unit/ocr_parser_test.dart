@@ -142,4 +142,30 @@ void main() {
       expect(d.region, '후일라');
     });
   });
+
+  group('parseOcr 타이포 제목/이브로우', () {
+    test('최대폰트 상단줄=제품명, 그 위 작은줄=로스터리', () {
+      final d = parseOcr(const [
+        OcrLine('베이스캠프 로스터스', left: 10, top: 10, right: 200, bottom: 30),
+        OcrLine('콜롬비아 핑크버번 내추럴', left: 10, top: 40, right: 500, bottom: 90),
+        OcrLine('원산지', left: 10, top: 120, right: 70, bottom: 140),
+        OcrLine('지역', left: 10, top: 150, right: 60, bottom: 170),
+      ]);
+      expect(d.name, '콜롬비아 핑크버번 내추럴');
+      expect(d.roaster, '베이스캠프 로스터스');
+    });
+    test('가드: 균일 높이면 name/roaster null', () {
+      final d = parseOcr(const [
+        OcrLine('원산지', left: 10, top: 10, right: 70, bottom: 30),
+        OcrLine('콜롬비아', left: 120, top: 10, right: 260, bottom: 30),
+        OcrLine('지역', left: 10, top: 40, right: 60, bottom: 60),
+      ]);
+      expect(d.name, isNull);
+      expect(d.roaster, isNull);
+    });
+    test('콜론 라벨은 타이포 없이도 폴백으로 채워짐(비회귀)', () {
+      expect(parseOcrText('제품명: 예가체프 코체레').name, '예가체프 코체레');
+      expect(parseOcrText('로스터리: 아우어사이드').roaster, '아우어사이드');
+    });
+  });
 }

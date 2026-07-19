@@ -1,0 +1,418 @@
+<title>M3.3 좌표 기반 OCR 파싱 Implementation Plan</title>
+<style>
+*{box-sizing:border-box}
+:root{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+  --font-sans:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Consolas,"Malgun Gothic",monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}}
+:root[data-theme="light"]{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+}
+:root[data-theme="dark"]{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-sans);line-height:1.7;-webkit-font-smoothing:antialiased}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.doc{max-width:880px;margin:0 auto;padding:44px 24px 96px}
+.crumb{font-family:var(--font-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:16px}
+h1{font-size:clamp(26px,4vw,38px);font-weight:800;letter-spacing:-.025em;line-height:1.2;margin:.1em 0 .5em;text-wrap:balance}
+h2{font-size:22px;font-weight:700;margin:2em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line);letter-spacing:-.01em;text-wrap:balance}
+h3{font-size:16.5px;font-weight:700;color:var(--accent-ink);margin:1.7em 0 .5em}
+h4{font-size:14px;font-weight:700;margin:1.3em 0 .4em}
+p{margin:.7em 0}
+a{color:var(--accent);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+strong{font-weight:700;color:var(--fg)}
+hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+code.ic{font-family:var(--font-mono);font-size:.85em;background:var(--ic-bg);color:var(--ic-fg);padding:1.5px 6px;border-radius:6px}
+pre.code{position:relative;background:var(--code-bg);color:var(--code-fg);border-radius:12px;padding:16px 18px;margin:1em 0;overflow-x:auto;border:1px solid rgba(0,0,0,.28)}
+pre.code code{font-family:var(--font-mono);font-size:12.75px;line-height:1.6;white-space:pre;color:inherit;background:none;padding:0}
+pre.code[data-lang]::before{content:attr(data-lang);position:absolute;top:9px;right:13px;font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(236,227,211,.42)}
+.tablewrap{overflow-x:auto;margin:1.1em 0}
+table{border-collapse:collapse;width:100%;font-size:13.75px}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--th);font-weight:700}
+tbody tr:nth-child(even){background:var(--surface)}
+blockquote{margin:1.1em 0;padding:11px 16px;border-left:3px solid var(--accent);background:var(--surface);border-radius:0 10px 10px 0;color:var(--muted)}
+blockquote strong{color:var(--fg)}
+ul,ol{margin:.7em 0;padding-left:1.4em}
+li{margin:.32em 0}
+ul.tasklist{list-style:none;padding-left:.15em}
+ul.tasklist li.task{position:relative;padding-left:30px;margin:.5em 0}
+ul.tasklist li.task::before{content:"";position:absolute;left:0;top:.18em;width:17px;height:17px;border:2px solid var(--accent);border-radius:5px;background:transparent}
+ul.tasklist li.task.done::before{content:"\2713";background:var(--accent);color:#fff;font-size:12px;font-weight:800;text-align:center;line-height:15px}
+</style>
+<article class="doc"><div class="crumb">BeanProfile · docs/plans</div>
+<h1>M3.3 좌표 기반 OCR 파싱 Implementation Plan</h1>
+<blockquote><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code class="ic">- [ ]</code>) syntax for tracking.</blockquote>
+<p><strong>Goal:</strong> 실제형(콜론 없는 2열 레이아웃) OCR 카드에서 지역·컵노트·제품명·로스터리를 좌표 기반으로 자동채움한다.</p>
+<p><strong>Architecture:</strong> <code class="ic">OcrService.recognize</code>를 <code class="ic">String</code> → <code class="ic">List&lt;OcrLine&gt;</code>(텍스트+boundingBox 좌표)로 확장하고, 새 <code class="ic">parseOcr(List&lt;OcrLine&gt;)</code> 코어가 라벨↔값을 공간적으로(같은 행·오른쪽 → 아래) 매칭한다. 제품명·로스터리는 글자 크기(타이포) 휴리스틱으로 추정한다. 콜론/키워드/칩 폴백을 유지해 기존 카드·테스트는 비회귀. 파서를 먼저 부가적으로 만든 뒤(Task 1·2) seam을 뒤집는다(Task 3).</p>
+<p><strong>Tech Stack:</strong> Flutter 3.44.6 / Dart 3.12.2, google_mlkit_text_recognition 0.16.0(한국어 팩 설치됨), flutter_riverpod 3.x, drift(무변경). 테스트: flutter_test(호스트 3계층) + integration_test(에뮬레이터 실측).</p>
+<p><strong>Spec:</strong> <code class="ic">docs/plans/milestone-3.3-geometry-ocr-design.md</code></p>
+<h2>Global Constraints</h2>
+<ul><li>한국어 UI 문자열. 오프라인·로컬 전용(네트워크 없음).</li><li>데이터 모델·저장소·DB·<code class="ic">OcrDraft</code>·<code class="ic">bean_form_screen</code> <strong>무변경</strong>.</li><li>ML Kit 한국어 팩은 이미 설치됨(iOS pod + Android gradle) — 건드리지 않는다.</li><li>SDD: 구현·리뷰·수정 sonnet, 최종 리뷰 opus. main 직접 커밋. 진행원장 <code class="ic">.superpowers/sdd/progress.md</code>에 M3.3 섹션 추가(gitignore, controller 소유).</li><li>커밋 트레일러: <code class="ic">Co-Authored-By: Claude Opus 4.8 (1M context) &lt;noreply@anthropic.com&gt;</code>.</li><li>각 커밋 전 <code class="ic">flutter analyze</code>(0 이슈) + 관련 테스트 green. 목표 릴리스 <strong>v0.3.3</strong>.</li><li><code class="ic">parseOcr</code>의 모든 공간 임계값은 라벨 높이(<code class="ic">label.height</code>) 단위 → 이미지 스케일 불변.</li></ul>
+<h2>File Structure</h2>
+<ul><li><code class="ic">lib/services/ocr_service.dart</code> — <code class="ic">OcrLine</code> 값 타입 추가(Task 1), <code class="ic">recognize</code> 시그니처 <code class="ic">List&lt;OcrLine&gt;</code> + ML Kit 매핑(Task 3).</li><li><code class="ic">lib/features/beans/ocr/ocr_parser.dart</code> — <code class="ic">parseOcr(List&lt;OcrLine&gt;)</code> 코어(Task 1·2) + <code class="ic">parseOcrText(String)</code> 하위호환 래퍼(Task 1).</li><li><code class="ic">lib/features/beans/add_bean_sheet.dart</code> — 호출부를 <code class="ic">parseOcr(lines)</code>로(Task 3).</li><li><code class="ic">test/helpers.dart</code> — <code class="ic">FakeOcrService.lines(...)</code>/<code class="ic">.text(...)</code>(Task 3).</li><li><code class="ic">test/unit/ocr_parser_test.dart</code> — <code class="ic">parseOcr</code> 공간/타이포 테스트 추가(Task 1·2), 기존 문자열 테스트 유지.</li><li><code class="ic">test/widget/add_bean_sheet_test.dart</code> — <code class="ic">FakeOcrService.text(...)</code>로 갱신(Task 3).</li><li><code class="ic">integration_test/ocr_probe_test.dart</code> — <code class="ic">recognize→parseOcr</code> 갱신 + 스타일 카드 필드 단언(Task 4).</li></ul>
+<hr>
+<h3>Task 1: <code class="ic">parseOcr</code> 코어 — OcrLine 타입 + 좌표 라벨→값(지역·컵노트) + 문자열 래퍼</h3>
+<p>순수 부가 작업: <code class="ic">recognize</code>는 아직 <code class="ic">String</code> 반환. <code class="ic">OcrLine</code>을 추가하고 <code class="ic">parseOcr</code>를 만들며 <code class="ic">parseOcrText</code>를 그 래퍼로 리팩터. 소비자(add_bean_sheet) 무변경 → 저장소 계속 컴파일·green.</p>
+<p><strong>Files:</strong></p>
+<ul><li>Modify: <code class="ic">lib/services/ocr_service.dart</code> (OcrLine 클래스 추가; recognize는 이번엔 유지)</li><li>Modify: <code class="ic">lib/features/beans/ocr/ocr_parser.dart</code></li><li>Test: <code class="ic">test/unit/ocr_parser_test.dart</code></li></ul>
+<p><strong>Interfaces:</strong></p>
+<ul><li>Produces: <code class="ic">class OcrLine { String text; double left,top,right,bottom; double get centerX/centerY/height/width; }</code> (const 생성자, 이름있는 좌표 인자 기본 0). <code class="ic">OcrDraft parseOcr(List&lt;OcrLine&gt; lines)</code>. <code class="ic">OcrDraft parseOcrText(String rawText)</code>(래퍼).</li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 1: <code class="ic">OcrLine</code> 타입 추가</strong></li></ul>
+<p><code class="ic">lib/services/ocr_service.dart</code> 상단(import 아래, <code class="ic">abstract class OcrService</code> 위)에 추가:</p>
+<pre class="code" data-lang="dart"><code>/// OCR 한 줄: 텍스트 + 이미지 픽셀 좌표(boundingBox). 순수 Dart라 호스트 테스트에서 직접 생성 가능.
+class OcrLine {
+  final String text;
+  final double left, top, right, bottom;
+  const OcrLine(this.text, {this.left = 0, this.top = 0, this.right = 0, this.bottom = 0});
+  double get centerX =&gt; (left + right) / 2;
+  double get centerY =&gt; (top + bottom) / 2;
+  double get height =&gt; bottom - top;
+  double get width =&gt; right - left;
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 2: 실패하는 테스트 작성</strong></li></ul>
+<p><code class="ic">test/unit/ocr_parser_test.dart</code> 상단 import에 추가: <code class="ic">import 'package:beanprofile/services/ocr_service.dart';</code> 파일 끝(마지막 <code class="ic">}</code> 앞)에 그룹 추가:</p>
+<pre class="code" data-lang="dart"><code>  group('parseOcr 좌표 라벨→값', () {
+    test('같은 행 오른쪽 값 → region', () {
+      final d = parseOcr(const [
+        OcrLine('지역', left: 10, top: 100, right: 60, bottom: 130),
+        OcrLine('후일라', left: 120, top: 100, right: 260, bottom: 130),
+      ]);
+      expect(d.region, '후일라');
+    });
+    test('라벨 아래 값 → cupNotes(구분자 분리)', () {
+      final d = parseOcr(const [
+        OcrLine('컵노트', left: 10, top: 200, right: 90, bottom: 230),
+        OcrLine('딸기, 복숭아, 레드와인', left: 10, top: 240, right: 400, bottom: 270),
+      ]);
+      expect(d.cupNotes, ['딸기', '복숭아', '레드와인']);
+    });
+    test('값 없으면 region null', () {
+      final d = parseOcr(const [OcrLine('지역', left: 10, top: 100, right: 60, bottom: 130)]);
+      expect(d.region, isNull);
+    });
+    test('2열 카드: 지역=같은 행, 국가=키워드', () {
+      final d = parseOcr(const [
+        OcrLine('원산지', left: 10, top: 100, right: 70, bottom: 130),
+        OcrLine('지역', left: 10, top: 150, right: 60, bottom: 180),
+        OcrLine('콜롬비아', left: 120, top: 100, right: 260, bottom: 130),
+        OcrLine('후일라', left: 120, top: 150, right: 260, bottom: 180),
+      ]);
+      expect(d.country, 'Colombia');
+      expect(d.region, '후일라');
+    });
+  });</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 3: 테스트 실패 확인</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/unit/ocr_parser_test.dart</code> Expected: 컴파일 실패 — <code class="ic">parseOcr</code> 미정의.</p>
+<ul class="tasklist"><li class="task"><strong>Step 4: <code class="ic">parseOcr</code> + 헬퍼 구현, <code class="ic">parseOcrText</code>를 래퍼로</strong></li></ul>
+<p><code class="ic">lib/features/beans/ocr/ocr_parser.dart</code> 상단 import에 추가: <code class="ic">import '../../../services/ocr_service.dart';</code> <code class="ic">_roasterLabel</code> 정의 아래에 토큰/헬퍼 추가:</p>
+<pre class="code" data-lang="dart"><code>const Set&lt;String&gt; _regionTokens = {'지역', 'region'};
+const Set&lt;String&gt; _cupTokens = {
+  '컵노트', '컵 노트', 'notes', 'cup notes', 'cup note', 'tasting notes', '향미',
+};
+
+/// 값 줄이 라벨로 오인되지 않도록: 트림·소문자·후행 콜론 제거 후 토큰과 정확히 일치.
+bool _isBareLabel(String text) {
+  final t = text.trim().toLowerCase().replaceAll(RegExp(r'[:：]\s*$'), '').trim();
+  return _regionTokens.contains(t) || _cupTokens.contains(t);
+}
+
+/// 토큰의 바레-라벨 줄을 찾아 공간적으로 값을 매칭.
+String? _spatialValue(List&lt;OcrLine&gt; lines, Set&lt;String&gt; tokens) {
+  for (final label in lines) {
+    final t = label.text.trim().toLowerCase().replaceAll(RegExp(r'[:：]\s*$'), '').trim();
+    if (!tokens.contains(t)) continue;
+    final v = _valueFor(lines, label);
+    if (v != null &amp;&amp; v.isNotEmpty) return v;
+  }
+  return null;
+}
+
+/// 라벨 줄의 값: ① 같은 행·오른쪽 → 없으면 ② 바로 아래(최근접).
+String? _valueFor(List&lt;OcrLine&gt; lines, OcrLine label) {
+  final h = label.height &lt;= 0 ? 1.0 : label.height;
+  OcrLine? best;
+  for (final v in lines) {
+    if (identical(v, label) || v.text.trim().isEmpty || _isBareLabel(v.text)) continue;
+    final aligned = (v.centerY - label.centerY).abs() &lt;= 0.6 * h;
+    if (aligned &amp;&amp; v.left &gt;= label.right - 0.5 * h) {
+      if (best == null || v.left &lt; best.left) best = v;
+    }
+  }
+  if (best != null) return best.text.trim();
+  for (final v in lines) {
+    if (identical(v, label) || v.text.trim().isEmpty || _isBareLabel(v.text)) continue;
+    final below = v.top &gt;= label.bottom - 0.5 * h;
+    final xOverlap = v.left &lt;= label.right &amp;&amp; v.right &gt;= label.left;
+    final sameCol = (v.left - label.left).abs() &lt;= 1.5 * h;
+    if (below &amp;&amp; (xOverlap || sameCol)) {
+      if (best == null || v.top &lt; best.top) best = v;
+    }
+  }
+  return best?.text.trim();
+}
+
+List&lt;String&gt; _splitNotes(String s) =&gt; s
+    .split(RegExp(r'[,/·、]'))
+    .map((e) =&gt; e.trim())
+    .where((e) =&gt; e.isNotEmpty)
+    .toList();</code></pre>
+<p>기존 <code class="ic">_matchCupNotes</code>를 <code class="ic">_splitNotes</code> 사용으로 교체:</p>
+<pre class="code" data-lang="dart"><code>List&lt;String&gt; _matchCupNotes(List&lt;String&gt; lines) {
+  for (final line in lines) {
+    final m = _noteLabel.firstMatch(line);
+    if (m != null) return _splitNotes(m.group(2)!);
+  }
+  return const [];
+}</code></pre>
+<p>기존 <code class="ic">parseOcrText</code> 함수 전체를 다음 두 함수로 교체:</p>
+<pre class="code" data-lang="dart"><code>OcrDraft parseOcr(List&lt;OcrLine&gt; lines) {
+  final texts = lines.map((l) =&gt; l.text.trim()).where((t) =&gt; t.isNotEmpty).toList();
+  final joined = texts.join('\n');
+  final lower = joined.toLowerCase();
+
+  // 4.1 좌표 라벨→값
+  String? region = _spatialValue(lines, _regionTokens);
+  final cupSpatial = _spatialValue(lines, _cupTokens);
+  var cupNotes = cupSpatial == null ? const &lt;String&gt;[] : _splitNotes(cupSpatial);
+
+  // 4.2 타이포 제목/이브로우 (Task 2에서 채움)
+  String? name;
+  String? roaster;
+
+  // 4.3 콜론/키워드 폴백
+  name ??= _firstLabel(texts, _nameLabel);
+  roaster ??= _firstLabel(texts, _roasterLabel);
+  region ??= _firstLabel(texts, _regionLabel);
+  if (cupNotes.isEmpty) cupNotes = _matchCupNotes(texts);
+
+  return OcrDraft(
+    name: name,
+    roaster: roaster,
+    country: _firstMatch(lower, _countries),
+    region: region,
+    roastDate: _matchDate(joined),
+    roastLevel: _firstMatch(lower, _roastKeywords),
+    process: _firstMatch(lower, _processKeywords),
+    cupNotes: cupNotes,
+    chips: _dedupe(texts),
+  );
+}
+
+/// 문자열 하위호환: 줄을 세로로 쌓은 합성 라인으로 감싸 parseOcr에 위임.
+OcrDraft parseOcrText(String rawText) {
+  final texts = rawText.split('\n').map((l) =&gt; l.trim()).where((l) =&gt; l.isNotEmpty).toList();
+  final lines = [
+    for (final (i, t) in texts.indexed)
+      OcrLine(t, left: 0, top: i * 10.0, right: 100, bottom: i * 10.0 + 10),
+  ];
+  return parseOcr(lines);
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 5: 전체 유닛 테스트 통과 확인</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/unit/ocr_parser_test.dart</code> Expected: PASS — 새 <code class="ic">parseOcr</code> 그룹 + 기존 문자열 테스트(country/roastDate/roastLevel/process/cupNotes/region/name&amp;roaster/chips) 전부 green.</p>
+<ul class="tasklist"><li class="task"><strong>Step 6: 전체 테스트 + 정적분석</strong></li></ul>
+<p>Run: <code class="ic">flutter test &amp;&amp; flutter analyze</code> Expected: 전 테스트 PASS, analyze 0 이슈(소비자 무변경이라 회귀 없음).</p>
+<ul class="tasklist"><li class="task"><strong>Step 7: 커밋</strong></li></ul>
+<pre class="code" data-lang="bash"><code>git add lib/services/ocr_service.dart lib/features/beans/ocr/ocr_parser.dart test/unit/ocr_parser_test.dart
+git commit -m "feat(m3.3): parseOcr core — spatial label→value (region/cupNotes) + OcrLine
+
+Co-Authored-By: Claude Opus 4.8 (1M context) &lt;noreply@anthropic.com&gt;"</code></pre>
+<hr>
+<h3>Task 2: 타이포 제목/이브로우 (제품명·로스터리) + 오채움 가드</h3>
+<p><code class="ic">parseOcr</code>에 4.2 추가. 여전히 부가 작업(소비자 무변경).</p>
+<p><strong>Files:</strong></p>
+<ul><li>Modify: <code class="ic">lib/features/beans/ocr/ocr_parser.dart</code></li><li>Test: <code class="ic">test/unit/ocr_parser_test.dart</code></li></ul>
+<p><strong>Interfaces:</strong></p>
+<ul><li>Consumes: <code class="ic">parseOcr</code>, <code class="ic">OcrLine</code>(Task 1).</li><li>Produces: <code class="ic">(String?, String?) _titleEyebrow(List&lt;OcrLine&gt;)</code> — (제품명, 로스터리).</li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 1: 실패하는 테스트 작성</strong></li></ul>
+<p><code class="ic">test/unit/ocr_parser_test.dart</code> 끝(마지막 <code class="ic">}</code> 앞)에 추가:</p>
+<pre class="code" data-lang="dart"><code>  group('parseOcr 타이포 제목/이브로우', () {
+    test('최대폰트 상단줄=제품명, 그 위 작은줄=로스터리', () {
+      final d = parseOcr(const [
+        OcrLine('베이스캠프 로스터스', left: 10, top: 10, right: 200, bottom: 30),
+        OcrLine('콜롬비아 핑크버번 내추럴', left: 10, top: 40, right: 500, bottom: 90),
+        OcrLine('원산지', left: 10, top: 120, right: 70, bottom: 140),
+        OcrLine('지역', left: 10, top: 150, right: 60, bottom: 170),
+      ]);
+      expect(d.name, '콜롬비아 핑크버번 내추럴');
+      expect(d.roaster, '베이스캠프 로스터스');
+    });
+    test('가드: 균일 높이면 name/roaster null', () {
+      final d = parseOcr(const [
+        OcrLine('원산지', left: 10, top: 10, right: 70, bottom: 30),
+        OcrLine('콜롬비아', left: 120, top: 10, right: 260, bottom: 30),
+        OcrLine('지역', left: 10, top: 40, right: 60, bottom: 60),
+      ]);
+      expect(d.name, isNull);
+      expect(d.roaster, isNull);
+    });
+    test('콜론 라벨은 타이포 없이도 폴백으로 채워짐(비회귀)', () {
+      expect(parseOcrText('제품명: 예가체프 코체레').name, '예가체프 코체레');
+      expect(parseOcrText('로스터리: 아우어사이드').roaster, '아우어사이드');
+    });
+  });</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 2: 테스트 실패 확인</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/unit/ocr_parser_test.dart -n "타이포"</code> Expected: FAIL — <code class="ic">name</code>/<code class="ic">roaster</code>가 null(4.2 미구현).</p>
+<ul class="tasklist"><li class="task"><strong>Step 3: <code class="ic">_titleEyebrow</code> 구현 + parseOcr에 연결</strong></li></ul>
+<p><code class="ic">ocr_parser.dart</code>에 <code class="ic">_valueFor</code> 아래로 추가:</p>
+<pre class="code" data-lang="dart"><code>/// 제품명=상단 최대폰트 줄, 로스터리=그 위 작은 줄. 균일 텍스트면 (null,null)로 오채움 회피.
+(String?, String?) _titleEyebrow(List&lt;OcrLine&gt; lines) {
+  final real = lines.where((l) =&gt; l.text.trim().isNotEmpty).toList();
+  if (real.length &lt; 2) return (null, null);
+  final hs = real.map((l) =&gt; l.height).toList()..sort();
+  final n = hs.length;
+  final medianH = n.isOdd ? hs[n ~/ 2] : (hs[n ~/ 2 - 1] + hs[n ~/ 2]) / 2;
+  if (medianH &lt;= 0) return (null, null);
+  var title = real.first;
+  for (final l in real) {
+    if (l.height &gt; title.height) title = l;
+  }
+  if (title.height &lt; 1.3 * medianH) return (null, null);
+  final minTop = real.map((l) =&gt; l.top).reduce((a, b) =&gt; a &lt; b ? a : b);
+  final maxBottom = real.map((l) =&gt; l.bottom).reduce((a, b) =&gt; a &gt; b ? a : b);
+  if (title.top &gt; minTop + 0.45 * (maxBottom - minTop)) return (null, null);
+  OcrLine? eyebrow;
+  for (final l in real) {
+    if (identical(l, title)) continue;
+    final above = l.bottom &lt;= title.top + 0.3 * title.height;
+    final xOverlap = l.left &lt;= title.right &amp;&amp; l.right &gt;= title.left;
+    if (above &amp;&amp; xOverlap &amp;&amp; l.height &lt; title.height) {
+      if (eyebrow == null || l.bottom &gt; eyebrow.bottom) eyebrow = l;
+    }
+  }
+  return (title.text.trim(), eyebrow?.text.trim());
+}</code></pre>
+<p><code class="ic">parseOcr</code> 안의 4.2 자리(주석 <code class="ic">// 4.2 타이포 제목/이브로우 (Task 2에서 채움)</code>와 두 줄 <code class="ic">String? name; String? roaster;</code>)를 다음으로 교체:</p>
+<pre class="code" data-lang="dart"><code>  // 4.2 타이포 제목/이브로우
+  final te = _titleEyebrow(lines);
+  String? name = te.$1;
+  String? roaster = te.$2;</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 4: 유닛 테스트 통과 확인</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/unit/ocr_parser_test.dart</code> Expected: PASS — 타이포 그룹 + 기존 전부 green(문자열 래퍼는 균일 높이라 타이포 미발동, 콜론 폴백 유지).</p>
+<ul class="tasklist"><li class="task"><strong>Step 5: 전체 테스트 + 정적분석</strong></li></ul>
+<p>Run: <code class="ic">flutter test &amp;&amp; flutter analyze</code> Expected: PASS, 0 이슈.</p>
+<ul class="tasklist"><li class="task"><strong>Step 6: 커밋</strong></li></ul>
+<pre class="code" data-lang="bash"><code>git add lib/features/beans/ocr/ocr_parser.dart test/unit/ocr_parser_test.dart
+git commit -m "feat(m3.3): typography title/eyebrow → name/roaster with misfire guard
+
+Co-Authored-By: Claude Opus 4.8 (1M context) &lt;noreply@anthropic.com&gt;"</code></pre>
+<hr>
+<h3>Task 3: seam 뒤집기 — recognize→List&lt;OcrLine&gt;, ML Kit 매핑, FakeOcrService, 호출부</h3>
+<p><code class="ic">parseOcr</code>가 검증됐으니 인터페이스를 기계적으로 교체한다. 저장소가 다시 컴파일·green이 되도록 소비자를 한 태스크에서 함께 갱신.</p>
+<p><strong>Files:</strong></p>
+<ul><li>Modify: <code class="ic">lib/services/ocr_service.dart</code> (recognize 시그니처 + ML Kit 매핑)</li><li>Modify: <code class="ic">lib/features/beans/add_bean_sheet.dart</code></li><li>Modify: <code class="ic">test/helpers.dart</code> (FakeOcrService)</li><li>Modify: <code class="ic">test/widget/add_bean_sheet_test.dart</code> (FakeOcrService.text)</li></ul>
+<p><strong>Interfaces:</strong></p>
+<ul><li>Consumes: <code class="ic">parseOcr</code>, <code class="ic">OcrLine</code>(Task 1).</li><li>Produces: <code class="ic">Future&lt;List&lt;OcrLine&gt;&gt; OcrService.recognize(String)</code>. <code class="ic">FakeOcrService.lines(List&lt;OcrLine&gt;)</code>, <code class="ic">factory FakeOcrService.text(String)</code>.</li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 1: <code class="ic">recognize</code> 시그니처 + ML Kit 매핑</strong></li></ul>
+<p><code class="ic">lib/services/ocr_service.dart</code>의 <code class="ic">abstract class OcrService</code>와 <code class="ic">MlkitOcrService</code>를 교체(Task 1에서 추가한 <code class="ic">OcrLine</code> 클래스는 유지):</p>
+<pre class="code" data-lang="dart"><code>abstract class OcrService {
+  /// 이미지의 인식 라인들. 실패/빈 이미지면 빈 리스트.
+  Future&lt;List&lt;OcrLine&gt;&gt; recognize(String imagePath);
+}
+
+class MlkitOcrService implements OcrService {
+  TextRecognizer? _recognizer;
+
+  @override
+  Future&lt;List&lt;OcrLine&gt;&gt; recognize(String imagePath) async {
+    try {
+      _recognizer ??= TextRecognizer(script: TextRecognitionScript.korean);
+      final result = await _recognizer!.processImage(InputImage.fromFilePath(imagePath));
+      return [
+        for (final block in result.blocks)
+          for (final line in block.lines)
+            OcrLine(line.text,
+                left: line.boundingBox.left,
+                top: line.boundingBox.top,
+                right: line.boundingBox.right,
+                bottom: line.boundingBox.bottom),
+      ];
+    } catch (_) {
+      return const []; // 인식 실패/모델 미다운로드 → 빈 리스트(폼의 '자동 인식 실패' 배너로 이어짐)
+    }
+  }
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 2: 호출부를 <code class="ic">parseOcr(lines)</code>로</strong></li></ul>
+<p><code class="ic">lib/features/beans/add_bean_sheet.dart</code>의 <code class="ic">_recognize</code> 안 <code class="ic">try</code> 블록에서 <code class="ic">final text = await ref.read(ocrServiceProvider).recognize(path);</code> + <code class="ic">return parseOcrText(text);</code> 두 줄을 다음으로 교체:</p>
+<pre class="code" data-lang="dart"><code>    final lines = await ref.read(ocrServiceProvider).recognize(path);
+    return parseOcr(lines);</code></pre>
+<p>(<code class="ic">import 'ocr/ocr_parser.dart';</code>는 이미 있음 — <code class="ic">parseOcr</code>도 같은 파일에서 export됨.)</p>
+<ul class="tasklist"><li class="task"><strong>Step 3: <code class="ic">FakeOcrService</code> 두 생성자로</strong></li></ul>
+<p><code class="ic">test/helpers.dart</code>의 <code class="ic">class FakeOcrService</code> 전체를 교체:</p>
+<pre class="code" data-lang="dart"><code>class FakeOcrService implements OcrService {
+  FakeOcrService.lines(this._lines);
+  factory FakeOcrService.text(String text) =&gt; FakeOcrService.lines([
+        for (final (i, t) in _splitText(text).indexed)
+          OcrLine(t, left: 0, top: i * 10.0, right: 100, bottom: i * 10.0 + 10),
+      ]);
+  final List&lt;OcrLine&gt; _lines;
+  @override
+  Future&lt;List&lt;OcrLine&gt;&gt; recognize(String imagePath) async =&gt; _lines;
+  static List&lt;String&gt; _splitText(String s) =&gt;
+      s.split('\n').map((l) =&gt; l.trim()).where((l) =&gt; l.isNotEmpty).toList();
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 4: 위젯 테스트의 <code class="ic">FakeOcrService</code> 호출 갱신</strong></li></ul>
+<p><code class="ic">test/widget/add_bean_sheet_test.dart</code>에서 두 곳 교체:</p>
+<ul><li><code class="ic">ocr: FakeOcrService('Ethiopia\nWashed\nNotes: 블루베리'),</code> → <code class="ic">ocr: FakeOcrService.text('Ethiopia\nWashed\nNotes: 블루베리'),</code></li><li><code class="ic">ocr: FakeOcrService(''), // 인식 실패 → 빈 텍스트</code> → <code class="ic">ocr: FakeOcrService.text(''), // 인식 실패 → 빈 라인</code></li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 5: 전체 테스트 + 정적분석</strong></li></ul>
+<p>Run: <code class="ic">flutter test &amp;&amp; flutter analyze</code> Expected: 전 테스트 PASS(촬영→OCR(가짜)→폼 프리필, 빈 결과 폴백 배너, wiring 등), analyze 0 이슈.</p>
+<ul class="tasklist"><li class="task"><strong>Step 6: 커밋</strong></li></ul>
+<pre class="code" data-lang="bash"><code>git add lib/services/ocr_service.dart lib/features/beans/add_bean_sheet.dart test/helpers.dart test/widget/add_bean_sheet_test.dart
+git commit -m "feat(m3.3): recognize() returns List&lt;OcrLine&gt; with coords; wire parseOcr
+
+Co-Authored-By: Claude Opus 4.8 (1M context) &lt;noreply@anthropic.com&gt;"</code></pre>
+<hr>
+<h3>Task 4: 에뮬레이터 프로브 갱신 + 실측 검증</h3>
+<p>호스트 테스트로는 실제 ML Kit 좌표를 못 만든다. 프로브를 <code class="ic">recognize→parseOcr</code>로 갱신하고 에뮬레이터에서 스타일 카드가 실제로 채워지는지 확인. 임계값이 실측과 어긋나면 이 태스크에서 조정한다.</p>
+<p><strong>Files:</strong></p>
+<ul><li>Modify: <code class="ic">integration_test/ocr_probe_test.dart</code></li></ul>
+<p><strong>Interfaces:</strong></p>
+<ul><li>Consumes: <code class="ic">MlkitOcrService.recognize</code>(List&lt;OcrLine&gt;), <code class="ic">parseOcr</code>(Task 1·2·3).</li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 1: 프로브를 구조화 입력으로 갱신</strong></li></ul>
+<p><code class="ic">integration_test/ocr_probe_test.dart</code>에서 두 테스트 모두 <code class="ic">recognize</code>→<code class="ic">parseOcr</code>로 바꾸고, 원문 출력은 라인+좌표로. 테스트 1 본문의 <code class="ic">final text = await MlkitOcrService().recognize(file.path);</code> … <code class="ic">final d = parseOcrText(text);</code> 를 다음으로 교체:</p>
+<pre class="code" data-lang="dart"><code>    final lines = await MlkitOcrService().recognize(file.path);
+    // ignore: avoid_print
+    print('===OCR_LINES_START===');
+    for (final l in lines) {
+      // ignore: avoid_print
+      print('[${l.left.toStringAsFixed(0)},${l.top.toStringAsFixed(0)} '
+          '${l.right.toStringAsFixed(0)},${l.bottom.toStringAsFixed(0)}] ${l.text}');
+    }
+    // ignore: avoid_print
+    print('===OCR_LINES_END===');
+    final d = parseOcr(lines);</code></pre>
+<p>테스트 2(원본 카드)도 동일하게 <code class="ic">recognize→parseOcr</code>로 바꾸고 라벨을 <code class="ic">ORIG_</code>로. import는 <code class="ic">ocr_parser.dart</code>(parseOcr)만 있으면 됨.</p>
+<ul class="tasklist"><li class="task"><strong>Step 2: 테스트 1(콜론 카드) 8/8 회귀 단언 유지</strong></li></ul>
+<p>테스트 1의 기존 8개 <code class="ic">expect</code>(name/roaster/country/region/process/roastLevel/roastDate/cupNotes)는 그대로 둔다.</p>
+<ul class="tasklist"><li class="task"><strong>Step 3: 테스트 2(스타일 카드)에 필드 단언 추가</strong></li></ul>
+<p>테스트 2의 <code class="ic">expect(text, isNotEmpty);</code>(있다면) 제거하고 다음으로 교체:</p>
+<pre class="code" data-lang="dart"><code>    expect(lines, isNotEmpty);
+    expect(d.country, 'Colombia');
+    expect(d.process, Process.natural);
+    expect(d.roastLevel, RoastLevel.medium);
+    expect(d.roastDate, DateTime(2026, 7, 5));
+    expect(d.region, '후일라');
+    expect(d.cupNotes, ['딸기', '복숭아', '레드와인']);
+    expect(d.name, '콜롬비아 핑크버번 내추럴');
+    expect(d.roaster, contains('베이스캠프')); // '베이스캠프 로스 터스'(자간 오독 허용)</code></pre>
+<p><code class="ic">integration_test/ocr_probe_test.dart</code> import에 <code class="ic">package:beanprofile/data/enums.dart</code>가 이미 있음(Process/RoastLevel).</p>
+<ul class="tasklist"><li class="task"><strong>Step 4: 에뮬레이터에서 실행</strong></li></ul>
+<p>Run: <code class="ic">flutter test integration_test/ocr_probe_test.dart -d emulator-5554</code> Expected: 두 테스트 PASS. 실패 시 <code class="ic">===OCR_LINES===</code> 출력의 실제 좌표로 <code class="ic">parseOcr</code> 임계값(0.6/0.5/1.5/1.3/0.45/0.3) 또는 토큰을 조정하고 재실행. <strong>임계값을 바꾸면 Task 1·2 유닛 테스트도 다시 green인지 확인</strong>(<code class="ic">flutter test</code>).</p>
+<ul class="tasklist"><li class="task"><strong>Step 5: 커밋</strong></li></ul>
+<pre class="code" data-lang="bash"><code>git add integration_test/ocr_probe_test.dart lib/features/beans/ocr/ocr_parser.dart
+git commit -m "test(m3.3): probe asserts styled card auto-fills region/cupNotes/name/roaster
+
+Co-Authored-By: Claude Opus 4.8 (1M context) &lt;noreply@anthropic.com&gt;"</code></pre>
+<hr>
+<h2>최종 검증 (전 태스크 후)</h2>
+<ul class="tasklist"><li class="task"><code class="ic">flutter test</code> (호스트 3계층) 전부 green + <code class="ic">flutter analyze</code> 0 이슈.</li><li class="task"><code class="ic">flutter test integration_test/ocr_probe_test.dart -d emulator-5554</code> 두 테스트 green(콜론 8/8 + 스타일 카드 지역·컵노트·제품명·로스터리 채움).</li><li class="task">opus 전체-브랜치 리뷰(SDD 규약).</li><li class="task"><code class="ic">.superpowers/sdd/progress.md</code>에 M3.3 완료 기록.</li><li class="task">릴리스 준비: 대기 중 커밋(적응형 아이콘, 콜론 제품명/로스터리) + M3.3 → <strong>v0.3.3</strong> (푸시·태그는 사용자 승인 후).</li></ul>
+</article>

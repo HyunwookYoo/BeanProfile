@@ -1,5 +1,6 @@
 import 'package:beanprofile/data/enums.dart';
 import 'package:beanprofile/features/beans/ocr/ocr_parser.dart';
+import 'package:beanprofile/services/ocr_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -108,6 +109,37 @@ void main() {
       expect(d.roastDate, DateTime(2026, 7, 2));
       expect(d.cupNotes, ['Blueberry', 'Jasmine']);
       expect(d.chips, contains('Fritz Coffee'));
+    });
+  });
+
+  group('parseOcr 좌표 라벨→값', () {
+    test('같은 행 오른쪽 값 → region', () {
+      final d = parseOcr(const [
+        OcrLine('지역', left: 10, top: 100, right: 60, bottom: 130),
+        OcrLine('후일라', left: 120, top: 100, right: 260, bottom: 130),
+      ]);
+      expect(d.region, '후일라');
+    });
+    test('라벨 아래 값 → cupNotes(구분자 분리)', () {
+      final d = parseOcr(const [
+        OcrLine('컵노트', left: 10, top: 200, right: 90, bottom: 230),
+        OcrLine('딸기, 복숭아, 레드와인', left: 10, top: 240, right: 400, bottom: 270),
+      ]);
+      expect(d.cupNotes, ['딸기', '복숭아', '레드와인']);
+    });
+    test('값 없으면 region null', () {
+      final d = parseOcr(const [OcrLine('지역', left: 10, top: 100, right: 60, bottom: 130)]);
+      expect(d.region, isNull);
+    });
+    test('2열 카드: 지역=같은 행, 국가=키워드', () {
+      final d = parseOcr(const [
+        OcrLine('원산지', left: 10, top: 100, right: 70, bottom: 130),
+        OcrLine('지역', left: 10, top: 150, right: 60, bottom: 180),
+        OcrLine('콜롬비아', left: 120, top: 100, right: 260, bottom: 130),
+        OcrLine('후일라', left: 120, top: 150, right: 260, bottom: 180),
+      ]);
+      expect(d.country, 'Colombia');
+      expect(d.region, '후일라');
     });
   });
 }

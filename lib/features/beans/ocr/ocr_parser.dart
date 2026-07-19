@@ -1,4 +1,5 @@
 import '../../../data/enums.dart';
+import '../../../services/ocr_service.dart';
 import 'ocr_draft.dart';
 
 /// 원산지 사전: 소문자 키워드 → 표준 표기. 복합어(Costa Rica)를 먼저.
@@ -69,24 +70,99 @@ final RegExp _roasterLabel = RegExp(
   caseSensitive: false,
 );
 
-OcrDraft parseOcrText(String rawText) {
-  final lines = rawText
-      .split('\n')
-      .map((l) => l.trim())
-      .where((l) => l.isNotEmpty)
-      .toList();
-  final lower = rawText.toLowerCase();
+const Set<String> _regionTokens = {'지역', 'region'};
+const Set<String> _cupTokens = {
+  '컵노트', '컵 노트', 'notes', 'cup notes', 'cup note', 'tasting notes', '향미',
+};
+
+/// 값 줄이 라벨로 오인되지 않도록: 트림·소문자·후행 콜론 제거 후 토큰과 정확히 일치.
+bool _isBareLabel(String text) {
+  final t = text.trim().toLowerCase().replaceAll(RegExp(r'[:：]\s*$'), '').trim();
+  return _regionTokens.contains(t) || _cupTokens.contains(t);
+}
+
+/// 토큰의 바레-라벨 줄을 찾아 공간적으로 값을 매칭.
+String? _spatialValue(List<OcrLine> lines, Set<String> tokens) {
+  for (final label in lines) {
+    final t = label.text.trim().toLowerCase().replaceAll(RegExp(r'[:：]\s*$'), '').trim();
+    if (!tokens.contains(t)) continue;
+    final v = _valueFor(lines, label);
+    if (v != null && v.isNotEmpty) return v;
+  }
+  return null;
+}
+
+/// 라벨 줄의 값: ① 같은 행·오른쪽 → 없으면 ② 바로 아래(최근접).
+String? _valueFor(List<OcrLine> lines, OcrLine label) {
+  final h = label.height <= 0 ? 1.0 : label.height;
+  OcrLine? best;
+  for (final v in lines) {
+    if (identical(v, label) || v.text.trim().isEmpty || _isBareLabel(v.text)) continue;
+    final aligned = (v.centerY - label.centerY).abs() <= 0.6 * h;
+    if (aligned && v.left >= label.right - 0.5 * h) {
+      if (best == null || v.left < best.left) best = v;
+    }
+  }
+  if (best != null) return best.text.trim();
+  for (final v in lines) {
+    if (identical(v, label) || v.text.trim().isEmpty || _isBareLabel(v.text)) continue;
+    final below = v.top >= label.bottom - 0.5 * h;
+    final xOverlap = v.left <= label.right && v.right >= label.left;
+    final sameCol = (v.left - label.left).abs() <= 1.5 * h;
+    if (below && (xOverlap || sameCol)) {
+      if (best == null || v.top < best.top) best = v;
+    }
+  }
+  return best?.text.trim();
+}
+
+List<String> _splitNotes(String s) => s
+    .split(RegExp(r'[,/·、]'))
+    .map((e) => e.trim())
+    .where((e) => e.isNotEmpty)
+    .toList();
+
+OcrDraft parseOcr(List<OcrLine> lines) {
+  final texts = lines.map((l) => l.text.trim()).where((t) => t.isNotEmpty).toList();
+  final joined = texts.join('\n');
+  final lower = joined.toLowerCase();
+
+  // 4.1 좌표 라벨→값
+  String? region = _spatialValue(lines, _regionTokens);
+  final cupSpatial = _spatialValue(lines, _cupTokens);
+  var cupNotes = cupSpatial == null ? const <String>[] : _splitNotes(cupSpatial);
+
+  // 4.2 타이포 제목/이브로우 (Task 2에서 채움)
+  String? name;
+  String? roaster;
+
+  // 4.3 콜론/키워드 폴백
+  name ??= _firstLabel(texts, _nameLabel);
+  roaster ??= _firstLabel(texts, _roasterLabel);
+  region ??= _firstLabel(texts, _regionLabel);
+  if (cupNotes.isEmpty) cupNotes = _matchCupNotes(texts);
+
   return OcrDraft(
-    name: _firstLabel(lines, _nameLabel),
-    roaster: _firstLabel(lines, _roasterLabel),
+    name: name,
+    roaster: roaster,
     country: _firstMatch(lower, _countries),
-    region: _firstLabel(lines, _regionLabel),
-    roastDate: _matchDate(rawText),
+    region: region,
+    roastDate: _matchDate(joined),
     roastLevel: _firstMatch(lower, _roastKeywords),
     process: _firstMatch(lower, _processKeywords),
-    cupNotes: _matchCupNotes(lines),
-    chips: _dedupe(lines),
+    cupNotes: cupNotes,
+    chips: _dedupe(texts),
   );
+}
+
+/// 문자열 하위호환: 줄을 세로로 쌓은 합성 라인으로 감싸 parseOcr에 위임.
+OcrDraft parseOcrText(String rawText) {
+  final texts = rawText.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
+  final lines = [
+    for (final (i, t) in texts.indexed)
+      OcrLine(t, left: 0, top: i * 10.0, right: 100, bottom: i * 10.0 + 10),
+  ];
+  return parseOcr(lines);
 }
 
 T? _firstMatch<T>(String lower, Map<String, T> table) {
@@ -127,13 +203,7 @@ DateTime? _dateIn(String s) {
 List<String> _matchCupNotes(List<String> lines) {
   for (final line in lines) {
     final m = _noteLabel.firstMatch(line);
-    if (m != null) {
-      return m.group(2)!
-          .split(RegExp(r'[,/·、]'))
-          .map((s) => s.trim())
-          .where((s) => s.isNotEmpty)
-          .toList();
-    }
+    if (m != null) return _splitNotes(m.group(2)!);
   }
   return const [];
 }

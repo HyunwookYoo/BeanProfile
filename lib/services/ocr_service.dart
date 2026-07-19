@@ -1,5 +1,16 @@
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 
+/// OCR 한 줄: 텍스트 + 이미지 픽셀 좌표(boundingBox). 순수 Dart라 호스트 테스트에서 직접 생성 가능.
+class OcrLine {
+  final String text;
+  final double left, top, right, bottom;
+  const OcrLine(this.text, {this.left = 0, this.top = 0, this.right = 0, this.bottom = 0});
+  double get centerX => (left + right) / 2;
+  double get centerY => (top + bottom) / 2;
+  double get height => bottom - top;
+  double get width => right - left;
+}
+
 /// 온디바이스 OCR seam. 실검증은 기기 전용(호스트 테스트에선 가짜 주입).
 abstract class OcrService {
   /// [imagePath] 이미지의 전체 인식 텍스트를 반환한다. 실패/빈 이미지면 ''.

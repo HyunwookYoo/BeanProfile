@@ -59,6 +59,16 @@ final RegExp _regionLabel = RegExp(
   caseSensitive: false,
 );
 
+final RegExp _nameLabel = RegExp(
+  r'^(제품명|상품명|product\s*name|name)\s*[:：]\s*(.+)$',
+  caseSensitive: false,
+);
+
+final RegExp _roasterLabel = RegExp(
+  r'^(로스터리|로스터|roaster)\s*[:：]\s*(.+)$',
+  caseSensitive: false,
+);
+
 OcrDraft parseOcrText(String rawText) {
   final lines = rawText
       .split('\n')
@@ -67,8 +77,10 @@ OcrDraft parseOcrText(String rawText) {
       .toList();
   final lower = rawText.toLowerCase();
   return OcrDraft(
+    name: _firstLabel(lines, _nameLabel),
+    roaster: _firstLabel(lines, _roasterLabel),
     country: _firstMatch(lower, _countries),
-    region: _matchRegion(lines),
+    region: _firstLabel(lines, _regionLabel),
     roastDate: _matchDate(rawText),
     roastLevel: _firstMatch(lower, _roastKeywords),
     process: _firstMatch(lower, _processKeywords),
@@ -126,9 +138,9 @@ List<String> _matchCupNotes(List<String> lines) {
   return const [];
 }
 
-String? _matchRegion(List<String> lines) {
+String? _firstLabel(List<String> lines, RegExp label) {
   for (final line in lines) {
-    final m = _regionLabel.firstMatch(line);
+    final m = label.firstMatch(line);
     if (m != null) {
       final v = m.group(2)!.trim();
       if (v.isNotEmpty) return v;

@@ -65,6 +65,8 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
     }
     final d = widget.draft;
     if (e == null && d != null) {
+      if (d.name != null) _name.text = d.name!;
+      if (d.roaster != null) _roaster.text = d.roaster!;
       if (d.country != null) _components.first.country.text = d.country!;
       if (d.region != null) _components.first.region.text = d.region!;
       if (d.process != null) _components.first.process = d.process!;
@@ -195,10 +197,12 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           children: [
         TextField(key: const Key('field-name'), controller: _name,
-            decoration: const InputDecoration(labelText: '제품명 *')),
+            decoration: InputDecoration(labelText: '제품명 *',
+                helperText: _auto && widget.draft!.name != null ? 'OCR 자동' : null)),
         const SizedBox(height: 10),
         TextField(key: const Key('field-roaster'), controller: _roaster,
-            decoration: const InputDecoration(labelText: '로스터리')),
+            decoration: InputDecoration(labelText: '로스터리',
+                helperText: _auto && widget.draft!.roaster != null ? 'OCR 자동' : null)),
         const SizedBox(height: 14),
         SegmentedButton<BeanType>(
           segments: const [

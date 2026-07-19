@@ -37,6 +37,24 @@ void main() {
     expect(find.text('프릳츠'), findsOneWidget);
   });
 
+  testWidgets('draft.name/roaster → 제품명·로스터리 프리필 + OCR 자동', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    t.view.physicalSize = const Size(2400, 4000);
+    t.view.devicePixelRatio = 3.0;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(wrapApp(
+      const BeanFormScreen(
+          draft: OcrDraft(name: '예가체프', roaster: '아우어사이드', country: 'Ethiopia')),
+      db: db,
+    ));
+    await t.pump();
+
+    expect(t.widget<TextField>(find.byKey(const Key('field-name'))).controller!.text, '예가체프');
+    expect(t.widget<TextField>(find.byKey(const Key('field-roaster'))).controller!.text, '아우어사이드');
+    expect(find.text('OCR 자동'), findsNWidgets(3)); // 제품명 + 로스터리 + 국가
+  });
+
   testWidgets('draft.region → 지역 칸 프리필 + OCR 자동', (t) async {
     final db = testDatabase();
     addTearDown(db.close);

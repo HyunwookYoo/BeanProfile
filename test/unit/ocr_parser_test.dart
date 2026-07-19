@@ -3,6 +3,20 @@ import 'package:beanprofile/features/beans/ocr/ocr_parser.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  group('name & roaster', () {
+    test('제품명/로스터리 라벨에서 추출(영/한)', () {
+      expect(parseOcrText('제품명: 예가체프 코체레').name, '예가체프 코체레');
+      expect(parseOcrText('로스터리: 아우어사이드').roaster, '아우어사이드');
+      expect(parseOcrText('Name: Kochere').name, 'Kochere');
+      expect(parseOcrText('Roaster: Ourside').roaster, 'Ourside');
+    });
+    test('라벨 없으면 null; 로스팅(roast)은 로스터리 아님', () {
+      expect(parseOcrText('Ethiopia Yirgacheffe').name, isNull);
+      expect(parseOcrText('Ethiopia Yirgacheffe').roaster, isNull);
+      expect(parseOcrText('로스팅: 라이트미디엄').roaster, isNull);
+    });
+  });
+
   group('country', () {
     test('영문/한글 원산지를 표준 표기로', () {
       expect(parseOcrText('Ethiopia Yirgacheffe G1').country, 'Ethiopia');

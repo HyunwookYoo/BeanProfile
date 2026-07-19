@@ -45,6 +45,8 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  integration_test:
+    sdk: flutter
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
@@ -79,6 +81,10 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  # OCR 통합 테스트용 카드 이미지(에뮬레이터 검증용).
+  assets:
+    - assets/test/ocr_card_ko.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:

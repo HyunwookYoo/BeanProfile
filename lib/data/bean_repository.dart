@@ -17,6 +17,7 @@ class BeanRepository {
             roastDate: Value(input.roastDate),
             cupNotes: Value(input.cupNotes),
             memo: Value(input.memo),
+            photoPath: Value(input.photoPath),
             createdAt: DateTime.now(),
           ));
       for (final c in input.components) {
@@ -48,6 +49,7 @@ class BeanRepository {
           roastDate: Value(input.roastDate),
           cupNotes: Value(input.cupNotes),
           memo: Value(input.memo),
+          photoPath: Value(input.photoPath),
         ),
       );
       await (db.delete(db.originComponents)..where((c) => c.beanId.equals(beanId)))

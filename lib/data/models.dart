@@ -29,6 +29,7 @@ class BeanInput {
   final List<String> cupNotes;
   final String? memo;
   final List<ComponentInput> components;
+  final String? photoPath;
   const BeanInput({
     required this.name,
     required this.roaster,
@@ -38,6 +39,7 @@ class BeanInput {
     required this.cupNotes,
     required this.memo,
     required this.components,
+    this.photoPath,
   });
 }
 

@@ -66,6 +66,7 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
     final d = widget.draft;
     if (e == null && d != null) {
       if (d.country != null) _components.first.country.text = d.country!;
+      if (d.region != null) _components.first.region.text = d.region!;
       if (d.process != null) _components.first.process = d.process!;
       _roast = d.roastLevel;
       _roastDate = d.roastDate;
@@ -304,7 +305,9 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
           Expanded(child: TextField(
               key: Key('field-region-$i'),
               controller: comp.region,
-              decoration: const InputDecoration(labelText: '지역'))),
+              decoration: InputDecoration(
+                  labelText: '지역',
+                  helperText: i == 0 && _auto && widget.draft!.region != null ? 'OCR 자동' : null))),
           const SizedBox(width: 10),
           Expanded(
             child: DropdownButtonFormField<Process>(

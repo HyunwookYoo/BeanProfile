@@ -65,6 +65,18 @@ void main() {
     });
   });
 
+  group('region', () {
+    test('지역/Region 라벨에서 추출', () {
+      expect(parseOcrText('지역: 후일라').region, '후일라');
+      expect(parseOcrText('Region: Yirgacheffe').region, 'Yirgacheffe');
+      expect(parseOcrText('REGION : Yirgacheffe · Kochere').region, 'Yirgacheffe · Kochere');
+    });
+    test('라벨 없으면 null; 국가 라벨(원산지:)은 지역 아님', () {
+      expect(parseOcrText('Ethiopia Yirgacheffe').region, isNull);
+      expect(parseOcrText('원산지: 콜롬비아').region, isNull);
+    });
+  });
+
   group('chips & isEmpty', () {
     test('비어있지 않은 줄을 중복제거해 칩으로', () {
       final d = parseOcrText('프릳츠\n\nG1\n프릳츠');

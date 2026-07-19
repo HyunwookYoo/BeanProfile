@@ -37,6 +37,22 @@ void main() {
     expect(find.text('프릳츠'), findsOneWidget);
   });
 
+  testWidgets('draft.region → 지역 칸 프리필 + OCR 자동', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    t.view.physicalSize = const Size(2400, 4000);
+    t.view.devicePixelRatio = 3.0;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(wrapApp(
+      const BeanFormScreen(draft: OcrDraft(country: 'Ethiopia', region: '예가체프')),
+      db: db,
+    ));
+    await t.pump();
+
+    expect(t.widget<TextField>(find.byKey(const Key('field-region-0'))).controller!.text, '예가체프');
+    expect(find.text('OCR 자동'), findsNWidgets(2)); // 국가 + 지역
+  });
+
   testWidgets('칩 탭 → 배정 시트가 대상 목록을 보여줌', (t) async {
     final db = testDatabase();
     addTearDown(db.close);

@@ -54,6 +54,11 @@ final RegExp _noteLabel = RegExp(
   caseSensitive: false,
 );
 
+final RegExp _regionLabel = RegExp(
+  r'^(region|지역)\s*[:：]\s*(.+)$',
+  caseSensitive: false,
+);
+
 OcrDraft parseOcrText(String rawText) {
   final lines = rawText
       .split('\n')
@@ -63,6 +68,7 @@ OcrDraft parseOcrText(String rawText) {
   final lower = rawText.toLowerCase();
   return OcrDraft(
     country: _firstMatch(lower, _countries),
+    region: _matchRegion(lines),
     roastDate: _matchDate(rawText),
     roastLevel: _firstMatch(lower, _roastKeywords),
     process: _firstMatch(lower, _processKeywords),
@@ -118,6 +124,17 @@ List<String> _matchCupNotes(List<String> lines) {
     }
   }
   return const [];
+}
+
+String? _matchRegion(List<String> lines) {
+  for (final line in lines) {
+    final m = _regionLabel.firstMatch(line);
+    if (m != null) {
+      final v = m.group(2)!.trim();
+      if (v.isNotEmpty) return v;
+    }
+  }
+  return null;
 }
 
 List<String> _dedupe(List<String> lines) {

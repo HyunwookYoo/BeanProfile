@@ -1,0 +1,184 @@
+<title>M3.2 지역 OCR 자동채움 — 구현 계획</title>
+<style>
+*{box-sizing:border-box}
+:root{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+  --font-sans:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Consolas,"Malgun Gothic",monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}}
+:root[data-theme="light"]{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+}
+:root[data-theme="dark"]{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-sans);line-height:1.7;-webkit-font-smoothing:antialiased}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.doc{max-width:880px;margin:0 auto;padding:44px 24px 96px}
+.crumb{font-family:var(--font-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:16px}
+h1{font-size:clamp(26px,4vw,38px);font-weight:800;letter-spacing:-.025em;line-height:1.2;margin:.1em 0 .5em;text-wrap:balance}
+h2{font-size:22px;font-weight:700;margin:2em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line);letter-spacing:-.01em;text-wrap:balance}
+h3{font-size:16.5px;font-weight:700;color:var(--accent-ink);margin:1.7em 0 .5em}
+h4{font-size:14px;font-weight:700;margin:1.3em 0 .4em}
+p{margin:.7em 0}
+a{color:var(--accent);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+strong{font-weight:700;color:var(--fg)}
+hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+code.ic{font-family:var(--font-mono);font-size:.85em;background:var(--ic-bg);color:var(--ic-fg);padding:1.5px 6px;border-radius:6px}
+pre.code{position:relative;background:var(--code-bg);color:var(--code-fg);border-radius:12px;padding:16px 18px;margin:1em 0;overflow-x:auto;border:1px solid rgba(0,0,0,.28)}
+pre.code code{font-family:var(--font-mono);font-size:12.75px;line-height:1.6;white-space:pre;color:inherit;background:none;padding:0}
+pre.code[data-lang]::before{content:attr(data-lang);position:absolute;top:9px;right:13px;font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(236,227,211,.42)}
+.tablewrap{overflow-x:auto;margin:1.1em 0}
+table{border-collapse:collapse;width:100%;font-size:13.75px}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--th);font-weight:700}
+tbody tr:nth-child(even){background:var(--surface)}
+blockquote{margin:1.1em 0;padding:11px 16px;border-left:3px solid var(--accent);background:var(--surface);border-radius:0 10px 10px 0;color:var(--muted)}
+blockquote strong{color:var(--fg)}
+ul,ol{margin:.7em 0;padding-left:1.4em}
+li{margin:.32em 0}
+ul.tasklist{list-style:none;padding-left:.15em}
+ul.tasklist li.task{position:relative;padding-left:30px;margin:.5em 0}
+ul.tasklist li.task::before{content:"";position:absolute;left:0;top:.18em;width:17px;height:17px;border:2px solid var(--accent);border-radius:5px;background:transparent}
+ul.tasklist li.task.done::before{content:"\2713";background:var(--accent);color:#fff;font-size:12px;font-weight:800;text-align:center;line-height:15px}
+</style>
+<article class="doc"><div class="crumb">BeanProfile · docs/plans</div>
+<h1>M3.2 지역 OCR 자동채움 — 구현 계획</h1>
+<blockquote><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan. Steps use checkbox (<code class="ic">- [ ]</code>) syntax.</blockquote>
+<p><strong>Goal:</strong> 사진 자동채움에서 <strong>지역(region)</strong> 이 채워지도록 한다 — <code class="ic">"Region:/지역:"</code> 라벨 줄에서 추출(이전엔 지역이 칩으로만 떨어짐).</p>
+<p><strong>Architecture:</strong> 파서에 컵노트와 같은 <strong>라벨 휴리스틱</strong>(<code class="ic">^(region|지역)\s*[:：]\s*(.+)$</code>)을 추가하고, <code class="ic">OcrDraft</code>에 <code class="ic">region</code> 필드를 더해 폼이 첫 구성의 지역 칸을 프리필(+ "OCR 자동" 하이라이트)한다. <strong>라벨 기반만</strong> — 라벨 없이 이름줄에 섞인 지역은 여전히 칩(M3.1 시트로 배정). 국가 라벨 <code class="ic">원산지:</code>는 줄이 "원"으로 시작해 <code class="ic">^지역</code>/<code class="ic">^region</code>에 안 걸려 충돌 없음.</p>
+<p><strong>Tech Stack:</strong> 순수 Dart 파서 · Flutter 폼 · flutter_test.</p>
+<h2>Global Constraints</h2>
+<ul><li>한국어 UI · 오프라인/로컬. <strong>데이터 모델·저장소·providers 변경 없음</strong>(파서+폼 프리필만).</li><li><code class="ic">flutter analyze</code> 0 · 기존 테스트 green 유지.</li><li>커밋 트레일러 <code class="ic">Co-Authored-By: Claude Opus 4.8 (1M context) &lt;noreply@anthropic.com&gt;</code> · main 직커밋 · TDD.</li><li><strong>라벨 기반만</strong>(설계 §5 "패턴이 명확한 것만 자동"). 국가 인접 휴리스틱은 스코프 밖.</li></ul>
+<hr>
+<h2>File Structure</h2>
+<p><strong>수정 (신규 파일 없음)</strong></p>
+<ul><li><code class="ic">lib/features/beans/ocr/ocr_draft.dart</code> — <code class="ic">OcrDraft.region</code>.</li><li><code class="ic">lib/features/beans/ocr/ocr_parser.dart</code> — <code class="ic">_regionLabel</code> + <code class="ic">_matchRegion</code> + <code class="ic">region:</code> 채움.</li><li><code class="ic">lib/features/beans/bean_form_screen.dart</code> — draft.region 프리필 + 지역 칸 "OCR 자동".</li><li><code class="ic">test/unit/ocr_parser_test.dart</code> · <code class="ic">test/widget/ocr_form_test.dart</code> — 테스트.</li></ul>
+<p>단일 태스크.</p>
+<hr>
+<h3>Task 1: 지역 라벨 자동채움</h3>
+<p><strong>Files:</strong></p>
+<ul><li>Modify: <code class="ic">ocr_draft.dart</code>, <code class="ic">ocr_parser.dart</code>, <code class="ic">bean_form_screen.dart</code></li><li>Test: <code class="ic">test/unit/ocr_parser_test.dart</code>, <code class="ic">test/widget/ocr_form_test.dart</code></li></ul>
+<p><strong>Interfaces:</strong></p>
+<ul><li>Produces: <code class="ic">OcrDraft({..., String? region})</code> · <code class="ic">parseOcrText</code>가 라벨 줄에서 region 채움.</li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 1: 실패 테스트 — 파서 (<code class="ic">test/unit/ocr_parser_test.dart</code>)</strong></li></ul>
+<p>기존 파일에 group 추가(다른 테스트 불변):</p>
+<pre class="code" data-lang="dart"><code>  group('region', () {
+    test('지역/Region 라벨에서 추출', () {
+      expect(parseOcrText('지역: 후일라').region, '후일라');
+      expect(parseOcrText('Region: Yirgacheffe').region, 'Yirgacheffe');
+      expect(parseOcrText('REGION : Yirgacheffe · Kochere').region, 'Yirgacheffe · Kochere');
+    });
+    test('라벨 없으면 null; 국가 라벨(원산지:)은 지역 아님', () {
+      expect(parseOcrText('Ethiopia Yirgacheffe').region, isNull);
+      expect(parseOcrText('원산지: 콜롬비아').region, isNull);
+    });
+  });</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 2: 실패 테스트 — 폼 프리필 (<code class="ic">test/widget/ocr_form_test.dart</code>)</strong></li></ul>
+<p>파일에 테스트 추가:</p>
+<pre class="code" data-lang="dart"><code>  testWidgets('draft.region → 지역 칸 프리필 + OCR 자동', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    t.view.physicalSize = const Size(2400, 4000);
+    t.view.devicePixelRatio = 3.0;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(wrapApp(
+      const BeanFormScreen(draft: OcrDraft(country: 'Ethiopia', region: '예가체프')),
+      db: db,
+    ));
+    await t.pump();
+
+    expect(t.widget&lt;TextField&gt;(find.byKey(const Key('field-region-0'))).controller!.text, '예가체프');
+    expect(find.text('OCR 자동'), findsNWidgets(2)); // 국가 + 지역
+  });</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 3: RED 확인</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/unit/ocr_parser_test.dart test/widget/ocr_form_test.dart</code> Expected: 새 테스트 FAIL — <code class="ic">OcrDraft</code>에 <code class="ic">region</code> 이름 인자 없음(컴파일 에러) / region 미채움.</p>
+<ul class="tasklist"><li class="task"><strong>Step 4: <code class="ic">OcrDraft</code>에 region 추가 (<code class="ic">ocr_draft.dart</code>)</strong></li></ul>
+<pre class="code" data-lang="dart"><code>class OcrDraft {
+  final String? country;
+  final String? region;
+  final DateTime? roastDate;
+  final RoastLevel? roastLevel;
+  final Process? process;
+  final List&lt;String&gt; cupNotes;
+  final List&lt;String&gt; chips;
+  const OcrDraft({
+    this.country,
+    this.region,
+    this.roastDate,
+    this.roastLevel,
+    this.process,
+    this.cupNotes = const [],
+    this.chips = const [],
+  });
+
+  /// 자동 채운 값도, 배정할 칩도 하나도 없음(= OCR 실패/빈 이미지).
+  bool get isEmpty =&gt;
+      country == null &amp;&amp;
+      region == null &amp;&amp;
+      roastDate == null &amp;&amp;
+      roastLevel == null &amp;&amp;
+      process == null &amp;&amp;
+      cupNotes.isEmpty &amp;&amp;
+      chips.isEmpty;
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 5: 파서에 region 추출 (<code class="ic">ocr_parser.dart</code>)</strong></li></ul>
+<p><code class="ic">_noteLabel</code> 아래에 region 라벨 정규식 추가:</p>
+<pre class="code" data-lang="dart"><code>final RegExp _regionLabel = RegExp(
+  r'^(region|지역)\s*[:：]\s*(.+)$',
+  caseSensitive: false,
+);</code></pre>
+<p><code class="ic">parseOcrText</code>의 <code class="ic">OcrDraft(...)</code>에 <code class="ic">region</code> 추가:</p>
+<pre class="code" data-lang="dart"><code>  return OcrDraft(
+    country: _firstMatch(lower, _countries),
+    region: _matchRegion(lines),
+    roastDate: _matchDate(rawText),
+    roastLevel: _firstMatch(lower, _roastKeywords),
+    process: _firstMatch(lower, _processKeywords),
+    cupNotes: _matchCupNotes(lines),
+    chips: _dedupe(lines),
+  );</code></pre>
+<p><code class="ic">_matchCupNotes</code> 아래에 <code class="ic">_matchRegion</code> 추가:</p>
+<pre class="code" data-lang="dart"><code>String? _matchRegion(List&lt;String&gt; lines) {
+  for (final line in lines) {
+    final m = _regionLabel.firstMatch(line);
+    if (m != null) {
+      final v = m.group(2)!.trim();
+      if (v.isNotEmpty) return v;
+    }
+  }
+  return null;
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 6: 폼 프리필 + 하이라이트 (<code class="ic">bean_form_screen.dart</code>)</strong></li></ul>
+<p><code class="ic">initState</code>의 draft 프리필 블록에 region 한 줄 추가(country 다음):</p>
+<pre class="code" data-lang="dart"><code>    if (e == null &amp;&amp; d != null) {
+      if (d.country != null) _components.first.country.text = d.country!;
+      if (d.region != null) _components.first.region.text = d.region!;
+      if (d.process != null) _components.first.process = d.process!;
+      _roast = d.roastLevel;
+      _roastDate = d.roastDate;
+      if (d.cupNotes.isNotEmpty) _cupNotes.text = d.cupNotes.join(', ');
+    }</code></pre>
+<p><code class="ic">_componentEditor</code>의 지역 TextField에 하이라이트 추가(<code class="ic">const</code> 제거):</p>
+<pre class="code" data-lang="dart"><code>          Expanded(child: TextField(
+              key: Key('field-region-$i'),
+              controller: comp.region,
+              decoration: InputDecoration(
+                  labelText: '지역',
+                  helperText: i == 0 &amp;&amp; _auto &amp;&amp; widget.draft!.region != null ? 'OCR 자동' : null))),</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 7: GREEN + analyze + 전체</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/unit/ocr_parser_test.dart test/widget/ocr_form_test.dart</code> Expected: 전체 PASS(새 테스트 포함). Run: <code class="ic">flutter analyze</code> Expected: No issues. Run: <code class="ic">flutter test</code> Expected: 전체 green(+3 새 테스트).</p>
+<ul class="tasklist"><li class="task"><strong>Step 8: Commit</strong></li></ul>
+<pre class="code" data-lang="bash"><code>git add lib/features/beans/ocr/ocr_draft.dart lib/features/beans/ocr/ocr_parser.dart lib/features/beans/bean_form_screen.dart test/unit/ocr_parser_test.dart test/widget/ocr_form_test.dart
+git commit -m "feat(m3.2): auto-fill region from Region:/지역: label in OCR"</code></pre>
+<hr>
+<h2>Self-Review</h2>
+<p><strong>Spec coverage:</strong> 라벨 추출(Step 5) · OcrDraft.region(Step 4) · 폼 프리필+하이라이트(Step 6) · 라벨-only(국가 라벨 비충돌 테스트 Step 1). ✅ <strong>Placeholder scan:</strong> 없음. ✅ <strong>Type consistency:</strong> <code class="ic">OcrDraft.region</code>(String?) 추가가 기존 호출부(모두 named args) 무손상. <code class="ic">region:</code> 채움이 draft 필드와 일치. 폼 프리필이 <code class="ic">_components.first.region</code> 사용(M3.1 지역 필드와 동일 컨트롤러). ✅ <strong>주의:</strong> 지역 라벨 정규식은 줄-시작 앵커라 <code class="ic">원산지:</code>(국가)와 충돌 안 함 — Step 1 음성 테스트로 가드. 지역 칸 helperText 추가로 <code class="ic">const InputDecoration</code> → 비-const 전환 필요(그대로 두면 컴파일 에러).</p>
+</article>

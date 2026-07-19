@@ -17,10 +17,13 @@ class _DebugOcrScreenState extends ConsumerState<DebugOcrScreen> {
     setState(() => _busy = true);
     try {
       final path = await ref.read(photoServiceProvider).pick(fromCamera: camera);
+      if (!mounted) return;
       if (path == null) { setState(() { _busy = false; _text = '취소됨'; }); return; }
       final text = await ref.read(ocrServiceProvider).recognize(path);
+      if (!mounted) return;
       setState(() { _busy = false; _text = text.isEmpty ? '(인식 텍스트 없음)' : text; });
     } catch (e) {
+      if (!mounted) return;
       setState(() { _busy = false; _text = '오류: $e'; });
     }
   }

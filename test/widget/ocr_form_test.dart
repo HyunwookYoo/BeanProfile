@@ -32,31 +32,38 @@ void main() {
 
     expect(find.text('Ethiopia'), findsOneWidget);         // 국가 프리필
     expect(find.text('블루베리'), findsOneWidget);           // 컵노트 프리필
-    expect(find.text('OCR 자동'), findsWidgets);            // 하이라이트
+    expect(find.text('OCR 자동'), findsNWidgets(2));        // 하이라이트: 국가+컵노트 (로스팅단계·날짜는 null)
     expect(find.byType(OcrChipsPanel), findsOneWidget);
     expect(find.text('프릳츠'), findsOneWidget);
   });
 
-  testWidgets('칸 포커스 후 칩 탭 → 그 칸에 채워지고 칩은 비활성', (t) async {
+  testWidgets('칩이 포커스된 칸으로 라우팅됨 (하드코딩 아님)', (t) async {
     final db = testDatabase();
     addTearDown(db.close);
     t.view.physicalSize = const Size(2400, 4000); // 칩 패널이 뷰포트 밖 → 마운트되도록 확장(위 테스트 주석 참고)
     t.view.devicePixelRatio = 3.0;
     addTearDown(t.view.reset);
     await t.pumpWidget(wrapApp(
-      const BeanFormScreen(draft: OcrDraft(chips: ['프릳츠'])),
+      const BeanFormScreen(draft: OcrDraft(chips: ['프릳츠', '블루보틀'])),
       db: db,
     ));
     await t.pump();
 
-    await t.tap(find.byKey(const Key('field-roaster')));   // 로스터리 포커스
+    // 로스터리 포커스 → 첫 칩
+    await t.tap(find.byKey(const Key('field-roaster')));
     await t.pump();
     await t.tap(find.byKey(const Key('chip-프릳츠')));
     await t.pump();
+    expect(t.widget<TextField>(find.byKey(const Key('field-roaster'))).controller!.text, '프릳츠');
 
-    expect(find.widgetWithText(TextField, '프릳츠'), findsOneWidget); // 로스터리에 채워짐
-    final chip = t.widget<ActionChip>(find.byKey(const Key('chip-프릳츠')));
-    expect(chip.onPressed, isNull);                        // used → 비활성
+    // 제품명 포커스 → 둘째 칩 → 제품명에만, 로스터리는 그대로
+    await t.tap(find.byKey(const Key('field-name')));
+    await t.pump();
+    await t.tap(find.byKey(const Key('chip-블루보틀')));
+    await t.pump();
+    expect(t.widget<TextField>(find.byKey(const Key('field-name'))).controller!.text, '블루보틀');
+    expect(t.widget<TextField>(find.byKey(const Key('field-roaster'))).controller!.text, '프릳츠'); // 라우팅 증명
+    expect(t.widget<ActionChip>(find.byKey(const Key('chip-블루보틀'))).onPressed, isNull); // used
   });
 
   testWidgets('OCR 실패(빈 draft) → 안내 배너, 칩 패널 없음', (t) async {

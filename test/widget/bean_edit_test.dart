@@ -22,4 +22,23 @@ void main() {
     final updated = await repo.getBeanDetail(id);
     expect(updated!.bean.name, '변경됨');
   });
+
+  testWidgets('편집 시 기존 사진이 유지된다 (photoPath 미덮어씀)', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    final repo = testRepository(db);
+    final id = await repo.createBean(sampleSingle().copyWithPhoto('/existing/photo.jpg'));
+    final detail = await repo.getBeanDetail(id);
+
+    await t.pumpWidget(wrapApp(BeanFormScreen(existing: detail), db: db));
+    await t.pump();
+    await t.enterText(find.byKey(const Key('field-name')), '수정된 이름');
+    await t.tap(find.byKey(const Key('save-bean')));
+    await t.pumpAndSettle();
+
+    final updated = await repo.getBeanDetail(id);
+    expect(updated!.bean.name, '수정된 이름');       // 편집이 실제로 저장됨
+    expect(updated.bean.photoPath, '/existing/photo.jpg'); // 사진이 보존됨(널로 안 덮음)
+    await db.close();
+  });
 }

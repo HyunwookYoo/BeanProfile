@@ -99,3 +99,40 @@ class FakePhotoService implements PhotoService {
     return persistResult;
   }
 }
+
+// ── 순수 함수(computeTasteProfile) 테스트용 drift 행 팩토리 ──
+// BeanInput이 아니라 DB에서 읽힌 '행' 그대로가 필요해서 직접 만든다(DB 불필요).
+
+Bean beanRow({int id = 1, String name = '원두', List<String> cupNotes = const []}) =>
+    Bean(
+      id: id, name: name, roaster: '', type: BeanType.singleOrigin,
+      cupNotes: cupNotes, createdAt: DateTime(2026, 7, 1),
+    );
+
+OriginComponent compRow({
+  int id = 1,
+  int beanId = 1,
+  String country = 'Ethiopia',
+  Process process = Process.washed,
+  int? ratioPercent,
+}) =>
+    OriginComponent(
+      id: id, beanId: beanId, country: country,
+      process: process, ratioPercent: ratioPercent,
+    );
+
+Tasting tastingRow({
+  int id = 1,
+  int beanId = 1,
+  int overall = 4,
+  int acidity = 3,
+  int sweetness = 3,
+  int body = 3,
+  int bitterness = 3,
+}) =>
+    Tasting(
+      id: id, beanId: beanId, date: DateTime(2026, 7, 1),
+      acidity: acidity, sweetness: sweetness, body: body,
+      bitterness: bitterness, overall: overall,
+      createdAt: DateTime(2026, 7, 1),
+    );

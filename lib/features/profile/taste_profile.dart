@@ -140,6 +140,9 @@ TasteProfile computeTasteProfile(TasteSnapshot snap) {
     final comps = componentsOf[t.beanId] ?? const <OriginComponent>[];
     final weights = componentWeights(comps);
     for (var i = 0; i < comps.length; i++) {
+      // 0%(또는 음수) 비율 구성은 실제로 기여한 게 없으므로 집계 키를 만들지 않는다
+      // — 안 그러면 이 키의 유일한 기여가 weight=0일 때 평균이 0/0 = NaN이 된다.
+      if (weights[i] <= 0) continue;
       final overall = t.overall.toDouble();
       (countries[comps[i].country] ??= _WeightedMean()).add(overall, weights[i]);
       (processes[comps[i].process] ??= _WeightedMean()).add(overall, weights[i]);

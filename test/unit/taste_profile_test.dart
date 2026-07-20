@@ -203,6 +203,24 @@ void main() {
       ));
       expect(p.byCountry.map((b) => b.label), ['Brazil', 'Kenya']);
     });
+
+    test('비율 0%인 구성은 국가·가공 집계에서 제외된다 (0/0 = NaN 방지)', () {
+      // 블렌드(Brazil 0%/내추럴, Ethiopia 100%/워시드) ★5.
+      // Brazil·내추럴은 weight=0이고 다른 기여가 없으므로 키 자체가 생기면 안 된다.
+      // Ethiopia·워시드는 100%라 진짜 평균(5.0)이 그대로 나와야 한다.
+      final p = computeTasteProfile(snap(
+        beans: [beanRow(id: 1)],
+        components: [
+          compRow(id: 1, beanId: 1, country: 'Brazil', process: Process.natural, ratioPercent: 0),
+          compRow(id: 2, beanId: 1, country: 'Ethiopia', process: Process.washed, ratioPercent: 100),
+        ],
+        tastings: [tastingRow(id: 1, beanId: 1, overall: 5)],
+      ));
+      expect(p.byCountry.map((b) => b.value).toList(), [5.0]);
+      expect(p.byCountry.map((b) => b.label).toList(), ['Ethiopia']);
+      expect(p.byProcess.map((b) => b.value).toList(), [5.0]);
+      expect(p.byProcess.map((b) => b.label).toList(), ['워시드']);
+    });
   });
 
   group('③ 선호 컵노트 — 원두 1표', () {

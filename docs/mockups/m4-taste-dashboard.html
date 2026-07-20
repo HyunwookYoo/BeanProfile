@@ -1,0 +1,349 @@
+<title>BeanProfile — M4 취향 대시보드 목업</title>
+<style>
+  :root{
+    --bg:#E7E1D6; --fg:#2B2019; --muted:#7A6F62; --line:#D6CEC0;
+    --surface:#F3EFE8; --accent:#A66A24;
+    --shadow:0 18px 40px -18px rgba(60,42,24,.45), 0 4px 12px -6px rgba(60,42,24,.25);
+    --espresso:#2B2019; --oat:#ECE6DB; --cup:#FCFBF8; --cup-2:#F4EFE6;
+    --crema:#B67B2E; --crema-ink:#8A5A18; --cherry:#9E3B2D;
+    --app-muted:#8C8172; --app-line:#E4DED2; --app-line-2:#EDE8DD;
+    --font-sans:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --font-mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Consolas,"Malgun Gothic",monospace;
+  }
+  @media (prefers-color-scheme:dark){:root{
+    --bg:#1B1510; --fg:#EDE5D8; --muted:#9C9081; --line:#332A21; --surface:#241D16; --accent:#D89A46;
+    --shadow:0 20px 46px -18px rgba(0,0,0,.7), 0 4px 14px -6px rgba(0,0,0,.5);
+  }}
+  :root[data-theme="light"]{--bg:#E7E1D6;--fg:#2B2019;--muted:#7A6F62;--line:#D6CEC0;--surface:#F3EFE8;--accent:#A66A24}
+  :root[data-theme="dark"]{--bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--surface:#241D16;--accent:#D89A46}
+
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-sans);line-height:1.5;-webkit-font-smoothing:antialiased}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+  .board{max-width:1180px;margin:0 auto;padding:40px 24px 72px}
+  .eyebrow{font-family:var(--font-mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin:0 0 10px;font-weight:700}
+  h1.title{font-size:clamp(24px,4vw,38px);font-weight:800;letter-spacing:-.025em;margin:0;text-wrap:balance}
+  .sub{color:var(--muted);max-width:66ch;margin:12px 0 0;font-size:15px}
+
+  .legend{display:flex;flex-wrap:wrap;gap:8px 18px;margin:22px 0 4px;padding:14px 16px;background:var(--surface);border:1px solid var(--line);border-radius:14px}
+  .legend span{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
+  .legend b{font-weight:700}
+  .sw{width:13px;height:13px;border-radius:4px;display:inline-block;flex:none}
+
+  .screens{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:18px 20px;margin-top:26px;justify-items:center}
+  .screen-card{width:100%;max-width:360px;display:flex;flex-direction:column;align-items:center}
+  .screen-head{width:100%;display:flex;align-items:baseline;gap:10px;margin:0 4px 12px}
+  .screen-idx{font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--accent)}
+  .screen-name{font-weight:700;font-size:16px}
+  .screen-cap{width:100%;margin:14px 4px 8px;color:var(--muted);font-size:12.5px}
+  .screen-cap li{margin:3px 0}.screen-cap ul{margin:6px 0 0;padding-left:16px}.screen-cap .k{color:var(--fg);font-weight:600}
+
+  .phone{width:320px;height:664px;border-radius:40px;background:#0d0a07;padding:9px;box-shadow:var(--shadow);flex:none;position:relative}
+  .screen{position:relative;width:100%;height:100%;border-radius:32px;overflow:hidden;background:var(--oat);color:var(--espresso);display:flex;flex-direction:column;font-size:14px}
+  .statusbar{height:34px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 20px;font-family:var(--font-mono);font-size:12px;font-weight:600}
+  .statusbar .dots{display:flex;gap:4px}.statusbar .dots i{width:6px;height:6px;border-radius:50%;background:var(--espresso);opacity:.55}
+  .appbar{flex:none;display:flex;align-items:center;gap:10px;padding:6px 16px 12px}
+  .appbar h1{font-size:18px;font-weight:800;letter-spacing:-.02em;margin:0;flex:1}
+  .body{flex:1;overflow:hidden;padding:0 16px}
+  svg{display:block}.ico{width:18px;height:18px;stroke:currentColor;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round}
+  .bottomnav{flex:none;height:56px;display:flex;border-top:1px solid var(--app-line);background:var(--cup)}
+  .navitem{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:10px;font-weight:700;color:var(--app-muted)}
+  .navitem.on{color:var(--crema)}
+
+  /* dashboard — ui-mockup-v1.html 화면 05와 동일 */
+  .summary{display:flex;gap:10px;margin-bottom:14px}
+  .stat{flex:1;background:var(--cup);border:1px solid var(--app-line);border-radius:13px;padding:10px 12px}
+  .stat .n{font-family:var(--font-mono);font-size:22px;font-weight:800;letter-spacing:-.02em}
+  .stat .n.none{color:#c3b8a6}
+  .stat .l{font-size:10.5px;color:var(--app-muted);font-weight:600;margin-top:1px}
+  .panel{background:var(--cup);border:1px solid var(--app-line);border-radius:15px;padding:12px 13px;margin-bottom:11px}
+  .panel .ttl{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .panel .ttl .t{font-weight:700;font-size:13px}
+  .panel .ttl .h{font-size:10px;color:var(--app-muted);font-family:var(--font-mono)}
+  .radarwrap{display:flex;justify-content:center;padding:2px 0 4px}
+  .barrow{display:flex;align-items:center;gap:9px;margin-bottom:8px}
+  .barrow:last-child{margin-bottom:0}
+  .barrow .bl{width:56px;font-size:11.5px;font-weight:600;flex:none}
+  .barrow .track{flex:1;height:9px;border-radius:6px;background:var(--cup-2);overflow:hidden}
+  .barrow .fill{height:100%;border-radius:6px;background:var(--crema)}
+  .barrow .bv{width:26px;text-align:right;font-family:var(--font-mono);font-size:11px;font-weight:700;flex:none}
+  .barrow .fill.soft{background:linear-gradient(90deg,var(--crema),#d3a862)}
+
+  /* M4 신규 상태 */
+  .panel .ttl .h.fb{color:var(--crema-ink);background:#EAD9BE;border:1px solid var(--crema);border-radius:7px;padding:2px 7px;font-weight:700}
+  .emptypanel{font-size:11.5px;color:var(--app-muted);text-align:center;padding:10px 4px 8px;line-height:1.55}
+  .emptyall{background:var(--cup);border:1px dashed var(--app-line);border-radius:15px;padding:34px 18px;text-align:center;color:var(--app-muted);font-size:12.5px;line-height:1.7}
+  .emptyall .big{font-size:14px;font-weight:700;color:var(--espresso);margin-bottom:6px}
+  .emptyall .bean{font-size:30px;opacity:.35;margin-bottom:10px}
+
+  .decisions{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin:28px 0 6px}
+  .dcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+  .dcard.rec{border-color:var(--crema);box-shadow:0 0 0 2px #EAD9BE}
+  .dcard .tag{font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);font-weight:700}
+  .dcard h4{margin:6px 0 5px;font-size:13.5px}
+  .dcard p{margin:0;font-size:12px;color:var(--muted);line-height:1.55}.dcard p b{color:var(--fg)}
+  .board-foot{margin-top:30px;color:var(--muted);font-size:12.5px;border-top:1px solid var(--line);padding-top:18px;max-width:74ch}
+  .board-foot code{font-family:var(--font-mono);background:var(--surface);padding:1px 6px;border-radius:5px}
+</style>
+
+<div class="board">
+  <header>
+    <p class="eyebrow">BeanProfile · M4 · TASTE DASHBOARD</p>
+    <h1 class="title">취향 대시보드 — 데이터가 적을 때가 기본값</h1>
+    <p class="sub">v1 원안(<code>ui-mockup-v1.html</code> 화면 05)의 레이아웃을 그대로 계승하고, 실제 사용 조건에서 <b>대부분의 시간을 차지하는 상태</b>들을 추가로 확정합니다. 현재 기록된 원두는 0~3개 수준이라 <b>★4+ 시음이 0건인 폴백</b>과 <b>빈 상태</b>가 예외가 아니라 주 경로입니다.</p>
+  </header>
+
+  <div class="legend">
+    <span><i class="sw" style="background:var(--crema)"></i>평점 막대 <b>(5.0 만점 고정)</b></span>
+    <span><i class="sw" style="background:linear-gradient(90deg,var(--crema),#d3a862)"></i>빈도 막대 <b>(1위 기준 상대)</b></span>
+    <span><i class="sw" style="background:#EAD9BE;border:1px solid var(--crema)"></i><b>폴백 중</b> 배지</span>
+    <span><i class="sw" style="background:var(--cup);border:1px dashed var(--app-line)"></i>빈 상태 안내</span>
+  </div>
+
+  <section class="screens">
+
+    <!-- 1. 주 상태 -->
+    <article class="screen-card">
+      <div class="screen-head"><span class="screen-idx">01</span><span class="screen-name">데이터 있음 (★4+ 기준)</span></div>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i></span></div>
+        <div class="appbar"><h1>내 취향</h1></div>
+        <div class="body">
+          <div class="summary">
+            <div class="stat"><div class="n">6</div><div class="l">기록한 원두</div></div>
+            <div class="stat"><div class="n">14</div><div class="l">누적 시음</div></div>
+            <div class="stat"><div class="n">4.7</div><div class="l">최고 평점 원두</div></div>
+          </div>
+
+          <div class="panel">
+            <div class="ttl"><span class="t">선호 강도</span><span class="h">★4+ 기준</span></div>
+            <div class="radarwrap">
+              <svg width="180" height="164" viewBox="0 0 180 164" role="img" aria-label="선호 강도 레이더">
+                <g stroke="#e0d5bf" fill="none" stroke-width="1">
+                  <polygon points="90,22 148,80 90,138 32,80"/>
+                  <polygon points="90,33.6 136.4,80 90,126.4 43.6,80"/>
+                  <polygon points="90,45.2 124.8,80 90,114.8 55.2,80"/>
+                  <polygon points="90,56.8 113.2,80 90,103.2 66.8,80"/>
+                  <polygon points="90,68.4 101.6,80 90,91.6 78.4,80"/>
+                  <line x1="90" y1="80" x2="90" y2="22"/><line x1="90" y1="80" x2="148" y2="80"/>
+                  <line x1="90" y1="80" x2="90" y2="138"/><line x1="90" y1="80" x2="32" y2="80"/>
+                </g>
+                <polygon points="90,30.1 131.8,80 90,117.1 62.2,80" fill="rgba(182,123,46,.28)" stroke="#B67B2E" stroke-width="2"/>
+                <g fill="#B67B2E">
+                  <circle cx="90" cy="30.1" r="3.2"/><circle cx="131.8" cy="80" r="3.2"/>
+                  <circle cx="90" cy="117.1" r="3.2"/><circle cx="62.2" cy="80" r="3.2"/>
+                </g>
+                <g fill="#8C8172" font-family="ui-monospace,monospace" font-size="10.5" font-weight="700">
+                  <text x="90" y="14" text-anchor="middle">산미</text>
+                  <text x="153" y="83" text-anchor="start">단맛</text>
+                  <text x="90" y="156" text-anchor="middle">바디</text>
+                  <text x="27" y="83" text-anchor="end">쓴맛</text>
+                </g>
+              </svg>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="ttl"><span class="t">원산지별 평균 평점</span></div>
+            <div class="barrow"><span class="bl">에티오피아</span><span class="track"><span class="fill" style="width:92%"></span></span><span class="bv">4.6</span></div>
+            <div class="barrow"><span class="bl">콜롬비아</span><span class="track"><span class="fill" style="width:84%"></span></span><span class="bv">4.2</span></div>
+            <div class="barrow"><span class="bl">브라질</span><span class="track"><span class="fill" style="width:76%"></span></span><span class="bv">3.8</span></div>
+          </div>
+
+          <div class="panel">
+            <div class="ttl"><span class="t">선호 컵노트</span><span class="h">★4+ 빈도</span></div>
+            <div class="barrow"><span class="bl">블루베리</span><span class="track"><span class="fill soft" style="width:100%"></span></span><span class="bv">3</span></div>
+            <div class="barrow"><span class="bl">자스민</span><span class="track"><span class="fill soft" style="width:67%"></span></span><span class="bv">2</span></div>
+          </div>
+        </div>
+        <div class="bottomnav">
+          <div class="navitem"><svg class="ico" viewBox="0 0 24 24"><path d="M7 4c4 0 9 2 9 8s-5 8-9 8"/><path d="M7 4c2 3 2 13 0 16"/></svg>원두</div>
+          <div class="navitem on"><svg class="ico" viewBox="0 0 24 24"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>취향</div>
+          <div class="navitem"><svg class="ico" viewBox="0 0 24 24"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="15" cy="8" r="2.2"/><circle cx="8" cy="16" r="2.2"/></svg>설정</div>
+        </div>
+      </div></div>
+      <div class="screen-cap"><span class="k">v1 화면 05 계승</span>
+        <ul>
+          <li>평점 막대는 <span class="k">5.0 고정</span> 기준 (4.6 → 92%), 빈도 막대는 <span class="k">1위 기준 상대</span> (3 → 100%, 2 → 67%).</li>
+          <li>정렬은 값 내림차순 · <span class="k">동점이면 라벨 오름차순</span>(결정적 순서 = 테스트 가능).</li>
+          <li>가공방식 패널은 아래로 스크롤. <span class="k">상위 N 자르기 없음</span>.</li>
+        </ul>
+      </div>
+    </article>
+
+    <!-- 2. 폴백 -->
+    <article class="screen-card">
+      <div class="screen-head"><span class="screen-idx">02</span><span class="screen-name">★4+ 0건 → 전체 기준 폴백</span></div>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i></span></div>
+        <div class="appbar"><h1>내 취향</h1></div>
+        <div class="body">
+          <div class="summary">
+            <div class="stat"><div class="n">3</div><div class="l">기록한 원두</div></div>
+            <div class="stat"><div class="n">5</div><div class="l">누적 시음</div></div>
+            <div class="stat"><div class="n">3.5</div><div class="l">최고 평점 원두</div></div>
+          </div>
+
+          <div class="panel">
+            <div class="ttl"><span class="t">선호 강도</span><span class="h fb">전체 기준</span></div>
+            <div class="radarwrap">
+              <svg width="180" height="164" viewBox="0 0 180 164" role="img" aria-label="선호 강도 레이더 (전체 시음 기준)">
+                <g stroke="#e0d5bf" fill="none" stroke-width="1">
+                  <polygon points="90,22 148,80 90,138 32,80"/>
+                  <polygon points="90,33.6 136.4,80 90,126.4 43.6,80"/>
+                  <polygon points="90,45.2 124.8,80 90,114.8 55.2,80"/>
+                  <polygon points="90,56.8 113.2,80 90,103.2 66.8,80"/>
+                  <polygon points="90,68.4 101.6,80 90,91.6 78.4,80"/>
+                  <line x1="90" y1="80" x2="90" y2="22"/><line x1="90" y1="80" x2="148" y2="80"/>
+                  <line x1="90" y1="80" x2="90" y2="138"/><line x1="90" y1="80" x2="32" y2="80"/>
+                </g>
+                <polygon points="90,42.9 122.5,80 90,114.8 59.8,80" fill="rgba(182,123,46,.28)" stroke="#B67B2E" stroke-width="2"/>
+                <g fill="#B67B2E">
+                  <circle cx="90" cy="42.9" r="3.2"/><circle cx="122.5" cy="80" r="3.2"/>
+                  <circle cx="90" cy="114.8" r="3.2"/><circle cx="59.8" cy="80" r="3.2"/>
+                </g>
+                <g fill="#8C8172" font-family="ui-monospace,monospace" font-size="10.5" font-weight="700">
+                  <text x="90" y="14" text-anchor="middle">산미</text>
+                  <text x="153" y="83" text-anchor="start">단맛</text>
+                  <text x="90" y="156" text-anchor="middle">바디</text>
+                  <text x="27" y="83" text-anchor="end">쓴맛</text>
+                </g>
+              </svg>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="ttl"><span class="t">원산지별 평균 평점</span></div>
+            <div class="barrow"><span class="bl">에티오피아</span><span class="track"><span class="fill" style="width:70%"></span></span><span class="bv">3.5</span></div>
+            <div class="barrow"><span class="bl">브라질</span><span class="track"><span class="fill" style="width:60%"></span></span><span class="bv">3.0</span></div>
+          </div>
+
+          <div class="panel">
+            <div class="ttl"><span class="t">선호 컵노트</span><span class="h fb">전체 빈도</span></div>
+            <div class="barrow"><span class="bl">블루베리</span><span class="track"><span class="fill soft" style="width:100%"></span></span><span class="bv">2</span></div>
+            <div class="barrow"><span class="bl">다크초콜릿</span><span class="track"><span class="fill soft" style="width:50%"></span></span><span class="bv">1</span></div>
+          </div>
+        </div>
+        <div class="bottomnav">
+          <div class="navitem"><svg class="ico" viewBox="0 0 24 24"><path d="M7 4c4 0 9 2 9 8s-5 8-9 8"/><path d="M7 4c2 3 2 13 0 16"/></svg>원두</div>
+          <div class="navitem on"><svg class="ico" viewBox="0 0 24 24"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>취향</div>
+          <div class="navitem"><svg class="ico" viewBox="0 0 24 24"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="15" cy="8" r="2.2"/><circle cx="8" cy="16" r="2.2"/></svg>설정</div>
+        </div>
+      </div></div>
+      <div class="screen-cap"><span class="k">지금 가장 자주 보게 될 화면</span>
+        <ul>
+          <li>★4+ 시음이 0건이면 <span class="k">전체 시음으로 자동 전환</span>. 배지가 <span class="k">강조 표시</span>로 바뀌어 폴백 중임을 숨기지 않는다.</li>
+          <li>영향받는 건 <span class="k">①강도·③컵노트</span>뿐. ②원산지·④가공은 원래 전체 시음 기준이라 배지가 없다.</li>
+        </ul>
+      </div>
+    </article>
+
+    <!-- 3. 전체 빈 상태 -->
+    <article class="screen-card">
+      <div class="screen-head"><span class="screen-idx">03</span><span class="screen-name">시음 0건 — 전체 빈 상태</span></div>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i></span></div>
+        <div class="appbar"><h1>내 취향</h1></div>
+        <div class="body">
+          <div class="summary">
+            <div class="stat"><div class="n">3</div><div class="l">기록한 원두</div></div>
+            <div class="stat"><div class="n">0</div><div class="l">누적 시음</div></div>
+            <div class="stat"><div class="n none">—</div><div class="l">최고 평점 원두</div></div>
+          </div>
+          <div class="emptyall">
+            <div class="bean">☕</div>
+            <div class="big">아직 시음 기록이 없어요</div>
+            원두를 열고 <b>시음을 추가</b>하면<br>취향 분석이 여기에 나타납니다
+          </div>
+        </div>
+        <div class="bottomnav">
+          <div class="navitem"><svg class="ico" viewBox="0 0 24 24"><path d="M7 4c4 0 9 2 9 8s-5 8-9 8"/><path d="M7 4c2 3 2 13 0 16"/></svg>원두</div>
+          <div class="navitem on"><svg class="ico" viewBox="0 0 24 24"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>취향</div>
+          <div class="navitem"><svg class="ico" viewBox="0 0 24 24"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="15" cy="8" r="2.2"/><circle cx="8" cy="16" r="2.2"/></svg>설정</div>
+        </div>
+      </div></div>
+      <div class="screen-cap"><span class="k">요약 행은 남긴다</span>
+        <ul>
+          <li>원두 수는 이미 유효한 정보 — <span class="k">"원두 3개는 있는데 시음이 0"</span> 이라는 상태가 한눈에 읽힌다.</li>
+          <li>원두가 0개여도 같은 화면(요약이 전부 0). <span class="k">평점 없이는 취향이 없다</span>는 원칙이라 분기하지 않는다.</li>
+          <li><code>최고 평점 원두</code>는 <span class="k">—</span>.</li>
+        </ul>
+      </div>
+    </article>
+
+    <!-- 4. 패널 빈 상태 -->
+    <article class="screen-card">
+      <div class="screen-head"><span class="screen-idx">04</span><span class="screen-name">컵노트만 빔 — 패널 단위 안내</span></div>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i></span></div>
+        <div class="appbar"><h1>내 취향</h1></div>
+        <div class="body">
+          <div class="summary">
+            <div class="stat"><div class="n">4</div><div class="l">기록한 원두</div></div>
+            <div class="stat"><div class="n">9</div><div class="l">누적 시음</div></div>
+            <div class="stat"><div class="n">4.4</div><div class="l">최고 평점 원두</div></div>
+          </div>
+
+          <div class="panel">
+            <div class="ttl"><span class="t">원산지별 평균 평점</span></div>
+            <div class="barrow"><span class="bl">콜롬비아</span><span class="track"><span class="fill" style="width:88%"></span></span><span class="bv">4.4</span></div>
+            <div class="barrow"><span class="bl">에티오피아</span><span class="track"><span class="fill" style="width:80%"></span></span><span class="bv">4.0</span></div>
+            <div class="barrow"><span class="bl">브라질</span><span class="track"><span class="fill" style="width:64%"></span></span><span class="bv">3.2</span></div>
+          </div>
+
+          <div class="panel">
+            <div class="ttl"><span class="t">선호 컵노트</span><span class="h">★4+ 빈도</span></div>
+            <div class="emptypanel">컵노트가 기록된 원두가 없어요<br>원두를 편집해 컵노트를 추가해 보세요</div>
+          </div>
+
+          <div class="panel">
+            <div class="ttl"><span class="t">가공방식별 평점</span></div>
+            <div class="barrow"><span class="bl">내추럴</span><span class="track"><span class="fill" style="width:86%"></span></span><span class="bv">4.3</span></div>
+            <div class="barrow"><span class="bl">워시드</span><span class="track"><span class="fill" style="width:76%"></span></span><span class="bv">3.8</span></div>
+          </div>
+        </div>
+        <div class="bottomnav">
+          <div class="navitem"><svg class="ico" viewBox="0 0 24 24"><path d="M7 4c4 0 9 2 9 8s-5 8-9 8"/><path d="M7 4c2 3 2 13 0 16"/></svg>원두</div>
+          <div class="navitem on"><svg class="ico" viewBox="0 0 24 24"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>취향</div>
+          <div class="navitem"><svg class="ico" viewBox="0 0 24 24"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="15" cy="8" r="2.2"/><circle cx="8" cy="16" r="2.2"/></svg>설정</div>
+        </div>
+      </div></div>
+      <div class="screen-cap"><span class="k">실제로 흔한 경로</span>
+        <ul>
+          <li>시음이 있어도 <span class="k">OCR이 컵노트를 못 잡으면</span> 태그가 전부 비어 이 패널만 빈다.</li>
+          <li>①강도는 시음이 있으면 항상 값이 있고, ④가공은 <code>process</code>가 non-null 기본값이라 항상 값이 있다 — <span class="k">빌 수 있는 건 사실상 ③뿐</span>.</li>
+          <li>패널을 <span class="k">숨기지 않는다</span> — 자리가 사라지면 무엇이 빠졌는지 알 수 없다.</li>
+        </ul>
+      </div>
+    </article>
+
+  </section>
+
+  <section class="decisions">
+    <div class="dcard rec">
+      <div class="tag">Decision · 차트</div>
+      <h4>의존성 0 — 직접 그린다</h4>
+      <p>막대 3개는 원래 차트가 아니다(<code>track</code>+<code>fill</code> = <b>Container + FractionallySizedBox</b>). 진짜 차트는 레이더 하나뿐이고 <b>4축 고정·값 0~5</b>라 <code>CustomPainter</code>로 충분하다. <code>fl_chart</code>를 들이지 않아 <b>iOS CI 리스크 0</b>이고 목업 색·모노스페이스와 픽셀 단위로 일치한다.</p>
+    </div>
+    <div class="dcard rec">
+      <div class="tag">Decision · 집계</div>
+      <h4>SQL이 아니라 순수 Dart</h4>
+      <p><code>beans.cupNotes</code>는 JSON 문자열 한 칸에 저장돼 <b>SQL로 태그 빈도를 셀 수 없다</b>. 데이터는 수십~수백 행이라 SQL의 성능 이점도 0. 한 번 로드해 <b>순수 함수</b>로 계산하면 4개 위젯이 같은 스냅샷을 공유하고 <b>DB 없이 유닛 테스트</b>된다.</p>
+    </div>
+    <div class="dcard">
+      <div class="tag">Decision · 블렌드</div>
+      <h4>비율 가중, 원두 단위 all-or-nothing</h4>
+      <p>구성 <b>전부</b>에 비율이 있으면 <code>ratio/100</code>, <b>하나라도 비면</b> 그 원두는 전 구성 <code>1/n</code>. 부분적으로 채워진 비율을 추측해 메우지 않는다. 싱글 오리진은 항상 <code>w = 1</code>.</p>
+    </div>
+    <div class="dcard">
+      <div class="tag">Decision · 컵노트</div>
+      <h4>원두 1표</h4>
+      <p>평균★ ≥ 4 인 원두마다 자기 태그에 +1(원두 내 중복 태그는 1회). 막대 숫자가 곧 <b>원두 개수</b>라 직관적이고, 같은 원두를 여러 번 마셨다고 순위가 왜곡되지 않는다.</p>
+    </div>
+  </section>
+
+  <div class="board-foot">
+    설계 문서: <code>docs/plans/milestone-4-design.md</code> · 로드맵: <code>docs/plans/roadmap.md</code> · v1 원안 화면 05: <code>docs/mockups/ui-mockup-v1.html</code><br>
+    v1 목업은 <b>수정하지 않는다</b> — 이 문서가 M4의 상태들을 덧붙일 뿐, 레이아웃·색·타이포는 v1을 그대로 계승한다.
+  </div>
+</div>

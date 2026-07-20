@@ -1,0 +1,155 @@
+<title>M4 — 취향 대시보드 (설계)</title>
+<style>
+*{box-sizing:border-box}
+:root{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+  --font-sans:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Consolas,"Malgun Gothic",monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}}
+:root[data-theme="light"]{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+}
+:root[data-theme="dark"]{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-sans);line-height:1.7;-webkit-font-smoothing:antialiased}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.doc{max-width:880px;margin:0 auto;padding:44px 24px 96px}
+.crumb{font-family:var(--font-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:16px}
+h1{font-size:clamp(26px,4vw,38px);font-weight:800;letter-spacing:-.025em;line-height:1.2;margin:.1em 0 .5em;text-wrap:balance}
+h2{font-size:22px;font-weight:700;margin:2em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line);letter-spacing:-.01em;text-wrap:balance}
+h3{font-size:16.5px;font-weight:700;color:var(--accent-ink);margin:1.7em 0 .5em}
+h4{font-size:14px;font-weight:700;margin:1.3em 0 .4em}
+p{margin:.7em 0}
+a{color:var(--accent);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+strong{font-weight:700;color:var(--fg)}
+hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+code.ic{font-family:var(--font-mono);font-size:.85em;background:var(--ic-bg);color:var(--ic-fg);padding:1.5px 6px;border-radius:6px}
+pre.code{position:relative;background:var(--code-bg);color:var(--code-fg);border-radius:12px;padding:16px 18px;margin:1em 0;overflow-x:auto;border:1px solid rgba(0,0,0,.28)}
+pre.code code{font-family:var(--font-mono);font-size:12.75px;line-height:1.6;white-space:pre;color:inherit;background:none;padding:0}
+pre.code[data-lang]::before{content:attr(data-lang);position:absolute;top:9px;right:13px;font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(236,227,211,.42)}
+.tablewrap{overflow-x:auto;margin:1.1em 0}
+table{border-collapse:collapse;width:100%;font-size:13.75px}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--th);font-weight:700}
+tbody tr:nth-child(even){background:var(--surface)}
+blockquote{margin:1.1em 0;padding:11px 16px;border-left:3px solid var(--accent);background:var(--surface);border-radius:0 10px 10px 0;color:var(--muted)}
+blockquote strong{color:var(--fg)}
+ul,ol{margin:.7em 0;padding-left:1.4em}
+li{margin:.32em 0}
+ul.tasklist{list-style:none;padding-left:.15em}
+ul.tasklist li.task{position:relative;padding-left:30px;margin:.5em 0}
+ul.tasklist li.task::before{content:"";position:absolute;left:0;top:.18em;width:17px;height:17px;border:2px solid var(--accent);border-radius:5px;background:transparent}
+ul.tasklist li.task.done::before{content:"\2713";background:var(--accent);color:#fff;font-size:12px;font-weight:800;text-align:center;line-height:15px}
+</style>
+<article class="doc"><div class="crumb">BeanProfile · docs/plans</div>
+<h1>M4 — 취향 대시보드 (설계)</h1>
+<blockquote>상태: 승인됨(2026-07-20). 계획: <code class="ic">milestone-4-plan.md</code>. 목표 릴리스 <strong>v0.4.0</strong>. 목업: <a href="../mockups/m4-taste-dashboard.html"><code class="ic">../mockups/m4-taste-dashboard.html</code></a> · v1 원안 화면 05: <a href="../mockups/ui-mockup-v1.html"><code class="ic">../mockups/ui-mockup-v1.html</code></a></blockquote>
+<h2>1. 배경 &amp; 목표</h2>
+<p>탭 2 「취향」은 아직 <code class="ic">'취향 분석은 곧 추가됩니다'</code> 한 줄짜리 플레이스홀더다(<code class="ic">lib/features/profile/profile_screen.dart</code>). M1~M3에서 쌓인 원두·시음 데이터를 집계해 <strong>내 취향 프로필</strong>을 되돌려주는 것이 M4다. 새로 입력받는 데이터는 없고, <strong>스키마 변경도 없다</strong> — 4개 위젯이 쓰는 컬럼이 이미 전부 존재한다.</p>
+<p><strong>설계 전제 (브레인스토밍에서 확정):</strong> 사용자의 실제 데이터는 현재 <strong>원두 0~3개</strong> 수준이다. 따라서 <strong>"데이터 부족" 상태는 예외가 아니라 이 화면의 주 경로</strong>다. 폴백·빈 상태를 나중에 덧붙이는 게 아니라 처음부터 1급 시민으로 설계한다.</p>
+<h2>2. 목표 &amp; 범위</h2>
+<p><strong>목표:</strong> 설계 <a href="../design.md"><code class="ic">../design.md</code></a> §6의 4개 위젯 + 상단 요약을 데이터가 거의 없는 상태에서도 정직하게 동작하도록 구현한다.</p>
+<p><strong>범위 내:</strong></p>
+<ul><li><code class="ic">BeanRepository.watchTasteSnapshot()</code> — 3테이블 원시 스냅샷 스트림</li><li><code class="ic">computeTasteProfile()</code> — 순수 함수 집계 (DB 무관)</li><li><code class="ic">ProfileScreen</code> 교체 + 위젯 4종 (요약 행 · 패널 · 막대 줄 · 강도 레이더)</li><li>폴백 기준 표시(배지) · 전체 빈 상태 · 패널별 빈 상태</li></ul>
+<p><strong>범위 밖(무변경):</strong> DB 스키마, <code class="ic">BeanRepository</code>의 기존 메서드, 원두/시음 CRUD·폼·OCR, 설정 탭, 백업(M5), 원두 검색/정렬(M5).</p>
+<h2>3. 원안 대비 변경 2건</h2>
+<p>브레인스토밍에서 근거를 갖고 원안을 바꾼 항목이다.</p>
+<h3>3.1 집계 위치: SQL → <strong>순수 Dart</strong></h3>
+<p>로드맵은 "분석 쿼리"라고 적었지만 <strong>위젯 ③은 SQL로 불가능하다.</strong> <code class="ic">beans.cupNotes</code>는 <code class="ic">StringListConverter</code>로 <strong>JSON 문자열</strong> 한 칸에 저장된다(<code class="ic">lib/data/converters.dart</code>). <code class="ic">["블루베리","자스민"]</code>이 통째로 들어가 있어 <code class="ic">GROUP BY</code>로 태그 빈도를 셀 수 없다.</p>
+<p>②④는 SQL로 가능하지만 그러면 집계 로직이 SQL과 Dart로 쪼개진다. 데이터는 개인용 수십~수백 행이라 SQL 집계의 성능 이점은 0이다.</p>
+<p>→ <strong>원두·구성·시음을 한 번 로드해 순수 Dart 함수로 계산한다.</strong> 4개 위젯이 같은 스냅샷을 공유하고, 비율 가중·컵노트 로직이 한곳에 모이며, <strong>DB 없이 유닛 테스트되는 순수 함수</strong>가 된다(M3.3의 <code class="ic">parseOcr</code>와 같은 이유).</p>
+<h3>3.2 차트: <code class="ic">fl_chart</code> → <strong>의존성 0</strong></h3>
+<p>설계 §7은 <code class="ic">fl_chart</code>를 적었으나 아직 <code class="ic">pubspec.yaml</code>에 없다. <strong>목업을 다시 보면 막대 3개는 차트가 아니다</strong> — <code class="ic">&lt;span class="track"&gt;&lt;span class="fill" style="width:92%"&gt;</code>, 즉 Flutter로는 <code class="ic">Container</code> + <code class="ic">FractionallySizedBox</code>다. 진짜 차트는 레이더 하나뿐이고 그것도 <strong>4축 고정 · 값 0~5</strong>라 일반 레이더보다 훨씬 단순하다.</p>
+<p>→ <strong>막대는 위젯 조합, 레이더는 <code class="ic">CustomPainter</code>.</strong> 새 의존성 0 → iOS CI 리스크 0(배포 제약: 파이프라인이 깨지면 iOS는 존재하지 않는다). 목업 색·모노스페이스와 픽셀 단위로 일치하고, 좌표 계산을 순수 함수로 분리하면 레이더도 유닛 테스트된다.</p>
+<h2>4. 데이터 흐름 &amp; 타입</h2>
+<pre class="code"><code>BeanRepository.watchTasteSnapshot()   →  Stream&lt;TasteSnapshot&gt;   (원시 3테이블)
+        ↓  .map(computeTasteProfile)                              ← 순수, DB 무관
+tasteProfileProvider (StreamProvider)  →  TasteProfile
+        ↓
+ProfileScreen  →  요약 3숫자 + 패널 4개</code></pre>
+<p><code class="ic">watchTasteSnapshot()</code>은 기존 <code class="ic">watchBeanDetail()</code>과 같은 패턴을 쓴다: 3테이블을 조인해 <strong>변경 트리거로만</strong> 등록하고(행은 무시) 재조회한다.</p>
+<pre class="code" data-lang="dart"><code>class TasteSnapshot {
+  final List&lt;Bean&gt; beans;
+  final List&lt;OriginComponent&gt; components;
+  final List&lt;Tasting&gt; tastings;
+}
+
+class Intensity { final double acidity, sweetness, body, bitterness; }
+
+class Bar { final String label; final double value; }
+
+class TasteProfile {
+  final int beanCount, tastingCount;
+  final double? topBeanRating;        // 시음 0건이면 null
+  final Intensity? intensity;         // 시음 0건이면 null
+  final bool intensityHighRatedOnly;  // 배지: '★4+ 기준' / '전체 기준'
+  final List&lt;Bar&gt; byCountry, byProcess;   // 값 = 평균★ (0~5)
+  final List&lt;Bar&gt; cupNotes;               // 값 = 빈도 (정수를 double로)
+  final bool cupNotesHighRatedOnly;       // 배지: '★4+ 빈도' / '전체 빈도'
+  bool get isEmpty =&gt; tastingCount == 0;
+}</code></pre>
+<h2>5. 계산 규칙</h2>
+<h3>5.1 공통 전제</h3>
+<p><strong>시음이 0건이면 <code class="ic">isEmpty</code></strong> → 화면 전체가 빈 상태. *원두만 등록하고 시음이 0건이어도 마찬가지다* — 평점 없이는 취향이 없다.</p>
+<h3>5.2 ① 선호 강도 (레이더)</h3>
+<ul><li>모집단: <code class="ic">overall &gt;= 4</code> 인 시음.</li><li><strong>0건이면 전체 시음으로 폴백</strong>하고 <code class="ic">intensityHighRatedOnly = false</code>.</li><li>값: 산미·단맛·바디·쓴맛 각각 산술평균(1~5).</li></ul>
+<p>폴백을 조용히 하지 않는다 — 패널 헤더 배지가 <code class="ic">★4+ 기준</code> ↔ <code class="ic">전체 기준</code>으로 바뀌어 <strong>무엇을 보고 있는지 항상 드러난다</strong>. 원두 2~3개 시점엔 ★4+가 0건일 확률이 높아 폴백이 사실상 주 경로다.</p>
+<h3>5.3 ② 원산지별 · ④ 가공방식별 평균 평점 (막대)</h3>
+<p>전체 시음 기준(★4+ 필터 없음). 각 시음 × 그 원두의 각 구성 → <code class="ic">(키, overall, w)</code> 로 펼친 뒤:</p>
+<pre class="code"><code>값(키) = Σ(overall × w) / Σ(w)</code></pre>
+<p>키는 ②가 <code class="ic">country</code> 문자열, ④가 <code class="ic">Process</code> <strong>enum</strong>이다(집계 후 <code class="ic">label</code>로 바꿔 <code class="ic">Bar</code>에 담는다 — 라벨 문자열로 묶으면 라벨이 겹칠 때 조용히 합쳐진다).</p>
+<p><strong>가중치 <code class="ic">w</code> — 원두 단위 all-or-nothing:</strong></p>
+<div class="tablewrap"><table><thead><tr><th>조건</th><th>w</th></tr></thead><tbody><tr><td>그 원두의 구성 <strong>전부</strong>에 <code class="ic">ratioPercent</code>가 있음</td><td><code class="ic">ratioPercent / 100</code></td></tr><tr><td>구성 중 <strong>하나라도</strong> <code class="ic">ratioPercent</code>가 null</td><td>그 원두의 전 구성이 <code class="ic">1 / n</code></td></tr></tbody></table></div>
+<p>싱글 오리진은 <code class="ic">n = 1</code>이라 비율 유무와 무관하게 항상 <code class="ic">w = 1</code>.</p>
+<p>부분적으로만 채워진 비율을 추측해 메우지 않는 것이 핵심이다(예: 60%만 입력됐을 때 나머지를 나눠 갖게 하지 않는다). 규칙이 원두 단위로 all-or-nothing이라 동작이 명확하고 테스트가 쉽다. <code class="ic">ratioPercent</code>는 nullable이고 OCR로 자동 채워지지 않으므로 실제로는 균등 경로가 흔하다.</p>
+<p>가중치는 <strong>평균</strong>에 쓰이므로(합이 아니라) 어떤 국가가 항상 10% 구성으로만 등장해도 그 국가의 평균은 왜곡되지 않는다. 가중치는 같은 키에 서로 다른 비중의 데이터 포인트가 섞일 때만 작동한다.</p>
+<h3>5.4 ③ 선호 컵노트 (막대)</h3>
+<ul><li>모집단: 시음이 1건 이상이고 <strong>평균 종합★ ≥ 4</strong> 인 원두.</li><li><strong>0개면 시음이 있는 전체 원두로 폴백</strong>하고 <code class="ic">cupNotesHighRatedOnly = false</code>.</li><li>집계: <strong>원두 1표</strong> — 각 원두의 <code class="ic">cupNotes</code> 태그마다 +1. 한 원두 안의 중복 태그는 1회만 센다.</li></ul>
+<p>막대 숫자가 곧 "그 컵노트를 가진 원두 개수"라 직관적이고, 같은 원두를 여러 번 마셨다고 순위가 왜곡되지 않는다.</p>
+<h3>5.5 상단 요약 3숫자</h3>
+<div class="tablewrap"><table><thead><tr><th>항목</th><th>값</th></tr></thead><tbody><tr><td>기록한 원두</td><td><code class="ic">beans.length</code></td></tr><tr><td>누적 시음</td><td><code class="ic">tastings.length</code></td></tr><tr><td>최고 평점 원두</td><td><strong>시음이 있는</strong> 원두별 평균★ 중 최댓값 (시음 0건이면 <code class="ic">null</code> → <code class="ic">—</code>)</td></tr></tbody></table></div>
+<h3>5.6 정렬 · 막대 최대치</h3>
+<p><strong>정렬:</strong> 값 내림차순, <strong>동점이면 라벨 오름차순</strong>. 동점 순서가 결정적이어야 테스트가 가능하다.</p>
+<p><strong>막대 트랙 100% 기준:</strong></p>
+<div class="tablewrap"><table><thead><tr><th>위젯</th><th>기준</th><th>값 표기</th><th>목업 검증</th></tr></thead><tbody><tr><td>② 원산지 · ④ 가공방식</td><td><strong>5.0 고정</strong>(별점 만점)</td><td>소수점 1자리 <code class="ic">4.6</code></td><td><code class="ic">4.6 → 92%</code> ✅</td></tr><tr><td>③ 컵노트</td><td><strong>1위 값 기준 상대</strong></td><td><strong>정수</strong> <code class="ic">3</code></td><td><code class="ic">12 → 100%</code>, <code class="ic">9 → 75%</code> ✅</td></tr></tbody></table></div>
+<p><code class="ic">Bar.value</code>는 셋 다 <code class="ic">double</code>이지만 <strong>표기 규칙이 다르다</strong> — 컵노트를 <code class="ic">3.0</code>으로 찍으면 안 된다. 기준값과 표기는 <code class="ic">BarRow</code> 호출부에서 정한다.</p>
+<p><strong>상위 N 자르기는 하지 않는다.</strong> 데이터가 거의 없는 지금 자를 것이 없고, 필요해지면 M5(검색/정렬)에서 다룬다. YAGNI.</p>
+<h2>6. 화면 &amp; 컴포넌트</h2>
+<pre class="code"><code>AppBar '내 취향'
+ListView
+  SummaryRow                                      기록한 원두 / 누적 시음 / 최고 평점 원두
+  DashboardPanel '선호 강도'      배지 ★4+ 기준|전체 기준  → IntensityRadar
+  DashboardPanel '원산지별 평균 평점'                      → BarRow × N
+  DashboardPanel '선호 컵노트'    배지 ★4+ 빈도|전체 빈도  → BarRow × N
+  DashboardPanel '가공방식별 평점'                         → BarRow × N</code></pre>
+<h3>6.1 레이더 (<code class="ic">IntensityRadar</code>)</h3>
+<p>4축 고정 — 위 산미 → 오른쪽 단맛 → 아래 바디 → 왼쪽 쓴맛(목업 순서). 격자 마름모 5겹(<code class="ic">appLine</code>), 값 폴리곤은 <code class="ic">crema</code> 28% 채움 + 2px 테두리 + 꼭짓점 점, 축 라벨은 모노스페이스 <code class="ic">appMuted</code>. 크기 180×164.</p>
+<p>좌표는 순수 함수로 분리한다:</p>
+<pre class="code" data-lang="dart"><code>Offset radarPoint(int axis, double value, {required Offset center, required double radius});</code></pre>
+<p><strong>painter가 아니라 이 함수를 유닛 테스트한다.</strong></p>
+<h3>6.2 막대 (<code class="ic">BarRow</code>)</h3>
+<p>라벨(고정폭) · 트랙(<code class="ic">Container</code> + <code class="ic">FractionallySizedBox</code>) · 값(모노스페이스)의 <code class="ic">Row</code> 한 줄.</p>
+<h2>7. 오류 처리 &amp; 빈 상태 레이어링</h2>
+<p><strong>프로바이더 레벨:</strong> <code class="ic">beanListProvider</code> 패턴 그대로 — <code class="ic">loading</code> → 스피너, <code class="ic">error</code> → <code class="ic">'불러오기 오류: $e'</code>.</p>
+<p><strong>순수 함수:</strong> 던지지 않는다. <code class="ic">Σw</code> 0-나눗셈은 구조적으로 불가능하다 — <code class="ic">w &gt; 0</code>이므로 모집단이 비면 그 키 자체가 결과에 없다.</p>
+<p><strong>빈 상태 두 층위:</strong></p>
+<div class="tablewrap"><table><thead><tr><th>층위</th><th>조건</th><th>표시</th></tr></thead><tbody><tr><td>전체</td><td><code class="ic">isEmpty</code> (시음 0건)</td><td><strong>요약 행은 유지</strong>하고 패널 자리에 안내 하나. <code class="ic">최고 평점 원두</code>는 <code class="ic">—</code></td></tr><tr><td>패널</td><td>그 패널의 막대 리스트가 빔 (일반 규칙, 3패널 공통)</td><td>그 패널만 짧은 안내. <strong>패널을 숨기지는 않는다</strong> — 자리가 사라지면 무엇이 빠졌는지 알 수 없다</td></tr></tbody></table></div>
+<p>전체 빈 상태에서 요약 행을 남기는 이유: 원두 수는 이미 유효한 정보이고, *"원두 3개는 있는데 시음이 0"* 이라는 상태가 한눈에 읽힌다. 원두가 0개여도 같은 화면을 쓴다(요약이 전부 0) — <strong>평점 없이는 취향이 없다</strong>는 원칙이라 분기하지 않는다.</p>
+<p>패널 빈 상태는 세 막대 패널에 공통으로 적용하지만, <strong>실제로 발생하는 건 ③컵노트뿐</strong>이다 — 시음이 있어도 OCR이 컵노트를 못 잡았으면 태그가 전부 비어 있다. ①은 시음이 있으면 항상 값이 있고, ②는 폼이 구성을 최소 1개 요구하며, ④는 <code class="ic">process</code>가 non-null 기본값이라 항상 값이 있다. 즉 ③은 불가능한 경우에 대한 방어가 아니라 실제로 흔한 경로고, ②④의 안내는 같은 규칙이 공짜로 덮는 것이다.</p>
+<h2>8. 테스트 (<a href="../testing.md"><code class="ic">../testing.md</code></a> 3계층)</h2>
+<div class="tablewrap"><table><thead><tr><th>계층</th><th>파일</th><th>내용</th></tr></thead><tbody><tr><td>유닛 (DB 없음)</td><td><code class="ic">test/unit/taste_profile_test.dart</code></td><td>빈 스냅샷 · 원두만 있고 시음 0 · ★4+ 축 평균 · <strong>★4+ 0건 → 폴백 + 배지 false</strong> · <strong>블렌드 60/40 가중평균</strong> · <strong>비율 일부 null → 균등</strong> · 싱글+블렌드 혼합 국가 집계 · 가공방식 집계 · 컵노트 원두 1표 / 원두 내 중복 태그 1회 / 평균★&lt;4 제외 / 폴백 · <strong>동점 시 라벨 오름차순</strong> · <code class="ic">topBeanRating</code></td></tr><tr><td>유닛 (DB 없음)</td><td><code class="ic">test/unit/intensity_radar_test.dart</code></td><td><code class="ic">radarPoint</code> — 4축 각도, <code class="ic">value</code> 0/5 경계</td></tr><tr><td>유닛 (인메모리 DB)</td><td><code class="ic">test/unit/taste_snapshot_test.dart</code></td><td><code class="ic">watchTasteSnapshot()</code>가 3테이블을 싣고, 시음 추가 시 재방출</td></tr><tr><td>위젯</td><td><code class="ic">test/widget/profile_screen_test.dart</code></td><td>전체 빈 상태 안내 · 패널 4개 + 막대 렌더 · <strong>배지 텍스트 전환</strong> · 컵노트 전무 시 그 패널만 안내</td></tr></tbody></table></div>
+<p><code class="ic">test/helpers.dart</code>에 drift 행 팩토리 <code class="ic">beanRow()</code> / <code class="ic">compRow()</code> / <code class="ic">tastingRow()</code> 를 추가한다(약 12개 테스트가 공유). 기존 <code class="ic">sampleSingle()</code> / <code class="ic">sampleBlend()</code>(비율 60/40 내장) / <code class="ic">sampleTasting()</code> 은 그대로 쓴다.</p>
+<h2>9. 실행 규약</h2>
+<p>M2~M3.3과 동일: <strong>SDD</strong>(태스크별 구현 서브에이전트 + 태스크 리뷰, 마지막에 opus 전체-브랜치 리뷰) · TDD(실패 테스트 → 최소 구현 → 통과 → 커밋) · 태스크 단위 main 직커밋 · 커밋 전 <code class="ic">flutter analyze &amp;&amp; flutter test</code> 초록불.</p>
+<h2>10. 파일 영향</h2>
+<div class="tablewrap"><table><thead><tr><th>파일</th><th>변경</th></tr></thead><tbody><tr><td><code class="ic">lib/data/bean_repository.dart</code></td><td><code class="ic">watchTasteSnapshot()</code> 추가</td></tr><tr><td><code class="ic">lib/data/models.dart</code></td><td><code class="ic">TasteSnapshot</code> 추가</td></tr><tr><td><code class="ic">lib/providers.dart</code></td><td><code class="ic">tasteProfileProvider</code> 추가</td></tr><tr><td><code class="ic">lib/features/profile/taste_profile.dart</code></td><td><strong>신규</strong> — <code class="ic">TasteProfile</code> · <code class="ic">Intensity</code> · <code class="ic">Bar</code> · <code class="ic">computeTasteProfile()</code></td></tr><tr><td><code class="ic">lib/features/profile/profile_screen.dart</code></td><td>플레이스홀더 → 대시보드</td></tr><tr><td><code class="ic">lib/features/profile/widgets/summary_row.dart</code></td><td><strong>신규</strong></td></tr><tr><td><code class="ic">lib/features/profile/widgets/dashboard_panel.dart</code></td><td><strong>신규</strong></td></tr><tr><td><code class="ic">lib/features/profile/widgets/bar_row.dart</code></td><td><strong>신규</strong></td></tr><tr><td><code class="ic">lib/features/profile/widgets/intensity_radar.dart</code></td><td><strong>신규</strong> — <code class="ic">CustomPainter</code> + <code class="ic">radarPoint()</code></td></tr><tr><td><code class="ic">test/helpers.dart</code></td><td>행 팩토리 3개 추가</td></tr><tr><td><code class="ic">test/unit/taste_profile_test.dart</code></td><td><strong>신규</strong></td></tr><tr><td><code class="ic">test/unit/intensity_radar_test.dart</code></td><td><strong>신규</strong></td></tr><tr><td><code class="ic">test/unit/taste_snapshot_test.dart</code></td><td><strong>신규</strong></td></tr><tr><td><code class="ic">test/widget/profile_screen_test.dart</code></td><td><strong>신규</strong></td></tr></tbody></table></div>
+<p>DB 스키마·마이그레이션 변경 없음. 새 패키지 의존성 없음.</p>
+</article>

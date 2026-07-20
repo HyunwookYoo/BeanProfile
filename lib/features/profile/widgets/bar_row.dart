@@ -48,7 +48,9 @@ class BarRow extends StatelessWidget {
               clipBehavior: Clip.antiAlias,
               child: FractionallySizedBox(
                 alignment: Alignment.centerLeft,
-                widthFactor: fraction.clamp(0.0, 1.0),
+                // NaN.clamp(0,1)은 Comparable 순서상 NaN이 항상 최댓값이라 상한인 1.0으로
+                // 가버려 "가장 꽉 찬 막대"로 보인다 — 반드시 명시적으로 0.0 처리해야 한다.
+                widthFactor: fraction.isNaN ? 0.0 : fraction.clamp(0.0, 1.0),
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: soft

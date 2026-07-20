@@ -60,4 +60,20 @@ void main() {
     final fill = t.widget<FractionallySizedBox>(find.byType(FractionallySizedBox));
     expect(fill.widthFactor, 1.0);
   });
+
+  testWidgets('BarRow는 fraction이 NaN이면 빈 막대로 그린다', (t) async {
+    await t.pumpWidget(wrapApp(const Scaffold(
+      body: BarRow(label: 'NaN', fraction: double.nan, text: '-'),
+    )));
+    final fill = t.widget<FractionallySizedBox>(find.byType(FractionallySizedBox));
+    expect(fill.widthFactor, 0.0);
+  });
+
+  testWidgets('BarRow는 fraction이 음수면 0으로 클램프한다', (t) async {
+    await t.pumpWidget(wrapApp(const Scaffold(
+      body: BarRow(label: '음수', fraction: -0.5, text: '0.0'),
+    )));
+    final fill = t.widget<FractionallySizedBox>(find.byType(FractionallySizedBox));
+    expect(fill.widthFactor, 0.0);
+  });
 }

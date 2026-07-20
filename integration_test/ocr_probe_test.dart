@@ -71,7 +71,7 @@ void main() {
         '| region=${d.region} | process=${d.process} | roast=${d.roastLevel} '
         '| date=${d.roastDate} | notes=${d.cupNotes}');
 
-    // 실제 ML Kit OCR → 스타일 카드(콜론 없음)도 좌표 파싱으로 4개 필드가 채워지는지.
+    // 실제 ML Kit OCR → 스타일 카드(콜론 없음) 8개 필드(그중 지역·컵노트·제품명·로스터리가 좌표 기반).
     expect(lines, isNotEmpty);
     expect(d.country, 'Colombia');
     expect(d.process, Process.natural);

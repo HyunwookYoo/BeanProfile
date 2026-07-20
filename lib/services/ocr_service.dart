@@ -5,10 +5,8 @@ class OcrLine {
   final String text;
   final double left, top, right, bottom;
   const OcrLine(this.text, {this.left = 0, this.top = 0, this.right = 0, this.bottom = 0});
-  double get centerX => (left + right) / 2;
   double get centerY => (top + bottom) / 2;
   double get height => bottom - top;
-  double get width => right - left;
 }
 
 /// 온디바이스 OCR seam. 실검증은 기기 전용(호스트 테스트에선 가짜 주입).

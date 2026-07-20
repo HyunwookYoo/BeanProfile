@@ -74,17 +74,30 @@ const Set<String> _regionTokens = {'지역', 'region'};
 const Set<String> _cupTokens = {
   '컵노트', '컵 노트', 'notes', 'cup notes', 'cup note', 'tasting notes', '향미',
 };
+const Set<String> _otherLabelTokens = {
+  '원산지','생산지','품종','가공','가공방식','로스팅','로스팅일','고도','제품명','상품명','로스터리','로스터','중량',
+  'origin','variety','varietal','process','roast','roast date','roasted','altitude','name','product name','roaster',
+};
 
-/// 값 줄이 라벨로 오인되지 않도록: 트림·소문자·후행 콜론 제거 후 토큰과 정확히 일치.
+final RegExp _trailingColon = RegExp(r'[:：]\s*$');
+
+/// 트림·소문자·후행 콜론 제거 정규화.
+String _norm(String text) => text.trim().toLowerCase().replaceAll(_trailingColon, '').trim();
+
+/// 값 줄이 라벨로 오인되지 않도록: 정규화 텍스트가 region/cupNotes 토큰과 정확히 일치.
 bool _isBareLabel(String text) {
-  final t = text.trim().toLowerCase().replaceAll(RegExp(r'[:：]\s*$'), '').trim();
+  final t = _norm(text);
   return _regionTokens.contains(t) || _cupTokens.contains(t);
 }
+
+/// 알려진 모든 라벨(지역·컵노트 + 그 외 카드 라벨). `_isBareLabel`이 찾는 "공간 매칭 대상
+/// 라벨"보다 넓게, "값으로 오채움하면 안 되는 줄"을 가르는 데 쓴다(값 후보 제외 + 아래-폴백 차단).
+bool _isLabel(String text) => _isBareLabel(text) || _otherLabelTokens.contains(_norm(text));
 
 /// 토큰의 바레-라벨 줄을 찾아 공간적으로 값을 매칭.
 String? _spatialValue(List<OcrLine> lines, Set<String> tokens) {
   for (final label in lines) {
-    final t = label.text.trim().toLowerCase().replaceAll(RegExp(r'[:：]\s*$'), '').trim();
+    final t = _norm(label.text);
     if (!tokens.contains(t)) continue;
     final v = _valueFor(lines, label);
     if (v != null && v.isNotEmpty) return v;
@@ -92,12 +105,14 @@ String? _spatialValue(List<OcrLine> lines, Set<String> tokens) {
   return null;
 }
 
-/// 라벨 줄의 값: ① 같은 행·오른쪽 → 없으면 ② 바로 아래(최근접).
+/// 라벨 줄의 값: ① 같은 행·오른쪽 → 없으면 ② 바로 아래(최근접). 두 탐색 모두 다른 라벨
+/// 줄은 값 후보에서 제외하고, ②는 추가로 라벨과 후보 사이에 다른 라벨이 끼어 있으면
+/// 차단해 인접 라벨을 값으로 오채움하지 않는다.
 String? _valueFor(List<OcrLine> lines, OcrLine label) {
   final h = label.height <= 0 ? 1.0 : label.height;
   OcrLine? best;
   for (final v in lines) {
-    if (identical(v, label) || v.text.trim().isEmpty || _isBareLabel(v.text)) continue;
+    if (identical(v, label) || v.text.trim().isEmpty || _isLabel(v.text)) continue;
     final aligned = (v.centerY - label.centerY).abs() <= 0.6 * h;
     if (aligned && v.left >= label.right - 0.5 * h) {
       if (best == null || v.left < best.left) best = v;
@@ -105,11 +120,13 @@ String? _valueFor(List<OcrLine> lines, OcrLine label) {
   }
   if (best != null) return best.text.trim();
   for (final v in lines) {
-    if (identical(v, label) || v.text.trim().isEmpty || _isBareLabel(v.text)) continue;
+    if (identical(v, label) || v.text.trim().isEmpty || _isLabel(v.text)) continue;
     final below = v.top >= label.bottom - 0.5 * h;
     final xOverlap = v.left <= label.right && v.right >= label.left;
     final sameCol = (v.left - label.left).abs() <= 1.5 * h;
-    if (below && (xOverlap || sameCol)) {
+    final blocked = lines.any((m) =>
+        !identical(m, label) && _isLabel(m.text) && m.top > label.top && m.top < v.top);
+    if (below && !blocked && (xOverlap || sameCol)) {
       if (best == null || v.top < best.top) best = v;
     }
   }
@@ -185,6 +202,7 @@ OcrDraft parseOcr(List<OcrLine> lines) {
 }
 
 /// 문자열 하위호환: 줄을 세로로 쌓은 합성 라인으로 감싸 parseOcr에 위임.
+/// 프로덕션 호출부 없음 — 문자열 코퍼스/비회귀 테스트 진입점으로 의도적으로 유지.
 OcrDraft parseOcrText(String rawText) {
   final texts = rawText.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
   final lines = [

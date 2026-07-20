@@ -103,6 +103,7 @@ return [
 <p>전 줄 높이의 <strong>중앙값</strong> <code class="ic">medianH</code>. 최대 높이 줄 <code class="ic">T</code>.</p>
 <ul><li><code class="ic">T.height &lt; 1.3·medianH</code>(균일 텍스트)이면 타이포 추정 없음 → 제품명·로스터리 이 단계에서 <code class="ic">null</code>(오채움 회피).</li><li><code class="ic">T</code>가 상단부(<code class="ic">T.top ≤ minTop + 0.45·(maxBottom − minTop)</code>, 여기서 minTop/maxBottom은 전 줄 경계)이면 <strong>제품명 = <code class="ic">T.text</code></strong>.</li><li><strong>로스터리 = 이브로우</strong>: <code class="ic">T</code> 위(<code class="ic">V.bottom ≤ T.top + 0.3·T.height</code>)이고 x가 겹치며 <code class="ic">V.height &lt; T.height</code>인 줄 중 가장 가까운(가장 큰 <code class="ic">V.bottom</code>) 것. 없으면 <code class="ic">null</code>.</li></ul>
 <p>→ 스타일 카드: <code class="ic">제품명=콜롬비아 핑크버번 내추럴</code>, <code class="ic">로스터리=베이스캠프 로스 터스</code>(자간 오독은 사용자가 수정).</p>
+<p><strong>알려진 한계(실측):</strong> 브랜드가 가장 큰 텍스트인 커피 <strong>봉투</strong>(bag)에서는 이 타이포 휴리스틱이 뒤집힌다 — 브랜드가 <code class="ic">제품명</code>으로, 태그라인이 <code class="ic">로스터리</code>로 채워진다. 승인된 휴리스틱(최대 폰트 줄=제목) 자체에 내재한 한계이며, 사용자가 저장 전 폼을 검토하므로 치명적이지 않다. 이 마일스톤의 실기기 검증은 <strong>정보 카드(info card)</strong> 레이아웃만 다루며, 봉투 레이아웃은 검증 범위 밖이다.</p>
 <h3>4.3 콜론/키워드 폴백 (기존 로직 재사용)</h3>
 <p>4.1·4.2에서 못 채운 라벨 필드는 <strong>줄 텍스트에 기존 콜론 라벨 추출</strong>로 보강 → 깨끗한 콜론 카드 계속 동작.</p>
 <ul><li>name/roaster/region: <code class="ic">_firstLabel(texts, _nameLabel/_roasterLabel/_regionLabel)</code></li><li>cupNotes: <code class="ic">_matchCupNotes(texts)</code></li></ul>

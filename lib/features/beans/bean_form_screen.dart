@@ -305,7 +305,9 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
               icon: const Icon(Icons.remove_circle_outline),
             ),
         ]),
-        Row(children: [
+        // 지역에 'OCR 자동' helper가 붙으면 그만큼 키가 커진다. Row 기본 정렬(center)이면
+        // helper가 없는 가공·% 필드가 아래로 밀려 밑줄이 어긋나므로 위를 맞춘다.
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Expanded(child: TextField(
               key: Key('field-region-$i'),
               controller: comp.region,

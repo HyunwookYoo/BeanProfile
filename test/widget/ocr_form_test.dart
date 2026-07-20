@@ -219,4 +219,37 @@ void main() {
     expect(find.textContaining('저장에 실패'), findsOneWidget);  // 에러 안내
     expect(t.widget<FilledButton>(find.byKey(const Key('save-bean'))).onPressed, isNotNull); // 재활성화
   });
+
+  group('지역·가공 밑줄 정렬', () {
+    // Row 기본 정렬은 center라, 지역에 'OCR 자동' helperText가 붙어 키가 커지면
+    // helper가 없는 가공 드롭다운이 아래로 밀려 두 필드의 밑줄이 어긋난다.
+    // (M3.3로 지역 자동채움이 실제 동작하면서 helper가 뜨게 돼 드러난 문제)
+    Future<void> pumpForm(WidgetTester t, {String? region}) async {
+      final db = testDatabase();
+      addTearDown(db.close);
+      t.view.physicalSize = const Size(2400, 4000);
+      t.view.devicePixelRatio = 3.0;
+      addTearDown(t.view.reset);
+      await t.pumpWidget(wrapApp(
+        BeanFormScreen(draft: OcrDraft(country: 'Ethiopia', region: region)),
+        db: db,
+      ));
+      await t.pump();
+    }
+
+    testWidgets('helper 없으면 두 필드 높이가 같다(입력 영역이 원래 일치함)', (t) async {
+      await pumpForm(t); // region 없음 → 지역에 helper 안 뜸
+      final region = t.getSize(find.byKey(const Key('field-region-0')));
+      final process = t.getSize(find.byType(DropdownButtonFormField<Process>));
+      expect(region.height, process.height);
+    });
+
+    testWidgets('OCR 자동 helper가 붙어도 두 필드가 같은 y에서 시작한다', (t) async {
+      await pumpForm(t, region: '예가체프'); // 지역에 'OCR 자동' helper 뜸
+      final regionTop = t.getTopLeft(find.byKey(const Key('field-region-0'))).dy;
+      final processTop = t.getTopLeft(find.byType(DropdownButtonFormField<Process>)).dy;
+      // 위가 맞고 입력 영역 높이가 같으므로(위 테스트) 밑줄도 맞는다.
+      expect(processTop, regionTop);
+    });
+  });
 }

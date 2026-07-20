@@ -1,4 +1,5 @@
 import '../../data/database.dart';
+import '../../data/enums.dart';
 import '../../data/models.dart';
 
 /// 강도 4축 평균 (1~5).
@@ -71,6 +72,26 @@ Intensity _meanIntensity(List<Tasting> ts) {
 double _meanOverall(List<Tasting> ts) =>
     ts.map((t) => t.overall).reduce((a, b) => a + b) / ts.length;
 
+class _WeightedMean {
+  double _sum = 0, _weight = 0;
+  void add(double value, double w) {
+    _sum += value * w;
+    _weight += w;
+  }
+
+  double get mean => _sum / _weight;
+}
+
+/// 값 내림차순, 동점이면 라벨 오름차순 — 순서를 결정적으로 만들어 테스트 가능하게 한다.
+List<Bar> _sorted(Iterable<Bar> bars) {
+  final list = bars.toList();
+  list.sort((a, b) {
+    final byValue = b.value.compareTo(a.value);
+    return byValue != 0 ? byValue : a.label.compareTo(b.label);
+  });
+  return list;
+}
+
 /// 스냅샷 → 대시보드 값. 순수 함수(DB·Flutter 무관) — 예외를 던지지 않는다.
 TasteProfile computeTasteProfile(TasteSnapshot snap) {
   final tastings = snap.tastings;
@@ -104,15 +125,54 @@ TasteProfile computeTasteProfile(TasteSnapshot snap) {
       .map(_meanOverall)
       .reduce((a, b) => a > b ? a : b);
 
+  // 원두별 구성 인덱스.
+  final componentsOf = <int, List<OriginComponent>>{};
+  for (final c in snap.components) {
+    (componentsOf[c.beanId] ??= []).add(c);
+  }
+
+  // ②④ — 시음 × 그 원두의 각 구성으로 펼쳐 가중 평균.
+  // 가중치는 평균의 분모·분자에 함께 들어가므로, 어떤 키가 항상 낮은 비중으로만
+  // 등장해도 평균 자체는 왜곡되지 않는다.
+  final countries = <String, _WeightedMean>{};
+  final processes = <Process, _WeightedMean>{};
+  for (final t in tastings) {
+    final comps = componentsOf[t.beanId] ?? const <OriginComponent>[];
+    final weights = componentWeights(comps);
+    for (var i = 0; i < comps.length; i++) {
+      final overall = t.overall.toDouble();
+      (countries[comps[i].country] ??= _WeightedMean()).add(overall, weights[i]);
+      (processes[comps[i].process] ??= _WeightedMean()).add(overall, weights[i]);
+    }
+  }
+
+  // ③ 컵노트 — 평균★ ≥ 4 인 원두 1표. 0개면 시음이 있는 전체 원두로 폴백.
+  final ratedBeans =
+      snap.beans.where((b) => tastingsOf.containsKey(b.id)).toList();
+  final lovedBeans = ratedBeans
+      .where((b) => _meanOverall(tastingsOf[b.id]!) >= 4)
+      .toList();
+  final cupNotesHighRatedOnly = lovedBeans.isNotEmpty;
+  final noteCounts = <String, int>{};
+  for (final b in (cupNotesHighRatedOnly ? lovedBeans : ratedBeans)) {
+    for (final note in b.cupNotes.toSet()) {
+      // 원두 안 중복 태그는 1회
+      noteCounts[note] = (noteCounts[note] ?? 0) + 1;
+    }
+  }
+
   return TasteProfile(
     beanCount: snap.beans.length,
     tastingCount: tastings.length,
     topBeanRating: topBeanRating,
     intensity: intensity,
     intensityHighRatedOnly: intensityHighRatedOnly,
-    byCountry: const [], // Task 3에서 채운다
-    cupNotes: const [], // Task 3에서 채운다
-    byProcess: const [], // Task 3에서 채운다
-    cupNotesHighRatedOnly: false, // Task 3에서 채운다
+    byCountry: _sorted(
+        countries.entries.map((e) => Bar(e.key, e.value.mean))),
+    cupNotes: _sorted(
+        noteCounts.entries.map((e) => Bar(e.key, e.value.toDouble()))),
+    byProcess: _sorted(
+        processes.entries.map((e) => Bar(e.key.label, e.value.mean))),
+    cupNotesHighRatedOnly: cupNotesHighRatedOnly,
   );
 }

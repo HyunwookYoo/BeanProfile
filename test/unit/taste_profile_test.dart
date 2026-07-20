@@ -1,4 +1,5 @@
 import 'package:beanprofile/data/database.dart';
+import 'package:beanprofile/data/enums.dart';
 import 'package:beanprofile/data/models.dart';
 import 'package:beanprofile/features/profile/taste_profile.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -115,6 +116,155 @@ void main() {
       ));
       expect(p.intensityHighRatedOnly, isTrue);
       expect(p.intensity!.acidity, 5.0);
+    });
+  });
+
+  group('②원산지 · ④가공방식 — 가중 평균', () {
+    test('싱글 오리진 여러 개는 국가별 산술평균', () {
+      final p = computeTasteProfile(snap(
+        beans: [beanRow(id: 1), beanRow(id: 2)],
+        components: [
+          compRow(id: 1, beanId: 1, country: 'Ethiopia'),
+          compRow(id: 2, beanId: 2, country: 'Ethiopia'),
+        ],
+        tastings: [
+          tastingRow(id: 1, beanId: 1, overall: 5),
+          tastingRow(id: 2, beanId: 2, overall: 3),
+        ],
+      ));
+      expect(p.byCountry.single.label, 'Ethiopia');
+      expect(p.byCountry.single.value, 4.0);
+    });
+
+    test('블렌드 60/40 비율이 국가별 가중평균에 반영된다', () {
+      // 블렌드1(Brazil 60 / Ethiopia 40) ★5, 싱글2(Ethiopia) ★1
+      // Ethiopia = (5*0.4 + 1*1.0) / (0.4 + 1.0) = 3.0 / 1.4 ≈ 2.142857
+      // Brazil    = (5*0.6) / 0.6 = 5.0
+      final p = computeTasteProfile(snap(
+        beans: [beanRow(id: 1), beanRow(id: 2)],
+        components: [
+          compRow(id: 1, beanId: 1, country: 'Brazil', ratioPercent: 60),
+          compRow(id: 2, beanId: 1, country: 'Ethiopia', ratioPercent: 40),
+          compRow(id: 3, beanId: 2, country: 'Ethiopia'),
+        ],
+        tastings: [
+          tastingRow(id: 1, beanId: 1, overall: 5),
+          tastingRow(id: 2, beanId: 2, overall: 1),
+        ],
+      ));
+      expect(p.byCountry.map((b) => b.label), ['Brazil', 'Ethiopia']);
+      expect(p.byCountry[0].value, 5.0);
+      expect(p.byCountry[1].value, closeTo(3.0 / 1.4, 1e-9));
+    });
+
+    test('비율이 하나라도 비면 그 원두는 균등(1/n)으로 계산된다', () {
+      // 블렌드(Brazil 60 / Ethiopia null) ★5 → 둘 다 w=0.5 → 각각 평균 5.0
+      final p = computeTasteProfile(snap(
+        beans: [beanRow(id: 1)],
+        components: [
+          compRow(id: 1, beanId: 1, country: 'Brazil', ratioPercent: 60),
+          compRow(id: 2, beanId: 1, country: 'Ethiopia'),
+        ],
+        tastings: [tastingRow(id: 1, beanId: 1, overall: 5)],
+      ));
+      expect(p.byCountry.map((b) => b.label), ['Brazil', 'Ethiopia']);
+      expect(p.byCountry[0].value, 5.0);
+      expect(p.byCountry[1].value, 5.0);
+    });
+
+    test('가공방식은 한국어 라벨로 집계된다', () {
+      final p = computeTasteProfile(snap(
+        beans: [beanRow(id: 1), beanRow(id: 2)],
+        components: [
+          compRow(id: 1, beanId: 1, process: Process.natural),
+          compRow(id: 2, beanId: 2, process: Process.washed),
+        ],
+        tastings: [
+          tastingRow(id: 1, beanId: 1, overall: 5),
+          tastingRow(id: 2, beanId: 2, overall: 3),
+        ],
+      ));
+      expect(p.byProcess.map((b) => b.label), ['내추럴', '워시드']);
+      expect(p.byProcess[0].value, 5.0);
+      expect(p.byProcess[1].value, 3.0);
+    });
+
+    test('동점이면 라벨 오름차순으로 정렬된다', () {
+      final p = computeTasteProfile(snap(
+        beans: [beanRow(id: 1), beanRow(id: 2)],
+        components: [
+          compRow(id: 1, beanId: 1, country: 'Kenya'),
+          compRow(id: 2, beanId: 2, country: 'Brazil'),
+        ],
+        tastings: [
+          tastingRow(id: 1, beanId: 1, overall: 4),
+          tastingRow(id: 2, beanId: 2, overall: 4),
+        ],
+      ));
+      expect(p.byCountry.map((b) => b.label), ['Brazil', 'Kenya']);
+    });
+  });
+
+  group('③ 선호 컵노트 — 원두 1표', () {
+    test('평균★ 4 이상 원두의 태그만 세고 원두당 1표', () {
+      // 원두1(평균 4.5, 블루베리·자스민) 시음 2회 / 원두2(평균 2.0, 초콜릿)
+      final p = computeTasteProfile(snap(
+        beans: [
+          beanRow(id: 1, cupNotes: ['블루베리', '자스민']),
+          beanRow(id: 2, cupNotes: ['초콜릿']),
+        ],
+        components: [compRow(id: 1, beanId: 1), compRow(id: 2, beanId: 2)],
+        tastings: [
+          tastingRow(id: 1, beanId: 1, overall: 5),
+          tastingRow(id: 2, beanId: 1, overall: 4),
+          tastingRow(id: 3, beanId: 2, overall: 2),
+        ],
+      ));
+      expect(p.cupNotesHighRatedOnly, isTrue);
+      // 2회 마셨어도 원두 1표 → 각 1. 동점이라 라벨 오름차순(블 < 자).
+      expect(p.cupNotes.map((b) => b.label), ['블루베리', '자스민']);
+      expect(p.cupNotes.every((b) => b.value == 1.0), isTrue);
+    });
+
+    test('한 원두 안의 중복 태그는 1회만 센다', () {
+      final p = computeTasteProfile(snap(
+        beans: [beanRow(id: 1, cupNotes: ['블루베리', '블루베리'])],
+        components: [compRow(id: 1, beanId: 1)],
+        tastings: [tastingRow(id: 1, beanId: 1, overall: 5)],
+      ));
+      expect(p.cupNotes.single.value, 1.0);
+    });
+
+    test('평균★ 4 이상 원두가 없으면 시음이 있는 전체 원두로 폴백', () {
+      final p = computeTasteProfile(snap(
+        beans: [
+          beanRow(id: 1, cupNotes: ['초콜릿']),
+          beanRow(id: 2, cupNotes: ['견과']), // 시음 없음 → 폴백 대상 아님
+        ],
+        components: [compRow(id: 1, beanId: 1)],
+        tastings: [tastingRow(id: 1, beanId: 1, overall: 2)],
+      ));
+      expect(p.cupNotesHighRatedOnly, isFalse);
+      expect(p.cupNotes.map((b) => b.label), ['초콜릿']);
+    });
+
+    test('컵노트가 하나도 없으면 빈 리스트(패널만 빈다)', () {
+      final p = computeTasteProfile(snap(
+        beans: [beanRow(id: 1)],
+        components: [compRow(id: 1, beanId: 1)],
+        tastings: [tastingRow(id: 1, beanId: 1, overall: 5)],
+      ));
+      expect(p.cupNotes, isEmpty);
+      expect(p.byCountry, isNotEmpty); // 다른 패널은 정상
+    });
+
+    test('빈도 동점이면 라벨 오름차순', () {
+      final p = computeTasteProfile(snap(
+        beans: [beanRow(id: 1, cupNotes: ['자스민', '감귤'])],
+        components: [compRow(id: 1, beanId: 1)],
+        tastings: [tastingRow(id: 1, beanId: 1, overall: 5)],
+      ));
+      expect(p.cupNotes.map((b) => b.label), ['감귤', '자스민']);
     });
   });
 }

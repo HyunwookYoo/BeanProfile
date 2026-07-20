@@ -166,4 +166,24 @@ class BeanRepository {
     ])..where(db.beans.id.equals(beanId));
     return trigger.watch().asyncMap((_) => getBeanDetail(beanId));
   }
+
+  Future<TasteSnapshot> getTasteSnapshot() async {
+    final beans = await db.select(db.beans).get();
+    final components = await db.select(db.originComponents).get();
+    final tastings = await db.select(db.tastings).get();
+    return TasteSnapshot(
+        beans: beans, components: components, tastings: tastings);
+  }
+
+  Stream<TasteSnapshot> watchTasteSnapshot() {
+    // 셋 중 무엇이 바뀌어도 재방출되도록 3테이블을 조인으로 등록한다.
+    // 조인 결과 행은 쓰지 않고(중복 행이 나옴) 트리거로만 쓴 뒤
+    // getTasteSnapshot으로 재조회한다 — watchBeanDetail과 같은 패턴.
+    final trigger = db.select(db.beans).join([
+      leftOuterJoin(db.tastings, db.tastings.beanId.equalsExp(db.beans.id)),
+      leftOuterJoin(db.originComponents,
+          db.originComponents.beanId.equalsExp(db.beans.id)),
+    ]);
+    return trigger.watch().asyncMap((_) => getTasteSnapshot());
+  }
 }

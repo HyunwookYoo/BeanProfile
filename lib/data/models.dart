@@ -100,3 +100,16 @@ class TastingInput {
         comment: t.comment,
       );
 }
+
+/// 취향 분석용 원시 스냅샷 — 3테이블 전부. 집계는 하지 않는다.
+/// (`computeTasteProfile`이 순수 함수로 계산한다)
+class TasteSnapshot {
+  final List<Bean> beans;
+  final List<OriginComponent> components;
+  final List<Tasting> tastings;
+  const TasteSnapshot({
+    required this.beans,
+    required this.components,
+    required this.tastings,
+  });
+}

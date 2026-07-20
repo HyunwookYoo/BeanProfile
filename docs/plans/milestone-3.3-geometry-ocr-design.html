@@ -71,10 +71,8 @@ class OcrLine {
   final String text;
   final double left, top, right, bottom;
   const OcrLine(this.text, {this.left = 0, this.top = 0, this.right = 0, this.bottom = 0});
-  double get centerX =&gt; (left + right) / 2;
   double get centerY =&gt; (top + bottom) / 2;
   double get height =&gt; bottom - top;
-  double get width =&gt; right - left;
 }
 
 abstract class OcrService {
@@ -97,7 +95,9 @@ return [
 <p><strong>바레-라벨 줄</strong>: 줄의 트림·소문자·후행 <code class="ic">:：</code> 제거 텍스트가 라벨 토큰과 <strong>정확히 일치</strong>하는 줄.</p>
 <ul><li>region 토큰: <code class="ic">지역</code>, <code class="ic">region</code></li><li>cupNotes 토큰: <code class="ic">컵노트</code>, <code class="ic">컵 노트</code>, <code class="ic">notes</code>, <code class="ic">cup notes</code>, <code class="ic">cup note</code>, <code class="ic">tasting notes</code>, <code class="ic">향미</code></li></ul>
 <p>라벨 줄 <code class="ic">L</code>의 값 후보 탐색(모든 임계값은 <code class="ic">L.height</code> 단위 → 스케일 불변):</p>
-<ol><li><strong>같은 행·오른쪽</strong>: 수직 정렬(<code class="ic">|V.centerY - L.centerY| ≤ 0.6·L.height</code>)이고 <code class="ic">V.left ≥ L.right - 0.5·L.height</code>이며 바레-라벨이 아닌 줄 <code class="ic">V</code> 중 <code class="ic">V.left</code>가 가장 작은(가장 가까운 오른쪽) 것.</li><li>없으면 <strong>바로 아래</strong>: <code class="ic">V.top ≥ L.bottom - 0.5·L.height</code>이고 x가 겹치거나(<code class="ic">V.left ≤ L.right &amp;&amp; V.right ≥ L.left</code>) 같은 열 시작(<code class="ic">|V.left - L.left| ≤ 1.5·L.height</code>)이며 바레-라벨이 아닌 줄 중 <code class="ic">V.top</code>이 가장 작은(가장 가까운 아래) 것.</li></ol>
+<ol><li><strong>같은 행·오른쪽</strong>: 수직 정렬(<code class="ic">|V.centerY - L.centerY| ≤ 0.6·L.height</code>)이고 <code class="ic">V.left ≥ L.right - 0.5·L.height</code>이며 <strong>알려진 라벨이 아닌</strong> 줄 <code class="ic">V</code> 중 <code class="ic">V.left</code>가 가장 작은(가장 가까운 오른쪽) 것.</li><li>없으면 <strong>바로 아래</strong>: <code class="ic">V.top ≥ L.bottom - 0.5·L.height</code>이고 x가 겹치거나(<code class="ic">V.left ≤ L.right &amp;&amp; V.right ≥ L.left</code>) 같은 열 시작(<code class="ic">|V.left - L.left| ≤ 1.5·L.height</code>)이며 <strong>알려진 라벨이 아닌</strong> 줄 중 <code class="ic">V.top</code>이 가장 작은(가장 가까운 아래) 것. 단, 라벨 <code class="ic">L</code>과 후보 <code class="ic">V</code> <strong>사이에 다른 알려진 라벨이 끼어 있으면 거부</strong>한다.</li></ol>
+<p><strong>값 후보 제외용 라벨 어휘</strong>는 검색 대상(region/cupNotes 토큰)보다 넓다 — <code class="ic">원산지·생산지·품종·가공·로스팅·로스팅일·고도·제품명·로스터리·중량</code>과 영문 대응어를 포함(<code class="ic">_otherLabelTokens</code>). 넓힌 것은 <strong>제외 집합뿐이며, 어떤 줄을 라벨로 삼아 값을 찾을지(검색 집합)는 region/cupNotes 그대로</strong>다.</p>
+<blockquote><strong>왜 필요한가(최종 리뷰에서 실측 발견):</strong> 2열 카드에서 라벨 아래 줄은 대개 *다음 라벨*이다. 값이 비었거나 OCR이 놓쳤을 때, 또는 사진이 ~5° 기울어 같은-행 매칭이 깨질 때, 위 가드가 없으면 <code class="ic">지역</code>이 아래의 <code class="ic">품종</code>을 값으로 채택해 <strong><code class="ic">region=품종</code>으로 오채움</strong>된다. 기존 파서는 이 경우 <code class="ic">null</code>이었으므로, 가드 없이는 §2의 비회귀 보장을 위반한다(빈칸 &gt; 틀린 값).</blockquote>
 <p>매칭된 <code class="ic">V.text</code>가 값. 컵노트는 <code class="ic">[,/·、]</code>로 분할(기존 <code class="ic">_matchCupNotes</code>와 동일). → 스타일 카드: <code class="ic">지역=후일라</code>(같은 행), <code class="ic">컵노트=딸기,복숭아,레드와인</code>(아래).</p>
 <h3>4.2 타이포 제목/이브로우 (제품명·로스터리)</h3>
 <p>전 줄 높이의 <strong>중앙값</strong> <code class="ic">medianH</code>. 최대 높이 줄 <code class="ic">T</code>.</p>

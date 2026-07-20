@@ -40,10 +40,8 @@ class OcrLine {
   final String text;
   final double left, top, right, bottom;
   const OcrLine(this.text, {this.left = 0, this.top = 0, this.right = 0, this.bottom = 0});
-  double get centerX => (left + right) / 2;
   double get centerY => (top + bottom) / 2;
   double get height => bottom - top;
-  double get width => right - left;
 }
 
 abstract class OcrService {
@@ -78,8 +76,11 @@ return [
 - cupNotes 토큰: `컵노트`, `컵 노트`, `notes`, `cup notes`, `cup note`, `tasting notes`, `향미`
 
 라벨 줄 `L`의 값 후보 탐색(모든 임계값은 `L.height` 단위 → 스케일 불변):
-1. **같은 행·오른쪽**: 수직 정렬(`|V.centerY - L.centerY| ≤ 0.6·L.height`)이고 `V.left ≥ L.right - 0.5·L.height`이며 바레-라벨이 아닌 줄 `V` 중 `V.left`가 가장 작은(가장 가까운 오른쪽) 것.
-2. 없으면 **바로 아래**: `V.top ≥ L.bottom - 0.5·L.height`이고 x가 겹치거나(`V.left ≤ L.right && V.right ≥ L.left`) 같은 열 시작(`|V.left - L.left| ≤ 1.5·L.height`)이며 바레-라벨이 아닌 줄 중 `V.top`이 가장 작은(가장 가까운 아래) 것.
+1. **같은 행·오른쪽**: 수직 정렬(`|V.centerY - L.centerY| ≤ 0.6·L.height`)이고 `V.left ≥ L.right - 0.5·L.height`이며 **알려진 라벨이 아닌** 줄 `V` 중 `V.left`가 가장 작은(가장 가까운 오른쪽) 것.
+2. 없으면 **바로 아래**: `V.top ≥ L.bottom - 0.5·L.height`이고 x가 겹치거나(`V.left ≤ L.right && V.right ≥ L.left`) 같은 열 시작(`|V.left - L.left| ≤ 1.5·L.height`)이며 **알려진 라벨이 아닌** 줄 중 `V.top`이 가장 작은(가장 가까운 아래) 것. 단, 라벨 `L`과 후보 `V` **사이에 다른 알려진 라벨이 끼어 있으면 거부**한다.
+
+**값 후보 제외용 라벨 어휘**는 검색 대상(region/cupNotes 토큰)보다 넓다 — `원산지·생산지·품종·가공·로스팅·로스팅일·고도·제품명·로스터리·중량`과 영문 대응어를 포함(`_otherLabelTokens`). 넓힌 것은 **제외 집합뿐이며, 어떤 줄을 라벨로 삼아 값을 찾을지(검색 집합)는 region/cupNotes 그대로**다.
+> **왜 필요한가(최종 리뷰에서 실측 발견):** 2열 카드에서 라벨 아래 줄은 대개 *다음 라벨*이다. 값이 비었거나 OCR이 놓쳤을 때, 또는 사진이 ~5° 기울어 같은-행 매칭이 깨질 때, 위 가드가 없으면 `지역`이 아래의 `품종`을 값으로 채택해 **`region=품종`으로 오채움**된다. 기존 파서는 이 경우 `null`이었으므로, 가드 없이는 §2의 비회귀 보장을 위반한다(빈칸 > 틀린 값).
 
 매칭된 `V.text`가 값. 컵노트는 `[,/·、]`로 분할(기존 `_matchCupNotes`와 동일).
 → 스타일 카드: `지역=후일라`(같은 행), `컵노트=딸기,복숭아,레드와인`(아래).

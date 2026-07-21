@@ -175,6 +175,22 @@ class BeanRepository {
         beans: beans, components: components, tastings: tastings);
   }
 
+  /// 3테이블을 전부 지우고 스냅샷으로 대체한다(백업 복원). 단일 트랜잭션이라
+  /// 전부 성공 또는 전부 롤백. 행의 id를 그대로 삽입해 백업 값을 보존한다.
+  Future<void> replaceAll(TasteSnapshot snap) {
+    return db.transaction(() async {
+      await db.delete(db.tastings).go();
+      await db.delete(db.originComponents).go();
+      await db.delete(db.beans).go();
+      await db.batch((b) {
+        b.insertAll(db.beans, snap.beans.map((e) => e.toCompanion(false)));
+        b.insertAll(
+            db.originComponents, snap.components.map((e) => e.toCompanion(false)));
+        b.insertAll(db.tastings, snap.tastings.map((e) => e.toCompanion(false)));
+      });
+    });
+  }
+
   Stream<TasteSnapshot> watchTasteSnapshot() {
     // 셋 중 무엇이 바뀌어도 재방출되도록 3테이블을 조인으로 등록한다.
     // 조인 결과 행은 쓰지 않고(중복 행이 나옴) 트리거로만 쓴 뒤

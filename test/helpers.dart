@@ -2,6 +2,7 @@ import 'package:beanprofile/data/bean_repository.dart';
 import 'package:beanprofile/data/database.dart';
 import 'package:beanprofile/data/enums.dart';
 import 'package:beanprofile/providers.dart';
+import 'package:beanprofile/services/backup_service.dart';
 import 'package:beanprofile/services/ocr_service.dart';
 import 'package:beanprofile/services/photo_service.dart';
 import 'package:beanprofile/theme.dart';
@@ -19,12 +20,15 @@ BeanRepository testRepository(AppDatabase db) => BeanRepository(db);
 ProviderContainer testContainer(AppDatabase db) =>
     ProviderContainer(overrides: [databaseProvider.overrideWithValue(db)]);
 
-/// 위젯 테스트용: 테마 + (선택) DB/OCR/Photo override로 화면을 감싼다.
-Widget wrapApp(Widget child, {AppDatabase? db, OcrService? ocr, PhotoService? photo}) => ProviderScope(
+/// 위젯 테스트용: 테마 + (선택) DB/OCR/Photo/Backup override로 화면을 감싼다.
+Widget wrapApp(Widget child,
+        {AppDatabase? db, OcrService? ocr, PhotoService? photo, BackupService? backup}) =>
+    ProviderScope(
       overrides: [
         if (db != null) databaseProvider.overrideWithValue(db),
         if (ocr != null) ocrServiceProvider.overrideWithValue(ocr),
         if (photo != null) photoServiceProvider.overrideWithValue(photo),
+        if (backup != null) backupServiceProvider.overrideWithValue(backup),
       ],
       child: MaterialApp(theme: AppTheme.light, home: child),
     );
@@ -97,6 +101,34 @@ class FakePhotoService implements PhotoService {
   Future<String> persist(String tempPath) async {
     if (throwOnPersist) throw Exception('persist failed');
     return persistResult;
+  }
+}
+
+class FakeBackupService implements BackupService {
+  FakeBackupService({this.backups = const [], TasteSnapshot? readResult, this.throwOnRead = false})
+      : _readResult = readResult;
+  final List<BackupFile> backups;
+  final TasteSnapshot? _readResult;
+  final bool throwOnRead;
+
+  int exportCalls = 0;
+  int readCalls = 0;
+  TasteSnapshot? lastExported;
+
+  @override
+  Future<void> exportBackup(TasteSnapshot snap) async {
+    exportCalls++;
+    lastExported = snap;
+  }
+
+  @override
+  Future<List<BackupFile>> listBackups() async => backups;
+
+  @override
+  Future<TasteSnapshot> readBackup(BackupFile file) async {
+    readCalls++;
+    if (throwOnRead) throw const FormatException('bad backup');
+    return _readResult ?? const TasteSnapshot(beans: [], components: [], tastings: []);
   }
 }
 

@@ -103,10 +103,18 @@ class FakePhotoService implements PhotoService {
 // ── 순수 함수(computeTasteProfile) 테스트용 drift 행 팩토리 ──
 // BeanInput이 아니라 DB에서 읽힌 '행' 그대로가 필요해서 직접 만든다(DB 불필요).
 
-Bean beanRow({int id = 1, String name = '원두', List<String> cupNotes = const []}) =>
+Bean beanRow({
+  int id = 1,
+  String name = '원두',
+  String roaster = '',
+  List<String> cupNotes = const [],
+  String? photoPath,
+  DateTime? createdAt,
+}) =>
     Bean(
-      id: id, name: name, roaster: '', type: BeanType.singleOrigin,
-      cupNotes: cupNotes, createdAt: DateTime(2026, 7, 1),
+      id: id, name: name, roaster: roaster, type: BeanType.singleOrigin,
+      cupNotes: cupNotes, photoPath: photoPath,
+      createdAt: createdAt ?? DateTime(2026, 7, 1),
     );
 
 OriginComponent compRow({

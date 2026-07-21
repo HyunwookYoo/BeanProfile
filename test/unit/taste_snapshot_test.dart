@@ -1,5 +1,6 @@
 import 'package:async/async.dart';
 import 'package:beanprofile/data/database.dart';
+import 'package:drift/drift.dart';
 import 'package:flutter_test/flutter_test.dart';
 import '../helpers.dart';
 
@@ -53,6 +54,24 @@ void main() {
 
     final second = await queue.next; // watchTasteSnapshot이 재방출해야만 완료됨
     expect(second.tastings, hasLength(1));
+    await queue.cancel();
+  });
+
+  test('원두의 컵노트를 수정하면 재방출된다', () async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    final repo = testRepository(db);
+    final id = await repo.createBean(sampleSingle());
+
+    final queue = StreamQueue(repo.watchTasteSnapshot());
+    final first = await queue.next; // 최초 방출 — 결정적
+    expect(first.beans.single.cupNotes, ['블루베리', '자스민']);
+
+    await (db.update(db.beans)..where((b) => b.id.equals(id))).write(
+        const BeansCompanion(cupNotes: Value(['오렌지'])));
+
+    final second = await queue.next; // watchTasteSnapshot이 재방출해야만 완료됨
+    expect(second.beans.single.cupNotes, ['오렌지']);
     await queue.cancel();
   });
 }

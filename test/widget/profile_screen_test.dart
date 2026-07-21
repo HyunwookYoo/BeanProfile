@@ -105,4 +105,46 @@ void main() {
     expect(find.text('원산지별 평균 평점'), findsOneWidget);
     await db.close();
   });
+
+  testWidgets('막대 fraction·text가 스케일·포맷 규칙을 따른다', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    expandViewport(t);
+    final repo = testRepository(db);
+    final idA = await repo.createBean(const BeanInput(
+      name: '에티오피아 원두', roaster: '', type: BeanType.singleOrigin,
+      roastLevel: null, roastDate: null,
+      cupNotes: ['블루베리', '자스민', '감귤'], memo: null,
+      components: [ComponentInput(country: 'Ethiopia', process: Process.washed)],
+    ));
+    await repo.createTasting(idA, sampleTasting(overall: 4));
+    final idB = await repo.createBean(const BeanInput(
+      name: '케냐 원두', roaster: '', type: BeanType.singleOrigin,
+      roastLevel: null, roastDate: null,
+      cupNotes: ['블루베리'], memo: null,
+      components: [ComponentInput(country: 'Kenya', process: Process.washed)],
+    ));
+    await repo.createTasting(idB, sampleTasting(overall: 4));
+
+    await t.pumpWidget(wrapApp(const ProfileScreen(), db: db));
+    await t.pumpAndSettle();
+
+    final bars = t.widgetList<BarRow>(find.byType(BarRow)).toList();
+
+    final ethiopia = bars.firstWhere((b) => b.label == 'Ethiopia');
+    expect(ethiopia.fraction, closeTo(0.8, 1e-9)); // value/5.0, not /10.0
+    expect(ethiopia.text, '4.0');                  // toStringAsFixed(1)
+    expect(ethiopia.soft, isFalse);
+
+    final blueberry = bars.firstWhere((b) => b.label == '블루베리');
+    expect(blueberry.fraction, closeTo(1.0, 1e-9)); // value/max(=2)
+    expect(blueberry.text, '2');                     // toStringAsFixed(0)
+    expect(blueberry.soft, isTrue);
+
+    final citron = bars.firstWhere((b) => b.label == '감귤');
+    expect(citron.fraction, closeTo(0.5, 1e-9)); // 1/max(=2), NOT 1/distinctCount(=3)
+    expect(citron.text, '1');
+
+    await db.close();
+  });
 }

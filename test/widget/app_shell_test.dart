@@ -24,7 +24,7 @@ void main() {
     await tester.tap(find.text('취향'));
     await tester.pumpAndSettle();
     expect(tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex, 1);
-    expect(find.text('취향 분석은 곧 추가됩니다'), findsOneWidget);
+    expect(find.text('내 취향'), findsOneWidget);
 
     // Close explicitly before the widget tree is torn down: drift schedules a
     // zero-duration Timer when a stream loses its last listener (see

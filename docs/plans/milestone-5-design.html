@@ -1,0 +1,135 @@
+<title>M5 — 백업 &amp; 마무리 (설계)</title>
+<style>
+*{box-sizing:border-box}
+:root{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+  --font-sans:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Consolas,"Malgun Gothic",monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}}
+:root[data-theme="light"]{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+}
+:root[data-theme="dark"]{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-sans);line-height:1.7;-webkit-font-smoothing:antialiased}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.doc{max-width:880px;margin:0 auto;padding:44px 24px 96px}
+.crumb{font-family:var(--font-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:16px}
+h1{font-size:clamp(26px,4vw,38px);font-weight:800;letter-spacing:-.025em;line-height:1.2;margin:.1em 0 .5em;text-wrap:balance}
+h2{font-size:22px;font-weight:700;margin:2em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line);letter-spacing:-.01em;text-wrap:balance}
+h3{font-size:16.5px;font-weight:700;color:var(--accent-ink);margin:1.7em 0 .5em}
+h4{font-size:14px;font-weight:700;margin:1.3em 0 .4em}
+p{margin:.7em 0}
+a{color:var(--accent);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+strong{font-weight:700;color:var(--fg)}
+hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+code.ic{font-family:var(--font-mono);font-size:.85em;background:var(--ic-bg);color:var(--ic-fg);padding:1.5px 6px;border-radius:6px}
+pre.code{position:relative;background:var(--code-bg);color:var(--code-fg);border-radius:12px;padding:16px 18px;margin:1em 0;overflow-x:auto;border:1px solid rgba(0,0,0,.28)}
+pre.code code{font-family:var(--font-mono);font-size:12.75px;line-height:1.6;white-space:pre;color:inherit;background:none;padding:0}
+pre.code[data-lang]::before{content:attr(data-lang);position:absolute;top:9px;right:13px;font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(236,227,211,.42)}
+.tablewrap{overflow-x:auto;margin:1.1em 0}
+table{border-collapse:collapse;width:100%;font-size:13.75px}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--th);font-weight:700}
+tbody tr:nth-child(even){background:var(--surface)}
+blockquote{margin:1.1em 0;padding:11px 16px;border-left:3px solid var(--accent);background:var(--surface);border-radius:0 10px 10px 0;color:var(--muted)}
+blockquote strong{color:var(--fg)}
+ul,ol{margin:.7em 0;padding-left:1.4em}
+li{margin:.32em 0}
+ul.tasklist{list-style:none;padding-left:.15em}
+ul.tasklist li.task{position:relative;padding-left:30px;margin:.5em 0}
+ul.tasklist li.task::before{content:"";position:absolute;left:0;top:.18em;width:17px;height:17px;border:2px solid var(--accent);border-radius:5px;background:transparent}
+ul.tasklist li.task.done::before{content:"\2713";background:var(--accent);color:#fff;font-size:12px;font-weight:800;text-align:center;line-height:15px}
+</style>
+<article class="doc"><div class="crumb">BeanProfile · docs/plans</div>
+<h1>M5 — 백업 &amp; 마무리 (설계)</h1>
+<blockquote>상태: 승인됨(2026-07-22). 계획: <code class="ic">milestone-5-plan.md</code>. 목표 릴리스 <strong>v0.5.0</strong>. 목업: <a href="../mockups/m5-backup-settings.html"><code class="ic">../mockups/m5-backup-settings.html</code></a> · v1 원안: <a href="../mockups/ui-mockup-v1.html"><code class="ic">../mockups/ui-mockup-v1.html</code></a></blockquote>
+<h2>1. 배경 &amp; 목표</h2>
+<p>탭 3 「설정」은 아직 <code class="ic">'설정은 곧 추가됩니다'</code> 한 줄짜리 플레이스홀더다(<code class="ic">lib/features/settings/settings_screen.dart</code>). 탭 1 「원두」 리스트에는 검색·정렬이 없다. M5는 <strong>v1의 마지막 마일스톤</strong> — 백업(JSON 내보내기/가져오기) · 설정 화면 · 원두 검색/정렬 · 빈 상태 점검.</p>
+<p><strong>설계 전제:</strong> 데이터는 로컬 전용이고 앱은 AltStore 사이드로드(7일 갱신)다. CLAUDE.md 배포 제약이 명시하듯 <strong>서명 불일치나 재설치로 앱 컨테이너가 지워지면 DB와 사진이 통째로 사라진다.</strong> 백업은 그 소실에 대한 <strong>유일한 안전망</strong>이다. 그래서 M5의 헤드라인은 백업이고, 데이터뿐 아니라 <strong>사진까지 포함해 완전 복원</strong>되는 것이 요구사항이다.</p>
+<h2>2. 목표 &amp; 범위</h2>
+<p><strong>범위 내:</strong></p>
+<ul><li><code class="ic">backup_codec.dart</code> — 순수 인코드/디코드 (사진 base64 포함, DB·파일 무관)</li><li><code class="ic">backup_service.dart</code> — I/O 경계 (<code class="ic">share_plus</code> + <code class="ic">path_provider</code>), 인터페이스 + Fake</li><li><code class="ic">BeanRepository.replaceAll()</code> — 단일 트랜잭션 전체 교체 (읽기는 기존 <code class="ic">getTasteSnapshot()</code> 재사용)</li><li><code class="ic">SettingsScreen</code> 교체 — 내보내기 · 가져오기 · 앱 정보</li><li>원두 리스트 검색 + 정렬(최근/평점/이름) + 검색-결과-없음 빈 상태</li><li>iOS <code class="ic">Info.plist</code> 파일공유 키</li></ul>
+<p><strong>범위 밖(무변경):</strong> DB 스키마·마이그레이션, 원두/시음 CRUD·폼·OCR, 취향 대시보드(M4), <strong>병합 import</strong>, <strong>file_picker</strong>, 브루잉 파라미터 등 설계 §8 스코프 밖.</p>
+<h2>3. 확정된 결정 (브레인스토밍 2026-07-22)</h2>
+<p>이 4건이 M5의 approach를 정하며, 설계 §7 원안(<code class="ic">share_plus + file_picker</code> 나열)을 근거를 갖고 조정한다.</p>
+<h3>3.1 내보내기 = 공유 시트 / 가져오기 = 무플러그인</h3>
+<p>설계 §7은 <code class="ic">share_plus + file_picker</code>를 나열했으나 둘 다 아직 <code class="ic">pubspec.yaml</code>에 없다. <strong>배포 제약이 지배적이다</strong> — 개발 머신은 Windows, Mac이 없어 iOS 빌드는 CI macOS 러너가 전부다. 네이티브 플러그인이 iOS 빌드를 깨면 "iOS는 존재하지 않는다"(M4가 의존성 0을 택한 이유와 동일).</p>
+<p>→ <strong>내보내기만 <code class="ic">share_plus</code></strong>(저위험, Flutter 팀 계열, 공유 시트로 메일·iCloud·Files 저장 → Mac 없는 Windows PC로 빼내기에 필수), <strong>가져오기는 <code class="ic">file_picker</code> 없이</strong> iOS <code class="ic">Info.plist</code> 파일공유 노출 폴더 + 이미 있는 <code class="ic">path_provider</code>로 읽는다. <code class="ic">file_picker</code>(iOS 포드스펙·권한 이력이 가장 까다로운 플러그인)를 회피해 CI 리스크를 최소화한다. 신규 네이티브 플러그인은 <strong><code class="ic">share_plus</code> 하나뿐.</strong></p>
+<h3>3.2 가져오기 의미 = 전체 교체 (restore)</h3>
+<p>백업은 <strong>sync가 아니라 restore</strong>다. 가져오면 기존 3테이블을 전부 지우고 백업 내용으로 대체한다. 실수 방지로 <strong>확인 다이얼로그 + "먼저 현재 데이터 내보내기" 안내</strong>를 둔다. 병합은 같은 백업 재적용 시 중복, autoincrement id 재매핑, 1인용 앱에서 두 데이터셋 병합의 의미 모호 — 채택하지 않는다.</p>
+<h3>3.3 사진 = base64 내장 (self-contained)</h3>
+<p>단일 <code class="ic">.json</code>에 사진까지 담아 파일 하나로 완결한다. <strong>재난 복구(§1)에서 사진도 살아남아야 백업의 존재 이유에 부합</strong>한다. <code class="ic">dart:convert</code>만 쓰므로 신규 플러그인이 없다. 대가는 파일 크기(개인 규모 수 MB — 공유·파싱에 문제 없음)와 가져오기 시 디코드→파일 쓰기→경로 재작성 로직.</p>
+<h3>3.4 zip 도입 안 함</h3>
+<p>self-contained 압축 번들(<code class="ic">archive</code> 패키지, 순수 Dart라 네이티브 리스크는 없음)은 base64 대비 이득이 marginal하고 복잡도만 는다. <strong>base64로 충분. YAGNI.</strong> 신규 의존성은 <code class="ic">share_plus</code>로 끝낸다.</p>
+<h2>4. 데이터 흐름 &amp; 타입</h2>
+<pre class="code"><code>[내보내기]
+BeanRepository.getTasteSnapshot()   →  TasteSnapshot (3테이블 행, Bean.photoPath 포함)
+        +  각 bean.photoPath 파일 → bytes                    ← 서비스가 읽음
+        ↓  encodeBackup(snapshot, photoBytesByPath)          ← 순수, dart:convert
+   JSON String  →  문서 폴더에 timestamped 파일  →  share_plus 공유 시트
+
+[가져오기]
+listImportable()  →  노출(문서) 폴더의 *.json 목록
+   선택 → 파일 읽기 → decodeBackup(json)                     ← 순수 (throws FormatException)
+        →  DecodedBackup {snapshot, photoBytesByOldPath}
+        →  사진 bytes를 새 기기 문서 폴더에 쓰기 · Bean.photoPath 재작성
+        →  BeanRepository.replaceAll(snapshot)                ← 단일 트랜잭션
+        (drift watch 스트림이 테이블 쓰기에 자동 반응 → 리스트·상세·대시보드 갱신, 수동 invalidate 불필요)</code></pre>
+<p><code class="ic">getTasteSnapshot()</code>은 M4에서 이미 3테이블 전체 행(Bean은 <code class="ic">photoPath</code> 컬럼 포함)을 반환하므로 <strong>내보내기 읽기에 그대로 재사용</strong>한다. 저장소에 새로 추가되는 건 <code class="ic">replaceAll()</code> 하나뿐.</p>
+<pre class="code" data-lang="dart"><code>// backup_codec.dart — 순수 (drift 생성 toJson/fromJson 재사용)
+String encodeBackup(TasteSnapshot snap, Map&lt;String, Uint8List&gt; photoBytes, {required DateTime exportedAt});
+
+class DecodedBackup {
+  final TasteSnapshot snapshot;                 // photoPath = 백업 당시의 옛 경로
+  final Map&lt;String, Uint8List&gt; photoBytesByPath; // 옛 경로 → 디코드된 bytes
+}
+DecodedBackup decodeBackup(String json);        // 잘못된 JSON·미지 버전 → FormatException</code></pre>
+<p><code class="ic">TasteSnapshot</code>(M4의 <code class="ic">{beans, components, tastings}</code>)을 백업에도 재사용한다 — 구조가 동일하고 사진 bytes는 스냅샷 밖에서 맵으로 따로 나른다. 경로 재작성·파일 I/O는 <strong>순수 코덱 밖</strong>(서비스)에 둔다. 코덱은 drift가 각 행에 생성한 <code class="ic">toJson</code>/<code class="ic">fromJson</code>을 재사용해(<strong>31필드 수기 매핑을 피해</strong> 오타 버그류를 없애고, encode↔decode 대칭이 라운드트립을 보장) 그 위에 <code class="ic">schemaVersion</code>·<code class="ic">exportedAt</code>·<code class="ic">photoBase64</code>만 래핑한다. DB·파일·플러그인 없이 유닛 테스트된다(M4 <code class="ic">taste_profile.dart</code>, M3.3 <code class="ic">parseOcr</code>와 같은 이유).</p>
+<h2>5. 백업 포맷 규칙 (<code class="ic">schemaVersion: 1</code>)</h2>
+<p>단일 JSON 객체:</p>
+<pre class="code" data-lang="json"><code>{ "schemaVersion": 1, "exportedAt": "2026-07-22T09:41:00.000Z",
+  "beans":      [ { "id":1, "name":"…", "type":0, "roastLevel":1, "roastDate":"…"|null,
+                    "cupNotes":["블루베리"], "photoBase64":"…"|null, "createdAt":"…", … } ],
+  "components": [ { "id":1, "beanId":1, "country":"…", "process":0, "ratioPercent":null, … } ],
+  "tastings":   [ { "id":1, "beanId":1, "date":"…", "acidity":4, …, "overall":4, "comment":null, "createdAt":"…" } ] }</code></pre>
+<div class="tablewrap"><table><thead><tr><th>항목</th><th>규칙</th></tr></thead><tbody><tr><td><code class="ic">schemaVersion</code></td><td><code class="ic">1</code>. decode가 모르는 버전이면 <code class="ic">FormatException</code>(향후 포맷 변경 대비)</td></tr><tr><td>per-row 필드</td><td>각 행 = drift 생성 <code class="ic">toJson()</code> 출력 그대로(enum=int 인덱스, <code class="ic">cupNotes</code>=배열, nullable=<code class="ic">null</code>, 날짜=drift 기본 포맷). 수기 매핑 없음 → 대칭성으로 왕복 보장</td></tr><tr><td><code class="ic">exportedAt</code></td><td>최상위 한 곳만 명시적 ISO-8601 UTC</td></tr><tr><td><code class="ic">photoBase64</code></td><td>bean별로 <code class="ic">toJson</code> 출력에 추가. 사진 파일 bytes의 base64, 사진 없음/파일 소실이면 <code class="ic">null</code></td></tr></tbody></table></div>
+<p><strong>핵심 불변식:</strong> <code class="ic">encodeBackup(decodeBackup(encodeBackup(x))) == encodeBackup(x)</code> (JSON 문자열 동일) — 모든 행·사진 바이트가 왕복에서 보존된다. drift 행의 <code class="ic">==</code>는 <code class="ic">cupNotes</code> 리스트를 <strong>참조 비교</strong>하므로 행 <code class="ic">==</code>가 아니라 <strong>JSON 문자열 멱등성</strong>으로 검증한다. 이 라운드트립이 코덱 유닛 테스트의 중심이다.</p>
+<h2>6. 화면 &amp; 컴포넌트</h2>
+<h3>6.1 설정 화면 (<code class="ic">settings_screen.dart</code>)</h3>
+<pre class="code"><code>AppBar '설정'
+ListView
+  섹션 '데이터'
+    ListTile  데이터 내보내기   부제: 사진 포함 JSON 백업 · 공유 시트
+    ListTile  데이터 가져오기   부제: 백업에서 복원 · 현재 데이터를 대체
+  섹션 '정보'
+    ListTile  버전            trailing: v0.5.0 (모노)
+    안내 한 줄  모든 데이터는 이 기기에만 저장됩니다 · 오프라인 전용</code></pre>
+<ul><li><strong>내보내기</strong> 탭 → 진행 표시 → <code class="ic">share_plus</code> 공유 시트. 실패 시 SnackBar.</li><li><strong>가져오기</strong> 탭 → <code class="ic">listImportable()</code> → <strong>파일 목록 바텀시트</strong>(파일명 + 저장 시각). 항목 탭 → <strong>확인 다이얼로그</strong>(체리색 강조 "현재 데이터가 모두 대체됩니다" + "먼저 내보내기를 권장") → 복원 → 완료 SnackBar → 프로바이더 invalidate.</li><li>파일이 없으면 목록 대신 안내: "가져올 백업 파일이 없어요 — Files 앱의 이 폴더에 <code class="ic">.json</code>을 넣어 주세요."</li><li><strong>앱 버전</strong>은 신규 플러그인(<code class="ic">package_info_plus</code>)을 피하려고 코드 상수 <code class="ic">kAppVersion</code>으로 표기하고 릴리스 태그와 함께 올린다. (현재 <code class="ic">pubspec</code> <code class="ic">version:</code>은 <code class="ic">flutter create</code> 기본값 <code class="ic">1.0.0</code>이라 오히려 실제 태그와 어긋나므로, 상수가 더 정직하다.)</li></ul>
+<h3>6.2 원두 검색/정렬 (<code class="ic">bean_list_screen.dart</code>)</h3>
+<pre class="code"><code>AppBar '내 원두'                         trailing: 정렬 PopupMenu(최근/평점/이름)
+  검색 필드   돋보기 · '이름 · 로스터리 검색' · 지우기(x)
+  리스트      필터 + 정렬 적용</code></pre>
+<ul><li><strong>검색:</strong> <code class="ic">name</code>·<code class="ic">roaster</code> 부분일치(소문자 비교).</li><li><strong>정렬:</strong> <strong>최근</strong>(<code class="ic">createdAt</code> desc, 기본) / <strong>평점</strong>(평균★ desc, 시음 없는 원두는 뒤) / <strong>이름</strong>(가나다 <code class="ic">compareTo</code>).</li><li><strong>구현:</strong> 필터·정렬은 이미 스트림에 있는 <code class="ic">List&lt;BeanSummary&gt;</code>에 적용하는 <strong>순수 함수</strong> <code class="ic">sortFilterBeans(list, query, sort)</code>로 분리(개인 규모라 DB 재쿼리 불필요, 유닛 테스트 가능). 정렬 상태 = 작은 <code class="ic">StateProvider&lt;BeanSort&gt;</code>, 검색어 = 로컬 위젯 상태.</li></ul>
+<h3>6.3 빈 상태</h3>
+<div class="tablewrap"><table><thead><tr><th>조건</th><th>표시</th></tr></thead><tbody><tr><td>원두 0개 (기존)</td><td>기존 안내 유지 — "아직 기록한 원두가 없어요 …"</td></tr><tr><td>검색 결과 0 (신규)</td><td>"'{검색어}'에 맞는 원두가 없어요" — 원본이 비지 않았을 때만</td></tr></tbody></table></div>
+<p>대시보드 2층 빈 상태는 M4에서 완료 — 손대지 않는다. ~~앱 아이콘~~은 M3.3에서 교체 완료 — <strong>M5 제외</strong>.</p>
+<h2>7. 오류 처리 &amp; 원자성</h2>
+<ul><li><strong>decode 실패</strong>(잘못된 JSON·미지 <code class="ic">schemaVersion</code>) → <code class="ic">FormatException</code> → UI SnackBar "백업 파일을 읽을 수 없어요". DB는 손대지 않는다.</li><li><strong>가져오기 순서 = 디코드 → 사진 쓰기 → DB 교체.</strong> <code class="ic">replaceAll()</code>은 <strong>단일 트랜잭션</strong>(FK 순서로 delete → insert, 전부 성공 또는 전부 롤백)이라 부분 적용이 없다. 트랜잭션이 실패해도 먼저 쓴 사진 파일은 고아로 남을 뿐 무해(다음 성공 import가 덮음).</li><li><strong>내보내기 중 사진 파일 소실</strong> → 그 bean만 <code class="ic">photoBase64: null</code>로 계속 진행(전체 실패 아님).</li><li><strong>프로바이더 레벨:</strong> 설정 화면의 비동기 동작은 로딩/에러를 SnackBar로 노출. 리스트 검색/정렬은 동기라 예외 경로 없음.</li></ul>
+<h2>8. 테스트 (<a href="../testing.md"><code class="ic">../testing.md</code></a> 3계층)</h2>
+<div class="tablewrap"><table><thead><tr><th>계층</th><th>파일</th><th>내용</th></tr></thead><tbody><tr><td>유닛 (DB 없음)</td><td><code class="ic">test/unit/backup_codec_test.dart</code></td><td><strong>encode→decode 라운드트립 동일성</strong> · <strong>사진 base64 bytes 왕복</strong> · <code class="ic">schemaVersion</code> 미지 → <code class="ic">FormatException</code> · 잘못된 JSON 거부 · 빈 스냅샷 · 날짜·enum·nullable 보존</td></tr><tr><td>유닛 (DB 없음)</td><td><code class="ic">test/unit/bean_sort_filter_test.dart</code></td><td><code class="ic">sortFilterBeans</code> — 검색 부분일치·대소문자 무시 · 최근/평점/이름 3정렬 · 동점 순서 · 평점 없는 원두 뒤로</td></tr><tr><td>유닛 (인메모리 DB)</td><td><code class="ic">test/unit/backup_repo_test.dart</code></td><td><code class="ic">replaceAll()</code>이 기존을 전부 지우고 백업으로 교체(FK 순서·id 보존) · <code class="ic">getTasteSnapshot()</code> 왕복</td></tr><tr><td>위젯</td><td><code class="ic">test/widget/settings_screen_test.dart</code></td><td>내보내기 탭 → Fake 서비스 호출 · 가져오기 → 목록 → <strong>확인 다이얼로그</strong> → import 호출 · 파일 없음 안내</td></tr><tr><td>위젯</td><td><code class="ic">test/widget/bean_list_search_test.dart</code></td><td>검색 입력 → 필터 · 정렬 전환 · <strong>검색 결과 없음</strong> 안내</td></tr><tr><td>통합 (선택)</td><td><code class="ic">integration_test/backup_roundtrip_test.dart</code></td><td>export→import 실제 왕복(인메모리 DB + 임시 디렉터리 + Fake 공유)</td></tr></tbody></table></div>
+<p><code class="ic">test/helpers.dart</code>의 기존 팩토리(<code class="ic">beanRow</code>/<code class="ic">compRow</code>/<code class="ic">tastingRow</code>/<code class="ic">sampleSingle</code>/<code class="ic">sampleBlend</code>)를 재사용하고, <code class="ic">FakeBackupService</code>를 <code class="ic">FakeOcrService</code>/<code class="ic">FakePhotoService</code> 옆에 추가한다.</p>
+<h2>9. 실행 규약</h2>
+<p>M2~M4와 동일: <strong>SDD</strong>(태스크별 구현 서브에이전트 + 태스크 리뷰, 마지막에 opus 전체-브랜치 리뷰) · TDD(실패 테스트 → 최소 구현 → 통과 → 커밋) · 태스크 단위 main 직커밋 · 커밋 전 <code class="ic">flutter analyze &amp;&amp; flutter test</code> 초록불.</p>
+<h2>10. 파일 영향</h2>
+<div class="tablewrap"><table><thead><tr><th>파일</th><th>변경</th></tr></thead><tbody><tr><td><code class="ic">pubspec.yaml</code></td><td><code class="ic">share_plus</code> 추가 (신규 네이티브 플러그인 — iOS 포드는 CI가 해결)</td></tr><tr><td><code class="ic">ios/Runner/Info.plist</code></td><td><code class="ic">UIFileSharingEnabled</code> + <code class="ic">LSSupportsOpeningDocumentsInPlace</code> = YES</td></tr><tr><td><code class="ic">lib/features/settings/backup_codec.dart</code></td><td><strong>신규</strong> — <code class="ic">encodeBackup</code> · <code class="ic">decodeBackup</code> · <code class="ic">DecodedBackup</code> (순수, 피처-로컬)</td></tr><tr><td><code class="ic">lib/services/backup_service.dart</code></td><td><strong>신규</strong> — <code class="ic">BackupService</code> 인터페이스 + 구현(<code class="ic">share_plus</code>/<code class="ic">path_provider</code>), 기존 <code class="ic">ocr_service</code>·<code class="ic">photo_service</code> 옆</td></tr><tr><td><code class="ic">lib/data/bean_repository.dart</code></td><td><code class="ic">replaceAll(TasteSnapshot)</code> 추가</td></tr><tr><td><code class="ic">lib/providers.dart</code></td><td><code class="ic">backupServiceProvider</code> · <code class="ic">beanSortProvider</code> 추가</td></tr><tr><td><code class="ic">lib/features/settings/settings_screen.dart</code></td><td>플레이스홀더 → 내보내기·가져오기·앱 정보</td></tr><tr><td><code class="ic">lib/features/beans/bean_list_screen.dart</code></td><td>검색 필드 + 정렬 메뉴 + 검색 빈 상태</td></tr><tr><td><code class="ic">lib/features/beans/bean_sort.dart</code></td><td><strong>신규</strong> — <code class="ic">BeanSort</code> enum + <code class="ic">sortFilterBeans()</code> 순수 함수</td></tr><tr><td><code class="ic">test/helpers.dart</code></td><td><code class="ic">FakeBackupService</code> 추가</td></tr><tr><td><code class="ic">test/unit/backup_codec_test.dart</code> · <code class="ic">bean_sort_filter_test.dart</code> · <code class="ic">backup_repo_test.dart</code></td><td><strong>신규</strong></td></tr><tr><td><code class="ic">test/widget/settings_screen_test.dart</code> · <code class="ic">bean_list_search_test.dart</code></td><td><strong>신규</strong></td></tr></tbody></table></div>
+<p>DB 스키마·마이그레이션 변경 없음. 신규 패키지 의존성은 <code class="ic">share_plus</code> 하나.</p>
+</article>

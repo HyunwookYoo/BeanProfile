@@ -1,0 +1,1165 @@
+<title>M5 백업 &amp; 마무리 — 구현 계획</title>
+<style>
+*{box-sizing:border-box}
+:root{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+  --font-sans:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Consolas,"Malgun Gothic",monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}}
+:root[data-theme="light"]{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+}
+:root[data-theme="dark"]{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-sans);line-height:1.7;-webkit-font-smoothing:antialiased}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.doc{max-width:880px;margin:0 auto;padding:44px 24px 96px}
+.crumb{font-family:var(--font-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:16px}
+h1{font-size:clamp(26px,4vw,38px);font-weight:800;letter-spacing:-.025em;line-height:1.2;margin:.1em 0 .5em;text-wrap:balance}
+h2{font-size:22px;font-weight:700;margin:2em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line);letter-spacing:-.01em;text-wrap:balance}
+h3{font-size:16.5px;font-weight:700;color:var(--accent-ink);margin:1.7em 0 .5em}
+h4{font-size:14px;font-weight:700;margin:1.3em 0 .4em}
+p{margin:.7em 0}
+a{color:var(--accent);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+strong{font-weight:700;color:var(--fg)}
+hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+code.ic{font-family:var(--font-mono);font-size:.85em;background:var(--ic-bg);color:var(--ic-fg);padding:1.5px 6px;border-radius:6px}
+pre.code{position:relative;background:var(--code-bg);color:var(--code-fg);border-radius:12px;padding:16px 18px;margin:1em 0;overflow-x:auto;border:1px solid rgba(0,0,0,.28)}
+pre.code code{font-family:var(--font-mono);font-size:12.75px;line-height:1.6;white-space:pre;color:inherit;background:none;padding:0}
+pre.code[data-lang]::before{content:attr(data-lang);position:absolute;top:9px;right:13px;font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(236,227,211,.42)}
+.tablewrap{overflow-x:auto;margin:1.1em 0}
+table{border-collapse:collapse;width:100%;font-size:13.75px}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--th);font-weight:700}
+tbody tr:nth-child(even){background:var(--surface)}
+blockquote{margin:1.1em 0;padding:11px 16px;border-left:3px solid var(--accent);background:var(--surface);border-radius:0 10px 10px 0;color:var(--muted)}
+blockquote strong{color:var(--fg)}
+ul,ol{margin:.7em 0;padding-left:1.4em}
+li{margin:.32em 0}
+ul.tasklist{list-style:none;padding-left:.15em}
+ul.tasklist li.task{position:relative;padding-left:30px;margin:.5em 0}
+ul.tasklist li.task::before{content:"";position:absolute;left:0;top:.18em;width:17px;height:17px;border:2px solid var(--accent);border-radius:5px;background:transparent}
+ul.tasklist li.task.done::before{content:"\2713";background:var(--accent);color:#fff;font-size:12px;font-weight:800;text-align:center;line-height:15px}
+</style>
+<article class="doc"><div class="crumb">BeanProfile · docs/plans</div>
+<h1>M5 백업 &amp; 마무리 — 구현 계획</h1>
+<blockquote><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code class="ic">- [ ]</code>) syntax for tracking.</blockquote>
+<p><strong>Goal:</strong> 로컬 전용 데이터를 사진까지 포함해 단일 JSON으로 내보내고 전체 교체로 복원하는 백업 기능 + 설정 화면 + 원두 검색/정렬을 추가해 v1을 마무리한다(릴리스 <strong>v0.5.0</strong>).</p>
+<p><strong>Architecture:</strong> 순수 코덱(<code class="ic">backup_codec.dart</code>, drift <code class="ic">toJson</code>/<code class="ic">fromJson</code> 재사용 + <code class="ic">photoBase64</code> 래핑)과 I/O 서비스(<code class="ic">backup_service.dart</code>, <code class="ic">share_plus</code>+<code class="ic">path_provider</code>, 기기 전용 seam)를 분리한다. 저장소는 읽기용 기존 <code class="ic">getTasteSnapshot()</code>을 재사용하고 쓰기용 <code class="ic">replaceAll()</code>(단일 트랜잭션) 하나만 추가한다. 검색/정렬은 스트림 리스트에 순수 함수 <code class="ic">sortFilterBeans()</code>를 적용한다. 신규 네이티브 플러그인은 <code class="ic">share_plus</code> 하나.</p>
+<p><strong>Tech Stack:</strong> Flutter 3.44.6 / Dart 3.12.2, drift 2.31, flutter_riverpod 3.3.2, share_plus(신규), path_provider(기존). 테스트는 <code class="ic">docs/testing.md</code> 3계층(인메모리 drift + <code class="ic">test/helpers.dart</code>).</p>
+<h2>Global Constraints</h2>
+<ul><li><strong>한국어 UI:</strong> 모든 사용자 노출 문자열은 한국어.</li><li><strong>의존성 최소화:</strong> 신규 네이티브 플러그인은 <strong><code class="ic">share_plus</code> 하나만</strong>. <code class="ic">file_picker</code>·<code class="ic">archive</code>·<code class="ic">package_info_plus</code> 도입 금지.</li><li><strong>커밋 전 초록불:</strong> 각 태스크 커밋 직전 <code class="ic">flutter analyze</code>(0 issues) + <code class="ic">flutter test</code>(전부 통과).</li><li><strong>커밋 트레일러(정확히):</strong> <code class="ic">Co-Authored-By: Claude Opus 4.8 (1M context) &lt;noreply@anthropic.com&gt;</code> — 2번째 <code class="ic">-m</code>으로 첨부.</li><li><strong>커밋 컨벤션:</strong> <code class="ic">feat(m5): …</code> / <code class="ic">test(m5): …</code> / <code class="ic">chore(m5): …</code> (기존 저장소 스타일).</li><li><strong>직커밋:</strong> 트렁크 기반, <code class="ic">main</code>에 태스크 단위 직접 커밋.</li><li><strong>스키마 무변경:</strong> DB 테이블·마이그레이션을 바꾸지 않는다.</li><li><strong>서비스 위치 규약:</strong> I/O 서비스는 <code class="ic">lib/services/</code>(기존 <code class="ic">ocr_service.dart</code>·<code class="ic">photo_service.dart</code> 옆), 순수 로직은 피처 폴더 아래.</li><li><strong>번들 ID 고정:</strong> <code class="ic">com.hyunwook.beanprofile</code> (변경 금지).</li></ul>
+<hr>
+<h2>파일 구조</h2>
+<div class="tablewrap"><table><thead><tr><th>파일</th><th>책임</th></tr></thead><tbody><tr><td><code class="ic">lib/features/settings/backup_codec.dart</code></td><td><strong>신규</strong> · 순수. <code class="ic">encodeBackup</code>/<code class="ic">decodeBackup</code>/<code class="ic">DecodedBackup</code>. drift <code class="ic">toJson</code>/<code class="ic">fromJson</code> 위에 <code class="ic">schemaVersion</code>·<code class="ic">exportedAt</code>·<code class="ic">photoBase64</code>를 래핑. DB·파일·플러그인 무관</td></tr><tr><td><code class="ic">lib/services/backup_service.dart</code></td><td><strong>신규</strong> · I/O seam. <code class="ic">BackupService</code>(추상) + <code class="ic">BackupFile</code> + <code class="ic">SharePlusBackupService</code>(기기 전용). 사진 읽기/쓰기·공유·폴더 나열</td></tr><tr><td><code class="ic">lib/data/bean_repository.dart</code></td><td><code class="ic">replaceAll(TasteSnapshot)</code> 추가(단일 트랜잭션). 읽기는 기존 <code class="ic">getTasteSnapshot()</code> 재사용</td></tr><tr><td><code class="ic">lib/features/settings/settings_screen.dart</code></td><td>플레이스홀더 → 내보내기·가져오기(파일시트+확인다이얼로그)·앱 정보</td></tr><tr><td><code class="ic">lib/features/beans/bean_sort.dart</code></td><td><strong>신규</strong> · 순수. <code class="ic">BeanSort</code> enum + <code class="ic">sortFilterBeans()</code></td></tr><tr><td><code class="ic">lib/features/beans/bean_list_screen.dart</code></td><td>검색 필드 + 정렬 메뉴 + 검색 빈 상태</td></tr><tr><td><code class="ic">lib/providers.dart</code></td><td><code class="ic">backupServiceProvider</code> · <code class="ic">beanSortProvider</code> 추가</td></tr><tr><td><code class="ic">test/helpers.dart</code></td><td><code class="ic">beanRow</code>에 <code class="ic">roaster</code>/<code class="ic">photoPath</code>/<code class="ic">createdAt</code> 파라미터 추가 · <code class="ic">FakeBackupService</code> + <code class="ic">wrapApp</code>에 <code class="ic">backup</code> 파라미터</td></tr><tr><td><code class="ic">ios/Runner/Info.plist</code></td><td><code class="ic">UIFileSharingEnabled</code> + <code class="ic">LSSupportsOpeningDocumentsInPlace</code> = true</td></tr></tbody></table></div>
+<hr>
+<h2>Task 1: 순수 백업 코덱 (<code class="ic">backup_codec.dart</code>)</h2>
+<p><strong>Files:</strong></p>
+<ul><li>Create: <code class="ic">lib/features/settings/backup_codec.dart</code></li><li>Create: <code class="ic">test/unit/backup_codec_test.dart</code></li><li>Modify: <code class="ic">test/helpers.dart</code> (<code class="ic">beanRow</code>에 <code class="ic">roaster</code>/<code class="ic">photoPath</code>/<code class="ic">createdAt</code> 옵션 추가)</li></ul>
+<p><strong>Interfaces:</strong></p>
+<ul><li>Consumes: <code class="ic">TasteSnapshot</code>(from <code class="ic">lib/data/models.dart</code>), <code class="ic">Bean</code>/<code class="ic">OriginComponent</code>/<code class="ic">Tasting</code>(from <code class="ic">lib/data/database.dart</code>, 각 <code class="ic">toJson()</code>/<code class="ic">fromJson()</code> 보유).</li><li>Produces:</li><li><code class="ic">String encodeBackup(TasteSnapshot snap, Map&lt;String, Uint8List&gt; photoBytes, {required DateTime exportedAt})</code></li><li><code class="ic">DecodedBackup decodeBackup(String jsonStr)</code> — 잘못된 JSON·미지 <code class="ic">schemaVersion</code>이면 <code class="ic">FormatException</code></li><li><code class="ic">class DecodedBackup { final TasteSnapshot snapshot; final Map&lt;String, Uint8List&gt; photoBytesByPath; }</code></li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 1: <code class="ic">beanRow</code> 헬퍼에 옵션 파라미터 추가</strong></li></ul>
+<p><code class="ic">test/helpers.dart</code>의 기존 <code class="ic">beanRow</code>를 아래로 교체(호출부 하위호환 — 전부 옵션):</p>
+<pre class="code" data-lang="dart"><code>Bean beanRow({
+  int id = 1,
+  String name = '원두',
+  String roaster = '',
+  List&lt;String&gt; cupNotes = const [],
+  String? photoPath,
+  DateTime? createdAt,
+}) =&gt;
+    Bean(
+      id: id, name: name, roaster: roaster, type: BeanType.singleOrigin,
+      cupNotes: cupNotes, photoPath: photoPath,
+      createdAt: createdAt ?? DateTime(2026, 7, 1),
+    );</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 2: 실패하는 코덱 테스트 작성</strong></li></ul>
+<p><code class="ic">test/unit/backup_codec_test.dart</code>:</p>
+<pre class="code" data-lang="dart"><code>import 'dart:typed_data';
+import 'package:beanprofile/data/enums.dart';
+import 'package:beanprofile/data/models.dart';
+import 'package:beanprofile/features/settings/backup_codec.dart';
+import 'package:flutter_test/flutter_test.dart';
+import '../helpers.dart';
+
+TasteSnapshot _sample() =&gt; TasteSnapshot(
+      beans: [
+        beanRow(id: 1, name: '예가체프', roaster: '프릳츠',
+            cupNotes: const ['블루베리', '자스민'], photoPath: '/p/a.jpg'),
+        beanRow(id: 2, name: '수프리모', roaster: '테라로사', cupNotes: const []),
+      ],
+      components: [
+        compRow(id: 1, beanId: 1, country: 'Ethiopia', process: Process.washed),
+        compRow(id: 2, beanId: 2, country: 'Colombia', process: Process.natural, ratioPercent: 100),
+      ],
+      tastings: [tastingRow(id: 1, beanId: 1, overall: 5)],
+    );
+
+void main() {
+  final when = DateTime.utc(2026, 7, 22, 9, 41);
+
+  test('encode→decode→encode 라운드트립 JSON이 동일하다', () {
+    final photos = {'/p/a.jpg': Uint8List.fromList([10, 20, 30])};
+    final json1 = encodeBackup(_sample(), photos, exportedAt: when);
+    final decoded = decodeBackup(json1);
+    final json2 = encodeBackup(decoded.snapshot, decoded.photoBytesByPath, exportedAt: when);
+    expect(json2, json1);
+  });
+
+  test('컵노트·enum·사진 바이트가 보존된다', () {
+    final photos = {'/p/a.jpg': Uint8List.fromList([10, 20, 30])};
+    final decoded = decodeBackup(encodeBackup(_sample(), photos, exportedAt: when));
+    final bean = decoded.snapshot.beans.firstWhere((b) =&gt; b.id == 1);
+    expect(bean.cupNotes, ['블루베리', '자스민']);
+    expect(bean.roaster, '프릳츠');
+    expect(decoded.photoBytesByPath['/p/a.jpg'], [10, 20, 30]);
+    expect(decoded.snapshot.components.first.process, Process.washed);
+    expect(decoded.snapshot.tastings.single.overall, 5);
+  });
+
+  test('사진 없는 원두는 photoBase64 없이 왕복된다', () {
+    final decoded = decodeBackup(encodeBackup(_sample(), const {}, exportedAt: when));
+    expect(decoded.photoBytesByPath, isEmpty);
+    expect(decoded.snapshot.beans, hasLength(2));
+  });
+
+  test('빈 스냅샷도 왕복된다', () {
+    const empty = TasteSnapshot(beans: [], components: [], tastings: []);
+    final decoded = decodeBackup(encodeBackup(empty, const {}, exportedAt: when));
+    expect(decoded.snapshot.beans, isEmpty);
+    expect(decoded.photoBytesByPath, isEmpty);
+  });
+
+  test('미지 schemaVersion은 FormatException', () {
+    expect(
+      () =&gt; decodeBackup('{"schemaVersion":999,"beans":[],"components":[],"tastings":[]}'),
+      throwsFormatException,
+    );
+  });
+
+  test('깨진 JSON은 FormatException', () {
+    expect(() =&gt; decodeBackup('not json at all'), throwsFormatException);
+  });
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 3: 실패 확인</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/unit/backup_codec_test.dart</code> Expected: FAIL — <code class="ic">backup_codec.dart</code>가 없어 컴파일 에러(<code class="ic">encodeBackup</code>/<code class="ic">decodeBackup</code> undefined).</p>
+<ul class="tasklist"><li class="task"><strong>Step 4: 코덱 구현</strong></li></ul>
+<p><code class="ic">lib/features/settings/backup_codec.dart</code>:</p>
+<pre class="code" data-lang="dart"><code>import 'dart:convert';
+import 'dart:typed_data';
+
+import '../../data/database.dart';
+import '../../data/models.dart';
+
+const _schemaVersion = 1;
+
+/// 사진 base64를 포함한 단일 JSON 문자열. 순수 함수 — DB·파일·플러그인 무관.
+/// [photoBytes]는 bean.photoPath → 파일 bytes 맵(서비스가 채워 넘긴다).
+String encodeBackup(
+  TasteSnapshot snap,
+  Map&lt;String, Uint8List&gt; photoBytes, {
+  required DateTime exportedAt,
+}) {
+  final beans = [
+    for (final b in snap.beans)
+      {
+        ...b.toJson(),
+        'photoBase64':
+            (b.photoPath != null &amp;&amp; photoBytes.containsKey(b.photoPath))
+                ? base64Encode(photoBytes[b.photoPath]!)
+                : null,
+      },
+  ];
+  return jsonEncode({
+    'schemaVersion': _schemaVersion,
+    'exportedAt': exportedAt.toUtc().toIso8601String(),
+    'beans': beans,
+    'components': [for (final c in snap.components) c.toJson()],
+    'tastings': [for (final t in snap.tastings) t.toJson()],
+  });
+}
+
+class DecodedBackup {
+  final TasteSnapshot snapshot;
+  final Map&lt;String, Uint8List&gt; photoBytesByPath;
+  const DecodedBackup(this.snapshot, this.photoBytesByPath);
+}
+
+/// 잘못된 JSON·미지 버전·해석 실패는 모두 [FormatException].
+DecodedBackup decodeBackup(String jsonStr) {
+  final dynamic root = jsonDecode(jsonStr); // 깨진 JSON → FormatException 전파
+  if (root is! Map || root['schemaVersion'] != _schemaVersion) {
+    throw const FormatException('지원하지 않는 백업 형식 또는 버전입니다');
+  }
+  try {
+    final photoBytes = &lt;String, Uint8List&gt;{};
+    final beans = &lt;Bean&gt;[];
+    for (final raw in (root['beans'] as List)) {
+      final m = Map&lt;String, dynamic&gt;.from(raw as Map);
+      final b64 = m.remove('photoBase64') as String?;
+      final bean = Bean.fromJson(m);
+      beans.add(bean);
+      if (b64 != null &amp;&amp; bean.photoPath != null) {
+        photoBytes[bean.photoPath!] = base64Decode(b64);
+      }
+    }
+    final components = [
+      for (final raw in (root['components'] as List))
+        OriginComponent.fromJson(Map&lt;String, dynamic&gt;.from(raw as Map)),
+    ];
+    final tastings = [
+      for (final raw in (root['tastings'] as List))
+        Tasting.fromJson(Map&lt;String, dynamic&gt;.from(raw as Map)),
+    ];
+    return DecodedBackup(
+      TasteSnapshot(beans: beans, components: components, tastings: tastings),
+      photoBytes,
+    );
+  } on FormatException {
+    rethrow;
+  } catch (e) {
+    throw FormatException('백업 파일을 해석할 수 없습니다: $e');
+  }
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 5: 통과 확인 + analyze</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/unit/backup_codec_test.dart &amp;&amp; flutter analyze lib/features/settings/backup_codec.dart test/unit/backup_codec_test.dart</code> Expected: 모든 테스트 PASS · analyze <code class="ic">No issues found!</code></p>
+<blockquote>만약 <code class="ic">Bean.toJson()</code>의 날짜 표현이 예상과 달라도 라운드트립 테스트는 통과한다(encode↔decode 대칭). 실패한다면 drift 직렬화 대칭이 깨진 것이니 <code class="ic">toJson()</code>/<code class="ic">fromJson()</code> 호출부의 오타부터 확인.</blockquote>
+<ul class="tasklist"><li class="task"><strong>Step 6: 커밋</strong></li></ul>
+<pre class="code" data-lang="bash"><code>git add lib/features/settings/backup_codec.dart test/unit/backup_codec_test.dart test/helpers.dart
+git commit -m "feat(m5): 순수 백업 코덱 — drift toJson/fromJson + 사진 base64 래핑" -m "Co-Authored-By: Claude Opus 4.8 (1M context) &lt;noreply@anthropic.com&gt;"</code></pre>
+<hr>
+<h2>Task 2: 저장소 <code class="ic">replaceAll</code> (전체 교체 복원)</h2>
+<p><strong>Files:</strong></p>
+<ul><li>Modify: <code class="ic">lib/data/bean_repository.dart</code> (<code class="ic">replaceAll</code> 추가)</li><li>Create: <code class="ic">test/unit/backup_repo_test.dart</code></li></ul>
+<p><strong>Interfaces:</strong></p>
+<ul><li>Consumes: <code class="ic">TasteSnapshot</code>, <code class="ic">AppDatabase</code>(기존 <code class="ic">db.transaction</code>/<code class="ic">db.batch</code>/<code class="ic">db.delete</code>), 행의 <code class="ic">toCompanion(false)</code>.</li><li>Produces: <code class="ic">Future&lt;void&gt; BeanRepository.replaceAll(TasteSnapshot snap)</code> — 3테이블을 지우고 스냅샷으로 대체(id 보존, 단일 트랜잭션).</li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 1: 실패하는 테스트 작성</strong></li></ul>
+<p><code class="ic">test/unit/backup_repo_test.dart</code>:</p>
+<pre class="code" data-lang="dart"><code>import 'package:beanprofile/data/models.dart';
+import 'package:flutter_test/flutter_test.dart';
+import '../helpers.dart';
+
+void main() {
+  test('replaceAll이 기존을 지우고 스냅샷으로 교체한다(id 보존)', () async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    final repo = testRepository(db);
+
+    await repo.createBean(sampleSingle(name: '기존 원두')); // id 1 + 구성 1개
+
+    final snap = TasteSnapshot(
+      beans: [beanRow(id: 42, name: '복원된 원두', cupNotes: const ['자몽'])],
+      components: [compRow(id: 7, beanId: 42, country: 'Kenya')],
+      tastings: [tastingRow(id: 3, beanId: 42, overall: 5)],
+    );
+
+    await repo.replaceAll(snap);
+
+    final after = await repo.getTasteSnapshot();
+    expect(after.beans.map((b) =&gt; b.name), ['복원된 원두']);
+    expect(after.beans.single.id, 42); // id 보존
+    expect(after.components.single.country, 'Kenya');
+    expect(after.tastings.single.overall, 5);
+  });
+
+  test('replaceAll에 빈 스냅샷을 주면 전부 비운다', () async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    final repo = testRepository(db);
+    await repo.createBean(sampleBlend());
+
+    await repo.replaceAll(const TasteSnapshot(beans: [], components: [], tastings: []));
+
+    final after = await repo.getTasteSnapshot();
+    expect(after.beans, isEmpty);
+    expect(after.components, isEmpty);
+    expect(after.tastings, isEmpty);
+  });
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 2: 실패 확인</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/unit/backup_repo_test.dart</code> Expected: FAIL — <code class="ic">replaceAll</code> undefined.</p>
+<ul class="tasklist"><li class="task"><strong>Step 3: <code class="ic">replaceAll</code> 구현</strong></li></ul>
+<p><code class="ic">lib/data/bean_repository.dart</code>의 <code class="ic">getTasteSnapshot()</code>와 <code class="ic">watchTasteSnapshot()</code> 사이(파일 끝 <code class="ic">}</code> 직전)에 추가:</p>
+<pre class="code" data-lang="dart"><code>  /// 3테이블을 전부 지우고 스냅샷으로 대체한다(백업 복원). 단일 트랜잭션이라
+  /// 전부 성공 또는 전부 롤백. 행의 id를 그대로 삽입해 백업 값을 보존한다.
+  Future&lt;void&gt; replaceAll(TasteSnapshot snap) {
+    return db.transaction(() async {
+      await db.delete(db.tastings).go();
+      await db.delete(db.originComponents).go();
+      await db.delete(db.beans).go();
+      await db.batch((b) {
+        b.insertAll(db.beans, snap.beans.map((e) =&gt; e.toCompanion(false)));
+        b.insertAll(
+            db.originComponents, snap.components.map((e) =&gt; e.toCompanion(false)));
+        b.insertAll(db.tastings, snap.tastings.map((e) =&gt; e.toCompanion(false)));
+      });
+    });
+  }</code></pre>
+<blockquote><code class="ic">toCompanion(false)</code>는 모든 컬럼(id 포함)을 <code class="ic">Value</code>로 채운다 → 명시적 id 삽입으로 백업 값이 보존된다. batch가 beans → components → tastings 순서로 실행하므로 FK가 만족된다.</blockquote>
+<ul class="tasklist"><li class="task"><strong>Step 4: 통과 확인 + analyze</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/unit/backup_repo_test.dart &amp;&amp; flutter analyze lib/data/bean_repository.dart</code> Expected: PASS · <code class="ic">No issues found!</code></p>
+<ul class="tasklist"><li class="task"><strong>Step 5: 커밋</strong></li></ul>
+<pre class="code" data-lang="bash"><code>git add lib/data/bean_repository.dart test/unit/backup_repo_test.dart
+git commit -m "feat(m5): BeanRepository.replaceAll — 단일 트랜잭션 전체 교체 복원" -m "Co-Authored-By: Claude Opus 4.8 (1M context) &lt;noreply@anthropic.com&gt;"</code></pre>
+<hr>
+<h2>Task 3: 백업 서비스 seam + 의존성 + Fake</h2>
+<p><strong>Files:</strong></p>
+<ul><li>Create: <code class="ic">lib/services/backup_service.dart</code> (추상 + <code class="ic">BackupFile</code> + 기기 전용 구현)</li><li>Modify: <code class="ic">lib/providers.dart</code> (<code class="ic">backupServiceProvider</code>)</li><li>Modify: <code class="ic">test/helpers.dart</code> (<code class="ic">FakeBackupService</code> + <code class="ic">wrapApp</code>에 <code class="ic">backup</code> 파라미터)</li><li>Create: <code class="ic">test/unit/backup_service_test.dart</code> (Fake 계약 검증)</li><li>Modify: <code class="ic">pubspec.yaml</code> (<code class="ic">share_plus</code>)</li><li>Modify: <code class="ic">ios/Runner/Info.plist</code> (파일공유 키)</li></ul>
+<p><strong>Interfaces:</strong></p>
+<ul><li>Consumes: <code class="ic">TasteSnapshot</code>, <code class="ic">encodeBackup</code>/<code class="ic">decodeBackup</code>(Task 1), <code class="ic">getApplicationDocumentsDirectory</code>(path_provider), <code class="ic">share_plus</code>.</li><li>Produces:</li><li><code class="ic">class BackupFile { final String path; final String name; final DateTime modified; }</code></li><li><code class="ic">abstract class BackupService { Future&lt;void&gt; exportBackup(TasteSnapshot snap); Future&lt;List&lt;BackupFile&gt;&gt; listBackups(); Future&lt;TasteSnapshot&gt; readBackup(BackupFile file); }</code></li><li><code class="ic">SharePlusBackupService</code>(기기 전용 구현), <code class="ic">backupServiceProvider</code>, <code class="ic">FakeBackupService</code>(테스트).</li></ul>
+<blockquote><strong>주의:</strong> 실 구현 <code class="ic">SharePlusBackupService</code>는 <code class="ic">dart:io</code>/<code class="ic">path_provider</code>/<code class="ic">share_plus</code>를 쓰는 <strong>기기 전용 코드</strong>로, 기존 <code class="ic">MlkitOcrService</code>/<code class="ic">ImagePickerPhotoService</code>처럼 <strong>호스트 테스트 대상이 아니다</strong>. 호스트 테스트는 전부 <code class="ic">FakeBackupService</code>로 돈다. 이 태스크의 게이트는 "analyze 0 + 기존 테스트 전부 통과 + Fake 계약 테스트 통과"다.</blockquote>
+<ul class="tasklist"><li class="task"><strong>Step 1: <code class="ic">share_plus</code> 추가</strong></li></ul>
+<p>Run: <code class="ic">flutter pub add share_plus</code> Expected: <code class="ic">pubspec.yaml</code>에 <code class="ic">share_plus: ^&lt;현재버전&gt;</code>이 추가되고 <code class="ic">flutter pub get</code> 성공.</p>
+<ul class="tasklist"><li class="task"><strong>Step 2: iOS 파일공유 키 추가</strong></li></ul>
+<p><code class="ic">ios/Runner/Info.plist</code>의 최상위 <code class="ic">&lt;dict&gt;</code> 안(다른 <code class="ic">&lt;key&gt;</code>들과 같은 레벨)에 추가:</p>
+<pre class="code" data-lang="xml"><code>	&lt;key&gt;UIFileSharingEnabled&lt;/key&gt;
+	&lt;true/&gt;
+	&lt;key&gt;LSSupportsOpeningDocumentsInPlace&lt;/key&gt;
+	&lt;true/&gt;</code></pre>
+<blockquote>이 두 키로 앱 문서 폴더가 iOS Files 앱(내 iPhone → BeanProfile)에 노출되어, 내보낸 <code class="ic">.json</code>을 꺼내고 새 백업을 넣을 수 있다. 호스트 테스트로는 검증 불가(기기/시뮬레이터 확인 사항).</blockquote>
+<ul class="tasklist"><li class="task"><strong>Step 3: 서비스 seam 작성</strong></li></ul>
+<p><code class="ic">lib/services/backup_service.dart</code>:</p>
+<pre class="code" data-lang="dart"><code>import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:drift/drift.dart' show Value;
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+
+import '../data/database.dart';
+import '../data/models.dart';
+import '../features/settings/backup_codec.dart';
+
+/// 노출 폴더에서 발견된 백업 파일 한 건.
+class BackupFile {
+  final String path;
+  final String name;
+  final DateTime modified;
+  const BackupFile({required this.path, required this.name, required this.modified});
+}
+
+/// 백업 I/O seam. 실검증은 기기 전용(호스트 테스트에선 가짜 주입).
+abstract class BackupService {
+  /// 스냅샷을 사진 포함 JSON으로 문서 폴더에 쓰고 공유 시트를 띄운다.
+  Future&lt;void&gt; exportBackup(TasteSnapshot snap);
+
+  /// 노출(문서) 폴더의 백업 `.json` 목록(최신 먼저).
+  Future&lt;List&lt;BackupFile&gt;&gt; listBackups();
+
+  /// 파일을 읽어 디코드하고, 사진을 새 기기에 기록한 뒤
+  /// photoPath를 재작성한 스냅샷을 돌려준다(DB 교체는 호출부가 수행).
+  Future&lt;TasteSnapshot&gt; readBackup(BackupFile file);
+}
+
+class SharePlusBackupService implements BackupService {
+  Future&lt;Directory&gt; _docs() =&gt; getApplicationDocumentsDirectory();
+
+  String _stamp(DateTime d) {
+    String p(int n) =&gt; n.toString().padLeft(2, '0');
+    return '${d.year}${p(d.month)}${p(d.day)}-${p(d.hour)}${p(d.minute)}';
+  }
+
+  @override
+  Future&lt;void&gt; exportBackup(TasteSnapshot snap) async {
+    final photoBytes = &lt;String, Uint8List&gt;{};
+    for (final b in snap.beans) {
+      final p = b.photoPath;
+      if (p != null &amp;&amp; await File(p).exists()) {
+        photoBytes[p] = await File(p).readAsBytes();
+      }
+    }
+    final json = encodeBackup(snap, photoBytes, exportedAt: DateTime.now());
+    final dir = await _docs();
+    final name = 'beanprofile-backup-${_stamp(DateTime.now())}.json';
+    final file = File('${dir.path}/$name');
+    await file.writeAsString(json);
+    // share_plus: 설치된 버전 API에 맞춘다. (v9+는 SharePlus.instance.share 형태)
+    await Share.shareXFiles([XFile(file.path)], subject: name);
+  }
+
+  @override
+  Future&lt;List&lt;BackupFile&gt;&gt; listBackups() async {
+    final dir = await _docs();
+    final files = dir
+        .listSync()
+        .whereType&lt;File&gt;()
+        .where((f) =&gt; f.path.toLowerCase().endsWith('.json'))
+        .toList();
+    final result = [
+      for (final f in files)
+        BackupFile(
+          path: f.path,
+          name: f.uri.pathSegments.last,
+          modified: f.statSync().modified,
+        ),
+    ];
+    result.sort((a, b) =&gt; b.modified.compareTo(a.modified));
+    return result;
+  }
+
+  @override
+  Future&lt;TasteSnapshot&gt; readBackup(BackupFile file) async {
+    final decoded = decodeBackup(await File(file.path).readAsString());
+    final dir = await _docs();
+    final photos = Directory('${dir.path}/photos');
+    if (!await photos.exists()) await photos.create(recursive: true);
+
+    final rewritten = &lt;Bean&gt;[];
+    var i = 0;
+    for (final b in decoded.snapshot.beans) {
+      final bytes = b.photoPath != null ? decoded.photoBytesByPath[b.photoPath] : null;
+      if (bytes != null) {
+        final dest =
+            '${photos.path}/${DateTime.now().microsecondsSinceEpoch}_${i++}.jpg';
+        await File(dest).writeAsBytes(bytes);
+        rewritten.add(b.copyWith(photoPath: Value(dest)));
+      } else {
+        // 사진 없음/소실 → 깨진 옛 경로를 남기지 않고 null로.
+        rewritten.add(b.copyWith(photoPath: const Value(null)));
+      }
+    }
+    return TasteSnapshot(
+      beans: rewritten,
+      components: decoded.snapshot.components,
+      tastings: decoded.snapshot.tastings,
+    );
+  }
+}</code></pre>
+<blockquote><code class="ic">Share.shareXFiles</code>가 설치된 share_plus 버전에서 이름이 다르면(예: <code class="ic">SharePlus.instance.share(ShareParams(files: [XFile(file.path)]))</code>) 그 API로 바꾼다. 이 파일은 기기 전용이라 호스트 테스트가 없으니, <strong><code class="ic">flutter analyze</code>가 통과하는 형태</strong>로 맞추면 된다.</blockquote>
+<ul class="tasklist"><li class="task"><strong>Step 4: provider 등록</strong></li></ul>
+<p><code class="ic">lib/providers.dart</code> 상단 import에 추가:</p>
+<pre class="code" data-lang="dart"><code>import 'services/backup_service.dart';</code></pre>
+<p><code class="ic">photoServiceProvider</code> 줄 아래에 추가:</p>
+<pre class="code" data-lang="dart"><code>final backupServiceProvider = Provider&lt;BackupService&gt;((ref) =&gt; SharePlusBackupService());</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 5: <code class="ic">FakeBackupService</code> + <code class="ic">wrapApp</code> 확장</strong></li></ul>
+<p><code class="ic">test/helpers.dart</code>의 import에 추가:</p>
+<pre class="code" data-lang="dart"><code>import 'package:beanprofile/services/backup_service.dart';</code></pre>
+<p><code class="ic">wrapApp</code>을 아래로 교체(파라미터 <code class="ic">backup</code> 추가):</p>
+<pre class="code" data-lang="dart"><code>Widget wrapApp(Widget child,
+        {AppDatabase? db, OcrService? ocr, PhotoService? photo, BackupService? backup}) =&gt;
+    ProviderScope(
+      overrides: [
+        if (db != null) databaseProvider.overrideWithValue(db),
+        if (ocr != null) ocrServiceProvider.overrideWithValue(ocr),
+        if (photo != null) photoServiceProvider.overrideWithValue(photo),
+        if (backup != null) backupServiceProvider.overrideWithValue(backup),
+      ],
+      child: MaterialApp(theme: AppTheme.light, home: child),
+    );</code></pre>
+<p><code class="ic">FakePhotoService</code> 아래(파일 끝)에 추가:</p>
+<pre class="code" data-lang="dart"><code>class FakeBackupService implements BackupService {
+  FakeBackupService({this.backups = const [], TasteSnapshot? readResult, this.throwOnRead = false})
+      : _readResult = readResult;
+  final List&lt;BackupFile&gt; backups;
+  final TasteSnapshot? _readResult;
+  final bool throwOnRead;
+
+  int exportCalls = 0;
+  int readCalls = 0;
+  TasteSnapshot? lastExported;
+
+  @override
+  Future&lt;void&gt; exportBackup(TasteSnapshot snap) async {
+    exportCalls++;
+    lastExported = snap;
+  }
+
+  @override
+  Future&lt;List&lt;BackupFile&gt;&gt; listBackups() async =&gt; backups;
+
+  @override
+  Future&lt;TasteSnapshot&gt; readBackup(BackupFile file) async {
+    readCalls++;
+    if (throwOnRead) throw const FormatException('bad backup');
+    return _readResult ?? const TasteSnapshot(beans: [], components: [], tastings: []);
+  }
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 6: Fake 계약 테스트 작성</strong></li></ul>
+<p><code class="ic">test/unit/backup_service_test.dart</code>:</p>
+<pre class="code" data-lang="dart"><code>import 'package:beanprofile/data/models.dart';
+import 'package:beanprofile/services/backup_service.dart';
+import 'package:flutter_test/flutter_test.dart';
+import '../helpers.dart';
+
+void main() {
+  test('FakeBackupService가 export 호출을 기록한다', () async {
+    final fake = FakeBackupService();
+    await fake.exportBackup(const TasteSnapshot(beans: [], components: [], tastings: []));
+    expect(fake.exportCalls, 1);
+  });
+
+  test('FakeBackupService.readBackup이 주입한 스냅샷을 돌려준다', () async {
+    final snap = TasteSnapshot(beans: [beanRow(id: 9, name: '복원됨')], components: const [], tastings: const []);
+    final fake = FakeBackupService(
+      backups: [BackupFile(path: '/b/x.json', name: 'x.json', modified: DateTime(2026, 7, 22))],
+      readResult: snap,
+    );
+    final files = await fake.listBackups();
+    expect(files.single.name, 'x.json');
+    final got = await fake.readBackup(files.single);
+    expect(got.beans.single.name, '복원됨');
+  });
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 7: 전체 초록불 확인</strong></li></ul>
+<p>Run: <code class="ic">flutter analyze &amp;&amp; flutter test</code> Expected: analyze <code class="ic">No issues found!</code> · 기존 테스트 전부 + 신규 Fake 테스트 PASS.</p>
+<ul class="tasklist"><li class="task"><strong>Step 8: 커밋</strong></li></ul>
+<pre class="code" data-lang="bash"><code>git add pubspec.yaml pubspec.lock ios/Runner/Info.plist lib/services/backup_service.dart lib/providers.dart test/helpers.dart test/unit/backup_service_test.dart
+git commit -m "feat(m5): 백업 서비스 seam + share_plus + Files 노출 키 + Fake" -m "Co-Authored-By: Claude Opus 4.8 (1M context) &lt;noreply@anthropic.com&gt;"</code></pre>
+<hr>
+<h2>Task 4: 설정 화면 (내보내기·가져오기·앱 정보)</h2>
+<p><strong>Files:</strong></p>
+<ul><li>Modify: <code class="ic">lib/features/settings/settings_screen.dart</code> (플레이스홀더 → 실제 화면)</li><li>Create: <code class="ic">test/widget/settings_screen_test.dart</code></li></ul>
+<p><strong>Interfaces:</strong></p>
+<ul><li>Consumes: <code class="ic">backupServiceProvider</code>/<code class="ic">beanRepositoryProvider</code>(providers), <code class="ic">BackupFile</code>/<code class="ic">BackupService</code>(Task 3), <code class="ic">replaceAll</code>(Task 2), <code class="ic">context.colors</code>(theme).</li><li>Produces: 사용자 노출 화면. 위젯 테스트가 찾는 문자열: <code class="ic">'데이터 내보내기'</code>, <code class="ic">'데이터 가져오기'</code>, <code class="ic">'복원'</code>, <code class="ic">'가져올 백업 파일이 없어요'</code>.</li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 1: 실패하는 위젯 테스트 작성</strong></li></ul>
+<p><code class="ic">test/widget/settings_screen_test.dart</code>:</p>
+<pre class="code" data-lang="dart"><code>import 'package:beanprofile/data/models.dart';
+import 'package:beanprofile/features/settings/settings_screen.dart';
+import 'package:beanprofile/services/backup_service.dart';
+import 'package:flutter_test/flutter_test.dart';
+import '../helpers.dart';
+
+void main() {
+  testWidgets('내보내기 탭 → 서비스가 호출된다', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    final fake = FakeBackupService();
+    await t.pumpWidget(wrapApp(const SettingsScreen(), db: db, backup: fake));
+
+    await t.tap(find.text('데이터 내보내기'));
+    await t.pumpAndSettle();
+
+    expect(fake.exportCalls, 1);
+  });
+
+  testWidgets('가져오기 → 파일 선택 → 확인 → replaceAll로 교체', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    final repo = testRepository(db);
+    await repo.createBean(sampleSingle(name: '기존'));
+
+    final restore = TasteSnapshot(
+      beans: [beanRow(id: 99, name: '복원됨')],
+      components: [compRow(id: 5, beanId: 99, country: 'Kenya')],
+      tastings: const [],
+    );
+    final fake = FakeBackupService(
+      backups: [BackupFile(path: '/b/x.json', name: 'x.json', modified: DateTime(2026, 7, 22))],
+      readResult: restore,
+    );
+    await t.pumpWidget(wrapApp(const SettingsScreen(), db: db, backup: fake));
+
+    await t.tap(find.text('데이터 가져오기'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('x.json')); // 파일 시트 항목
+    await t.pumpAndSettle();
+    await t.tap(find.text('복원')); // 확인 다이얼로그
+    await t.pumpAndSettle();
+
+    final after = await repo.getTasteSnapshot();
+    expect(after.beans.map((b) =&gt; b.name), ['복원됨']);
+  });
+
+  testWidgets('백업 파일이 없으면 안내한다', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    final fake = FakeBackupService(backups: const []);
+    await t.pumpWidget(wrapApp(const SettingsScreen(), db: db, backup: fake));
+
+    await t.tap(find.text('데이터 가져오기'));
+    await t.pumpAndSettle();
+
+    expect(find.textContaining('가져올 백업 파일이 없어요'), findsOneWidget);
+  });
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 2: 실패 확인</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/widget/settings_screen_test.dart</code> Expected: FAIL — 현재 화면은 <code class="ic">'설정은 곧 추가됩니다'</code>뿐이라 <code class="ic">'데이터 내보내기'</code>를 못 찾음.</p>
+<ul class="tasklist"><li class="task"><strong>Step 3: 설정 화면 구현</strong></li></ul>
+<p><code class="ic">lib/features/settings/settings_screen.dart</code> 전체를 아래로 교체:</p>
+<pre class="code" data-lang="dart"><code>import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../data/models.dart';
+import '../../providers.dart';
+import '../../services/backup_service.dart';
+import '../../theme.dart';
+
+const kAppVersion = 'v0.5.0';
+
+class SettingsScreen extends ConsumerWidget {
+  const SettingsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = context.colors;
+    return Scaffold(
+      appBar: AppBar(title: const Text('설정', style: TextStyle(fontWeight: FontWeight.w800))),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+        children: [
+          _sectionLabel(context, '데이터'),
+          _tile(
+            context,
+            icon: Icons.ios_share,
+            title: '데이터 내보내기',
+            subtitle: '사진 포함 JSON 백업 · 공유 시트',
+            onTap: () =&gt; _export(context, ref),
+          ),
+          const SizedBox(height: 9),
+          _tile(
+            context,
+            icon: Icons.download,
+            title: '데이터 가져오기',
+            subtitle: '백업에서 복원 · 현재 데이터를 대체',
+            onTap: () =&gt; _import(context, ref),
+          ),
+          _sectionLabel(context, '정보'),
+          _tile(
+            context,
+            icon: Icons.info_outline,
+            title: '버전',
+            trailing: Text(kAppVersion, style: monoStyle(size: 13, weight: FontWeight.w700, color: c.espresso)),
+          ),
+          const SizedBox(height: 14),
+          Center(
+            child: Text('모든 데이터는 이 기기에만 저장됩니다 · 오프라인 전용',
+                style: TextStyle(fontSize: 11, color: c.appMuted)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sectionLabel(BuildContext context, String text) =&gt; Padding(
+        padding: const EdgeInsets.fromLTRB(4, 14, 4, 8),
+        child: Text(text,
+            style: monoStyle(size: 10.5, weight: FontWeight.w700, color: context.colors.appMuted)),
+      );
+
+  Widget _tile(BuildContext context,
+      {required IconData icon, required String title, String? subtitle, Widget? trailing, VoidCallback? onTap}) {
+    final c = context.colors;
+    return Material(
+      color: c.cup,
+      borderRadius: BorderRadius.circular(13),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(13),
+        child: Container(
+          decoration: BoxDecoration(
+            border: Border.all(color: c.appLine),
+            borderRadius: BorderRadius.circular(13),
+          ),
+          padding: const EdgeInsets.all(13),
+          child: Row(
+            children: [
+              Icon(icon, size: 22, color: c.cremaInk),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                    if (subtitle != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(subtitle, style: TextStyle(fontSize: 11, color: c.appMuted)),
+                      ),
+                  ],
+                ),
+              ),
+              if (trailing != null) trailing,
+              if (onTap != null &amp;&amp; trailing == null)
+                Icon(Icons.chevron_right, color: c.appMuted),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _snack(BuildContext context, String msg) =&gt;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+
+  Future&lt;void&gt; _export(BuildContext context, WidgetRef ref) async {
+    final repo = ref.read(beanRepositoryProvider);
+    final service = ref.read(backupServiceProvider);
+    try {
+      final snap = await repo.getTasteSnapshot();
+      await service.exportBackup(snap);
+    } catch (e) {
+      if (context.mounted) _snack(context, '내보내기에 실패했어요: $e');
+    }
+  }
+
+  Future&lt;void&gt; _import(BuildContext context, WidgetRef ref) async {
+    final service = ref.read(backupServiceProvider);
+    final repo = ref.read(beanRepositoryProvider);
+
+    List&lt;BackupFile&gt; files;
+    try {
+      files = await service.listBackups();
+    } catch (e) {
+      if (context.mounted) _snack(context, '백업 폴더를 열 수 없어요: $e');
+      return;
+    }
+    if (!context.mounted) return;
+    if (files.isEmpty) {
+      _snack(context, '가져올 백업 파일이 없어요 — Files 앱의 이 폴더에 .json을 넣어 주세요');
+      return;
+    }
+
+    final picked = await showModalBottomSheet&lt;BackupFile&gt;(
+      context: context,
+      builder: (_) =&gt; _FileSheet(files: files),
+    );
+    if (picked == null || !context.mounted) return;
+
+    final ok = await showDialog&lt;bool&gt;(
+      context: context,
+      builder: (_) =&gt; const _ReplaceConfirmDialog(),
+    );
+    if (ok != true || !context.mounted) return;
+
+    try {
+      final snap = await service.readBackup(picked);
+      await repo.replaceAll(snap);
+      if (context.mounted) _snack(context, '복원했어요 · 원두 ${snap.beans.length}개');
+    } catch (e) {
+      if (context.mounted) _snack(context, '백업 파일을 읽을 수 없어요: $e');
+    }
+  }
+}
+
+class _FileSheet extends StatelessWidget {
+  const _FileSheet({required this.files});
+  final List&lt;BackupFile&gt; files;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 38, height: 4, margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(color: c.appLine, borderRadius: BorderRadius.circular(3)),
+            ),
+            const Padding(
+              padding: EdgeInsets.only(left: 4, bottom: 8),
+              child: Text('백업 파일 선택', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+            ),
+            for (final f in files)
+              ListTile(
+                leading: Icon(Icons.description_outlined, color: c.cremaInk),
+                title: Text(f.name, style: monoStyle(size: 12, weight: FontWeight.w700, color: c.espresso)),
+                subtitle: Text(_fmt(f.modified), style: TextStyle(fontSize: 11, color: c.appMuted)),
+                onTap: () =&gt; Navigator.of(context).pop(f),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _fmt(DateTime d) {
+    String p(int n) =&gt; n.toString().padLeft(2, '0');
+    return '${d.year}-${p(d.month)}-${p(d.day)} ${p(d.hour)}:${p(d.minute)}';
+  }
+}
+
+class _ReplaceConfirmDialog extends StatelessWidget {
+  const _ReplaceConfirmDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return AlertDialog(
+      title: Text('현재 데이터가 모두 대체됩니다', style: TextStyle(color: c.cherry, fontWeight: FontWeight.w800, fontSize: 17)),
+      content: const Text('가져오기는 지금 기록을 백업 내용으로 완전히 교체합니다. 되돌릴 수 없으니, 먼저 내보내기로 현재 상태를 백업해 두는 것을 권장합니다.'),
+      actions: [
+        TextButton(onPressed: () =&gt; Navigator.of(context).pop(false), child: const Text('취소')),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: c.cherry),
+          onPressed: () =&gt; Navigator.of(context).pop(true),
+          child: const Text('복원'),
+        ),
+      ],
+    );
+  }
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 4: 통과 확인 + analyze</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/widget/settings_screen_test.dart &amp;&amp; flutter analyze lib/features/settings/settings_screen.dart</code> Expected: 3개 테스트 PASS · <code class="ic">No issues found!</code></p>
+<ul class="tasklist"><li class="task"><strong>Step 5: 커밋</strong></li></ul>
+<pre class="code" data-lang="bash"><code>git add lib/features/settings/settings_screen.dart test/widget/settings_screen_test.dart
+git commit -m "feat(m5): 설정 화면 — 내보내기·가져오기(파일시트+교체확인)·버전" -m "Co-Authored-By: Claude Opus 4.8 (1M context) &lt;noreply@anthropic.com&gt;"</code></pre>
+<hr>
+<h2>Task 5: 검색/정렬 순수 함수 (<code class="ic">bean_sort.dart</code>)</h2>
+<p><strong>Files:</strong></p>
+<ul><li>Create: <code class="ic">lib/features/beans/bean_sort.dart</code></li><li>Create: <code class="ic">test/unit/bean_sort_filter_test.dart</code></li><li>Modify: <code class="ic">lib/providers.dart</code> (<code class="ic">beanSortProvider</code>)</li></ul>
+<p><strong>Interfaces:</strong></p>
+<ul><li>Consumes: <code class="ic">BeanSummary</code>(models), <code class="ic">beanRow</code>(helpers, Task 1에서 <code class="ic">roaster</code>/<code class="ic">createdAt</code> 추가됨).</li><li>Produces:</li><li><code class="ic">enum BeanSort { recent, rating, name }</code> + <code class="ic">String get label</code></li><li><code class="ic">List&lt;BeanSummary&gt; sortFilterBeans(List&lt;BeanSummary&gt; beans, String query, BeanSort sort)</code></li><li><code class="ic">beanSortProvider</code>(NotifierProvider&lt;…, BeanSort&gt;, 기본 <code class="ic">recent</code>).</li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 1: 실패하는 테스트 작성</strong></li></ul>
+<p><code class="ic">test/unit/bean_sort_filter_test.dart</code>:</p>
+<pre class="code" data-lang="dart"><code>import 'package:beanprofile/data/models.dart';
+import 'package:beanprofile/features/beans/bean_sort.dart';
+import 'package:flutter_test/flutter_test.dart';
+import '../helpers.dart';
+
+BeanSummary _s(String name, {String roaster = '', double? rating, int day = 1}) =&gt; BeanSummary(
+      bean: beanRow(name: name, roaster: roaster, createdAt: DateTime(2026, 7, day)),
+      originLabel: null,
+      avgRating: rating,
+      tastingCount: rating == null ? 0 : 1,
+    );
+
+void main() {
+  final beans = [
+    _s('예가체프', roaster: '프릳츠', rating: 4.2, day: 1),
+    _s('수프리모', roaster: '테라로사', rating: 4.8, day: 3),
+    _s('하우스 블렌드', roaster: '프릳츠', rating: null, day: 2),
+  ];
+
+  test('검색은 이름·로스터리 부분일치(대소문자 무시)', () {
+    expect(sortFilterBeans(beans, '예가', BeanSort.recent).map((b) =&gt; b.bean.name), ['예가체프']);
+    expect(sortFilterBeans(beans, '프릳츠', BeanSort.recent).map((b) =&gt; b.bean.name).toSet(),
+        {'예가체프', '하우스 블렌드'});
+    expect(sortFilterBeans(beans, '없음', BeanSort.recent), isEmpty);
+  });
+
+  test('최근순 = createdAt 내림차순', () {
+    expect(sortFilterBeans(beans, '', BeanSort.recent).map((b) =&gt; b.bean.name),
+        ['수프리모', '하우스 블렌드', '예가체프']);
+  });
+
+  test('평점순 = 평점 내림차순, 평점 없는 원두는 뒤로', () {
+    expect(sortFilterBeans(beans, '', BeanSort.rating).map((b) =&gt; b.bean.name),
+        ['수프리모', '예가체프', '하우스 블렌드']);
+  });
+
+  test('이름순 = 가나다', () {
+    expect(sortFilterBeans(beans, '', BeanSort.name).map((b) =&gt; b.bean.name),
+        ['수프리모', '예가체프', '하우스 블렌드']);
+  });
+
+  test('원본 리스트를 변형하지 않는다', () {
+    final original = [...beans];
+    sortFilterBeans(beans, '', BeanSort.name);
+    expect(beans, original); // 순서 그대로
+  });
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 2: 실패 확인</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/unit/bean_sort_filter_test.dart</code> Expected: FAIL — <code class="ic">bean_sort.dart</code> 없음.</p>
+<ul class="tasklist"><li class="task"><strong>Step 3: 순수 함수 구현</strong></li></ul>
+<p><code class="ic">lib/features/beans/bean_sort.dart</code>:</p>
+<pre class="code" data-lang="dart"><code>import '../../data/models.dart';
+
+enum BeanSort { recent, rating, name }
+
+extension BeanSortLabel on BeanSort {
+  String get label =&gt; switch (this) {
+        BeanSort.recent =&gt; '최근순',
+        BeanSort.rating =&gt; '평점순',
+        BeanSort.name =&gt; '이름순',
+      };
+}
+
+/// 스트림 리스트에 검색어 필터 + 정렬을 적용한다. 원본은 변형하지 않는다.
+/// 검색 = 이름·로스터리 부분일치(대소문자 무시). 동점은 최근순으로 깬다.
+List&lt;BeanSummary&gt; sortFilterBeans(List&lt;BeanSummary&gt; beans, String query, BeanSort sort) {
+  final q = query.trim().toLowerCase();
+  final list = q.isEmpty
+      ? [...beans]
+      : beans
+          .where((b) =&gt;
+              b.bean.name.toLowerCase().contains(q) ||
+              b.bean.roaster.toLowerCase().contains(q))
+          .toList();
+
+  int recent(BeanSummary a, BeanSummary b) =&gt; b.bean.createdAt.compareTo(a.bean.createdAt);
+
+  switch (sort) {
+    case BeanSort.recent:
+      list.sort(recent);
+    case BeanSort.rating:
+      list.sort((a, b) {
+        final ar = a.avgRating, br = b.avgRating;
+        if (ar == null &amp;&amp; br == null) return recent(a, b);
+        if (ar == null) return 1; // 평점 없는 원두는 뒤로
+        if (br == null) return -1;
+        final c = br.compareTo(ar);
+        return c != 0 ? c : recent(a, b);
+      });
+    case BeanSort.name:
+      list.sort((a, b) {
+        final c = a.bean.name.toLowerCase().compareTo(b.bean.name.toLowerCase());
+        return c != 0 ? c : recent(a, b);
+      });
+  }
+  return list;
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 4: 통과 확인</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/unit/bean_sort_filter_test.dart</code> Expected: 5개 테스트 PASS.</p>
+<ul class="tasklist"><li class="task"><strong>Step 5: <code class="ic">beanSortProvider</code> 등록</strong></li></ul>
+<p><code class="ic">lib/providers.dart</code> 상단 import에 추가:</p>
+<pre class="code" data-lang="dart"><code>import 'features/beans/bean_sort.dart';</code></pre>
+<p>파일 끝에 추가:</p>
+<pre class="code" data-lang="dart"><code>class BeanSortNotifier extends Notifier&lt;BeanSort&gt; {
+  @override
+  BeanSort build() =&gt; BeanSort.recent;
+  void set(BeanSort sort) =&gt; state = sort;
+}
+
+final beanSortProvider = NotifierProvider&lt;BeanSortNotifier, BeanSort&gt;(BeanSortNotifier.new);</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 6: analyze + 커밋</strong></li></ul>
+<p>Run: <code class="ic">flutter analyze lib/features/beans/bean_sort.dart lib/providers.dart test/unit/bean_sort_filter_test.dart</code> Expected: <code class="ic">No issues found!</code></p>
+<pre class="code" data-lang="bash"><code>git add lib/features/beans/bean_sort.dart lib/providers.dart test/unit/bean_sort_filter_test.dart
+git commit -m "feat(m5): sortFilterBeans 순수 함수 + beanSortProvider" -m "Co-Authored-By: Claude Opus 4.8 (1M context) &lt;noreply@anthropic.com&gt;"</code></pre>
+<hr>
+<h2>Task 6: 원두 리스트 검색/정렬 UI + 검색 빈 상태</h2>
+<p><strong>Files:</strong></p>
+<ul><li>Modify: <code class="ic">lib/features/beans/bean_list_screen.dart</code></li><li>Create: <code class="ic">test/widget/bean_list_search_test.dart</code></li></ul>
+<p><strong>Interfaces:</strong></p>
+<ul><li>Consumes: <code class="ic">beanListProvider</code>(기존), <code class="ic">beanSortProvider</code>(Task 5), <code class="ic">sortFilterBeans</code>/<code class="ic">BeanSort</code>(Task 5), 기존 <code class="ic">BeanCard</code>/<code class="ic">showAddBeanSheet</code>/<code class="ic">BeanDetailScreen</code>/<code class="ic">SwipeDeleteBackground</code>/<code class="ic">confirmDeleteBeanDialog</code>.</li><li>Produces: 검색·정렬이 적용된 리스트 화면. 테스트가 쓰는 것: <code class="ic">find.byType(TextField)</code>, <code class="ic">find.byIcon(Icons.sort)</code>, 정렬 메뉴 텍스트(<code class="ic">'이름순'</code> 등), 검색 빈 상태 <code class="ic">'맞는 원두가 없어요'</code>.</li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 1: 실패하는 위젯 테스트 작성</strong></li></ul>
+<p><code class="ic">test/widget/bean_list_search_test.dart</code>:</p>
+<pre class="code" data-lang="dart"><code>import 'package:beanprofile/features/beans/bean_list_screen.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import '../helpers.dart';
+
+void main() {
+  testWidgets('검색어로 필터링된다', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    final repo = testRepository(db);
+    await repo.createBean(sampleSingle(name: '예가체프 코체레'));
+    await repo.createBean(sampleSingle(name: '수프리모', country: 'Colombia'));
+
+    await t.pumpWidget(wrapApp(const BeanListScreen(), db: db));
+    await t.pumpAndSettle();
+    expect(find.text('예가체프 코체레'), findsOneWidget);
+    expect(find.text('수프리모'), findsOneWidget);
+
+    await t.enterText(find.byType(TextField), '예가');
+    await t.pumpAndSettle();
+    expect(find.text('예가체프 코체레'), findsOneWidget);
+    expect(find.text('수프리모'), findsNothing);
+  });
+
+  testWidgets('검색 결과가 없으면 안내한다', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    final repo = testRepository(db);
+    await repo.createBean(sampleSingle(name: '예가체프'));
+
+    await t.pumpWidget(wrapApp(const BeanListScreen(), db: db));
+    await t.pumpAndSettle();
+    await t.enterText(find.byType(TextField), 'zzzz');
+    await t.pumpAndSettle();
+
+    expect(find.textContaining('맞는 원두가 없어요'), findsOneWidget);
+  });
+
+  testWidgets('이름순 정렬로 전환하면 순서가 바뀐다', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    final repo = testRepository(db);
+    await repo.createBean(sampleSingle(name: '하우스')); // 먼저 생성(오래됨)
+    await repo.createBean(sampleSingle(name: '가나다')); // 나중 생성(최신)
+
+    await t.pumpWidget(wrapApp(const BeanListScreen(), db: db));
+    await t.pumpAndSettle();
+    // 기본 최근순: '가나다'(최신)가 위
+    expect(t.getTopLeft(find.text('가나다')).dy &lt; t.getTopLeft(find.text('하우스')).dy, isTrue);
+
+    await t.tap(find.byIcon(Icons.sort));
+    await t.pumpAndSettle();
+    await t.tap(find.text('이름순').last);
+    await t.pumpAndSettle();
+
+    // 이름순: '가나다'가 '하우스'보다 위(가나다 정렬상 앞)
+    expect(t.getTopLeft(find.text('가나다')).dy &lt; t.getTopLeft(find.text('하우스')).dy, isTrue);
+  });
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 2: 실패 확인</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/widget/bean_list_search_test.dart</code> Expected: FAIL — 현재 리스트에 <code class="ic">TextField</code>/<code class="ic">Icons.sort</code>가 없다.</p>
+<ul class="tasklist"><li class="task"><strong>Step 3: 리스트 화면 개조</strong></li></ul>
+<p><code class="ic">lib/features/beans/bean_list_screen.dart</code> 전체를 아래로 교체(FAB·Dismissible·네비게이션은 그대로 유지):</p>
+<pre class="code" data-lang="dart"><code>import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../providers.dart';
+import '../../theme.dart';
+import 'add_bean_sheet.dart';
+import 'bean_detail_screen.dart';
+import 'bean_sort.dart';
+import 'widgets/bean_card.dart';
+import 'widgets/delete_ux.dart';
+
+class BeanListScreen extends ConsumerStatefulWidget {
+  const BeanListScreen({super.key});
+
+  @override
+  ConsumerState&lt;BeanListScreen&gt; createState() =&gt; _BeanListScreenState();
+}
+
+class _BeanListScreenState extends ConsumerState&lt;BeanListScreen&gt; {
+  final _searchCtrl = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final beans = ref.watch(beanListProvider);
+    final sort = ref.watch(beanSortProvider);
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('내 원두', style: TextStyle(fontWeight: FontWeight.w800)),
+        actions: [
+          PopupMenuButton&lt;BeanSort&gt;(
+            icon: const Icon(Icons.sort),
+            initialValue: sort,
+            onSelected: (s) =&gt; ref.read(beanSortProvider.notifier).set(s),
+            itemBuilder: (_) =&gt; [
+              for (final s in BeanSort.values) PopupMenuItem(value: s, child: Text(s.label)),
+            ],
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () =&gt; showAddBeanSheet(context, ref),
+        backgroundColor: context.colors.crema,
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
+      body: beans.when(
+        loading: () =&gt; const Center(child: CircularProgressIndicator()),
+        error: (e, _) =&gt; Center(child: Text('불러오기 오류: $e')),
+        data: (list) {
+          if (list.isEmpty) {
+            return Center(
+              child: Text('아직 기록한 원두가 없어요\n＋ 로 첫 원두를 추가해 보세요',
+                  textAlign: TextAlign.center, style: TextStyle(color: context.colors.appMuted)),
+            );
+          }
+          final shown = sortFilterBeans(list, _query, sort);
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                child: _SearchField(
+                  controller: _searchCtrl,
+                  onChanged: (v) =&gt; setState(() =&gt; _query = v),
+                ),
+              ),
+              Expanded(
+                child: shown.isEmpty
+                    ? Center(
+                        child: Text("'$_query'에 맞는 원두가 없어요",
+                            style: TextStyle(color: context.colors.appMuted)),
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
+                        itemCount: shown.length,
+                        separatorBuilder: (_, __) =&gt; const SizedBox(height: 10),
+                        itemBuilder: (_, i) {
+                          final s = shown[i];
+                          return Dismissible(
+                            key: ValueKey('bean-${s.bean.id}'),
+                            direction: DismissDirection.endToStart,
+                            background: const SwipeDeleteBackground(),
+                            confirmDismiss: (_) async {
+                              final ok = await confirmDeleteBeanDialog(context);
+                              if (ok) await ref.read(beanRepositoryProvider).deleteBean(s.bean.id);
+                              return false; // 반응형 리빌드가 삭제된 카드 제거(assert 회피)
+                            },
+                            child: BeanCard(
+                              summary: s,
+                              onTap: () =&gt; Navigator.of(context).push(MaterialPageRoute(
+                                  builder: (_) =&gt; BeanDetailScreen(beanId: s.bean.id))),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _SearchField extends StatelessWidget {
+  const _SearchField({required this.controller, required this.onChanged});
+  final TextEditingController controller;
+  final ValueChanged&lt;String&gt; onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return TextField(
+      controller: controller,
+      onChanged: onChanged,
+      textInputAction: TextInputAction.search,
+      decoration: InputDecoration(
+        isDense: true,
+        hintText: '이름 · 로스터리 검색',
+        prefixIcon: const Icon(Icons.search, size: 20),
+        suffixIcon: controller.text.isEmpty
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.close, size: 18),
+                onPressed: () {
+                  controller.clear();
+                  onChanged('');
+                },
+              ),
+        filled: true,
+        fillColor: c.cup,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: c.appLine)),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: c.appLine)),
+      ),
+    );
+  }
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 4: 통과 확인 + analyze</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/widget/bean_list_search_test.dart &amp;&amp; flutter analyze lib/features/beans/bean_list_screen.dart</code> Expected: 3개 테스트 PASS · <code class="ic">No issues found!</code></p>
+<blockquote><code class="ic">_SearchField</code>의 <code class="ic">suffixIcon</code>이 <code class="ic">controller.text</code>에 반응하려면 <code class="ic">onChanged</code>가 <code class="ic">setState</code>를 부르므로 리빌드되어 갱신된다(부모 <code class="ic">_query</code> 갱신 시 함께 리빌드).</blockquote>
+<ul class="tasklist"><li class="task"><strong>Step 5: 커밋</strong></li></ul>
+<pre class="code" data-lang="bash"><code>git add lib/features/beans/bean_list_screen.dart test/widget/bean_list_search_test.dart
+git commit -m "feat(m5): 원두 리스트 검색 필드 + 정렬 메뉴 + 검색 빈 상태" -m "Co-Authored-By: Claude Opus 4.8 (1M context) &lt;noreply@anthropic.com&gt;"</code></pre>
+<hr>
+<h2>최종 검증 (전체 태스크 후)</h2>
+<ul class="tasklist"><li class="task"><strong>전체 스위트 초록불</strong></li></ul>
+<p>Run: <code class="ic">flutter analyze &amp;&amp; flutter test</code> Expected: analyze <code class="ic">No issues found!</code> · 기존 137 + 신규(코덱 6 · repo 2 · 서비스 2 · 설정 3 · 정렬 5 · 리스트 3 ≈ <strong>+21</strong>) 전부 통과.</p>
+<blockquote>Windows 호스트에서 <code class="ic">flutter test</code>가 파일별 출력을 드물게 누락/중복하면 <code class="ic">flutter test --concurrency=1 -r expanded</code>로 재확인.</blockquote>
+<ul class="tasklist"><li class="task"><strong>whole-branch opus 리뷰</strong> — SDD 관례. 커밋 범위 <code class="ic">git log</code>로 확인 후 <code class="ic">scripts/review-package &lt;base&gt; HEAD</code>.</li></ul>
+<ul class="tasklist"><li class="task"><strong>문서/상태 갱신</strong> — <code class="ic">CLAUDE.md</code> Status에 M5 항목 추가, <code class="ic">docs/plans/roadmap.md</code>의 M5 행 완료 표기. (릴리스 커밋과 함께)</li></ul>
+<ul class="tasklist"><li class="task"><strong>릴리스</strong> — <code class="ic">v0.5.0</code> 태그 푸시 → CI <code class="ic">.ipa</code> → AltStore. (사용자 확인 후)</li></ul>
+<hr>
+<h2>Self-Review (계획 ↔ 설계 대조)</h2>
+<p><strong>커버리지:</strong> 설계 §2 범위 내 항목 전부 태스크 존재 — 코덱(T1)·replaceAll(T2)·서비스+deps+Info.plist(T3)·설정화면(T4)·검색정렬 순수(T5)·리스트 UI+검색빈상태(T6). 설계 §8 테스트 표의 파일 6종 모두 계획에 포함(<code class="ic">backup_codec</code>·<code class="ic">bean_sort_filter</code>·<code class="ic">backup_repo</code>·<code class="ic">settings_screen</code>·<code class="ic">bean_list_search</code> + Fake 계약 <code class="ic">backup_service_test</code>). 선택적 통합 테스트(<code class="ic">backup_roundtrip</code>)는 YAGNI로 v1 제외(코덱 라운드트립 유닛 + 설정 위젯이 왕복을 실질 커버).</p>
+<p><strong>설계 대비 조정 2건(문서에 반영 필요):</strong> ① 코덱이 hand-rolled ISO 포맷 대신 <strong>drift <code class="ic">toJson</code>/<code class="ic">fromJson</code> 재사용</strong>(31필드 수기 매핑의 오타 버그류 제거, 대칭성으로 라운드트립 보장) → 설계 §5 갱신. ② import 후 <strong>프로바이더 invalidate 불필요</strong>(drift <code class="ic">watch</code> 스트림이 <code class="ic">replaceAll</code> 쓰기에 자동 반응) → 설계 §4 흐름의 마지막 줄 삭제.</p>
+<p><strong>타입 일관성:</strong> <code class="ic">TasteSnapshot</code>(재사용)·<code class="ic">BackupFile</code>·<code class="ic">DecodedBackup</code>·<code class="ic">BeanSort</code>·<code class="ic">sortFilterBeans</code>·<code class="ic">replaceAll</code>·<code class="ic">backupServiceProvider</code>·<code class="ic">beanSortProvider</code> 시그니처가 태스크 간 일치. <code class="ic">beanSortProvider.notifier).set(...)</code> 호출부(T6)와 정의(T5) 일치. <code class="ic">wrapApp(backup:)</code>(T3 정의) ↔ 사용(T4).</p>
+<p><strong>플레이스홀더 스캔:</strong> 없음. share_plus 실호출은 기기 전용 seam이라 "설치 버전 API에 맞춘다"는 지시가 유일한 열린 항목 — 의도된 것(호스트 테스트 무관, analyze로 검증).</p>
+</article>

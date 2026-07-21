@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'data/bean_repository.dart';
 import 'data/database.dart';
+import 'features/beans/bean_sort.dart';
 import 'features/profile/taste_profile.dart';
 import 'services/backup_service.dart';
 import 'services/ocr_service.dart';
@@ -35,3 +36,11 @@ final tasteProfileProvider = StreamProvider<TasteProfile>(
       .watchTasteSnapshot()
       .map(computeTasteProfile),
 );
+
+class BeanSortNotifier extends Notifier<BeanSort> {
+  @override
+  BeanSort build() => BeanSort.recent;
+  void set(BeanSort sort) => state = sort;
+}
+
+final beanSortProvider = NotifierProvider<BeanSortNotifier, BeanSort>(BeanSortNotifier.new);

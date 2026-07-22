@@ -35,7 +35,7 @@ class SharePlusBackupService implements BackupService {
 
   String _stamp(DateTime d) {
     String p(int n) => n.toString().padLeft(2, '0');
-    return '${d.year}${p(d.month)}${p(d.day)}-${p(d.hour)}${p(d.minute)}';
+    return '${d.year}${p(d.month)}${p(d.day)}-${p(d.hour)}${p(d.minute)}${p(d.second)}';
   }
 
   @override

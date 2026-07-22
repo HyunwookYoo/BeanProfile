@@ -59,46 +59,51 @@ class _BeanListScreenState extends ConsumerState<BeanListScreen> {
             );
           }
           final shown = sortFilterBeans(list, _query, sort);
-          return Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                child: _SearchField(
-                  controller: _searchCtrl,
-                  onChanged: (v) => setState(() => _query = v),
+          return GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: () => FocusScope.of(context).unfocus(),
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                  child: _SearchField(
+                    controller: _searchCtrl,
+                    onChanged: (v) => setState(() => _query = v),
+                  ),
                 ),
-              ),
-              Expanded(
-                child: shown.isEmpty
-                    ? Center(
-                        child: Text("'$_query'에 맞는 원두가 없어요",
-                            style: TextStyle(color: context.colors.appMuted)),
-                      )
-                    : ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
-                        itemCount: shown.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
-                        itemBuilder: (_, i) {
-                          final s = shown[i];
-                          return Dismissible(
-                            key: ValueKey('bean-${s.bean.id}'),
-                            direction: DismissDirection.endToStart,
-                            background: const SwipeDeleteBackground(),
-                            confirmDismiss: (_) async {
-                              final ok = await confirmDeleteBeanDialog(context);
-                              if (ok) await ref.read(beanRepositoryProvider).deleteBean(s.bean.id);
-                              return false; // 반응형 리빌드가 삭제된 카드 제거(assert 회피)
-                            },
-                            child: BeanCard(
-                              summary: s,
-                              onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                                  builder: (_) => BeanDetailScreen(beanId: s.bean.id))),
-                            ),
-                          );
-                        },
-                      ),
-              ),
-            ],
+                Expanded(
+                  child: shown.isEmpty
+                      ? Center(
+                          child: Text("'$_query'에 맞는 원두가 없어요",
+                              style: TextStyle(color: context.colors.appMuted)),
+                        )
+                      : ListView.separated(
+                          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
+                          itemCount: shown.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 10),
+                          itemBuilder: (_, i) {
+                            final s = shown[i];
+                            return Dismissible(
+                              key: ValueKey('bean-${s.bean.id}'),
+                              direction: DismissDirection.endToStart,
+                              background: const SwipeDeleteBackground(),
+                              confirmDismiss: (_) async {
+                                final ok = await confirmDeleteBeanDialog(context);
+                                if (ok) await ref.read(beanRepositoryProvider).deleteBean(s.bean.id);
+                                return false; // 반응형 리빌드가 삭제된 카드 제거(assert 회피)
+                              },
+                              child: BeanCard(
+                                summary: s,
+                                onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                                    builder: (_) => BeanDetailScreen(beanId: s.bean.id))),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
           );
         },
       ),

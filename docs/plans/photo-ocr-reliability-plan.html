@@ -1,0 +1,1609 @@
+<title>사진 OCR 신뢰성 개선 Implementation Plan</title>
+<style>
+*{box-sizing:border-box}
+:root{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+  --font-sans:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Consolas,"Malgun Gothic",monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}}
+:root[data-theme="light"]{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+}
+:root[data-theme="dark"]{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-sans);line-height:1.7;-webkit-font-smoothing:antialiased}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.doc{max-width:880px;margin:0 auto;padding:44px 24px 96px}
+.crumb{font-family:var(--font-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:16px}
+h1{font-size:clamp(26px,4vw,38px);font-weight:800;letter-spacing:-.025em;line-height:1.2;margin:.1em 0 .5em;text-wrap:balance}
+h2{font-size:22px;font-weight:700;margin:2em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line);letter-spacing:-.01em;text-wrap:balance}
+h3{font-size:16.5px;font-weight:700;color:var(--accent-ink);margin:1.7em 0 .5em}
+h4{font-size:14px;font-weight:700;margin:1.3em 0 .4em}
+p{margin:.7em 0}
+a{color:var(--accent);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+strong{font-weight:700;color:var(--fg)}
+hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+code.ic{font-family:var(--font-mono);font-size:.85em;background:var(--ic-bg);color:var(--ic-fg);padding:1.5px 6px;border-radius:6px}
+pre.code{position:relative;background:var(--code-bg);color:var(--code-fg);border-radius:12px;padding:16px 18px;margin:1em 0;overflow-x:auto;border:1px solid rgba(0,0,0,.28)}
+pre.code code{font-family:var(--font-mono);font-size:12.75px;line-height:1.6;white-space:pre;color:inherit;background:none;padding:0}
+pre.code[data-lang]::before{content:attr(data-lang);position:absolute;top:9px;right:13px;font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(236,227,211,.42)}
+.tablewrap{overflow-x:auto;margin:1.1em 0}
+table{border-collapse:collapse;width:100%;font-size:13.75px}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--th);font-weight:700}
+tbody tr:nth-child(even){background:var(--surface)}
+blockquote{margin:1.1em 0;padding:11px 16px;border-left:3px solid var(--accent);background:var(--surface);border-radius:0 10px 10px 0;color:var(--muted)}
+blockquote strong{color:var(--fg)}
+ul,ol{margin:.7em 0;padding-left:1.4em}
+li{margin:.32em 0}
+ul.tasklist{list-style:none;padding-left:.15em}
+ul.tasklist li.task{position:relative;padding-left:30px;margin:.5em 0}
+ul.tasklist li.task::before{content:"";position:absolute;left:0;top:.18em;width:17px;height:17px;border:2px solid var(--accent);border-radius:5px;background:transparent}
+ul.tasklist li.task.done::before{content:"\2713";background:var(--accent);color:#fff;font-size:12px;font-weight:800;text-align:center;line-height:15px}
+</style>
+<article class="doc"><div class="crumb">BeanProfile · docs/plans</div>
+<h1>사진 OCR 신뢰성 개선 Implementation Plan</h1>
+<blockquote><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code class="ic">- [ ]</code>) syntax for tracking.</blockquote>
+<p><strong>Goal:</strong> 사진 촬영·갤러리 입력에서 싱글/블렌드를 안전하게 판별하고 복수 원산지 구성을 올바르게 채우며, 저대비 사진은 조건부 보정 OCR로 개선하고 복구 불가능한 사진은 비차단 재촬영 안내를 제공한다.</p>
+<p><strong>Architecture:</strong> 기존 <code class="ic">PhotoService → OcrService → parseOcr → BeanFormScreen</code> 흐름에 사진 품질 분석기, OCR 이미지 전처리기, 결정적 후보 점수기, 조건부 <code class="ic">OcrPipeline</code>을 삽입한다. OCR 초안은 단일 원산지 필드 대신 <code class="ic">OcrComponentDraft[]</code>와 확실/불명확 유형 판정을 가지며, UI는 품질 경고를 먼저 처리한 뒤 필요한 경우에만 유형을 확인한다.</p>
+<p><strong>Tech Stack:</strong> Flutter 3.44.6, Dart 3.9, Riverpod 3, ML Kit Text Recognition 0.16.0, image 4.9.1, image_picker 1.2.3, drift, flutter_test, integration_test</p>
+<h2>Global Constraints</h2>
+<ul><li>모든 처리는 온디바이스·오프라인이어야 하며 서버, 계정, 외부 커피 카탈로그를 추가하지 않는다.</li><li>기존 M3.3 좌표 기반 라벨↔값, 콜론/키워드 폴백, 칩 배정 UX를 보존한다.</li><li>원본/최대 품질 파일은 OCR에 사용하고, 저장용 컬러 사진만 JPEG 품질 85로 인코딩한다. 미지원 형식은 원본 복사로 폴백한다.</li><li>OCR 보정은 방향 반영 → 회색조 → 히스토그램 양 끝 1.5% 클립 → 대비 1.2 → 임시 PNG 한 개로 제한한다.</li><li>두 번째 OCR은 저대비, 제품명 누락, 국가 구성 누락, 유효 줄 4개 미만, 또는 평균 신뢰도 0.65 미만일 때만 실행한다.</li><li>유형 단서 없음·충돌은 <code class="ic">ambiguous</code>; 확실한 유형은 묻지 않고, 불명확할 때만 한 번 확인한다.</li><li>싱글은 제품명과 첫 국가가 필수다. 블렌드는 제품명만 필수이며 구성 0~N개 저장을 허용한다.</li><li>OCR 구성의 가공 방식이 인식되지 않으면 <code class="ic">Process.other</code>를 사용해 <code class="ic">washed</code>를 사실처럼 생성하지 않는다.</li><li>품질 문제와 약한 OCR 결과가 함께 있을 때만 재촬영을 권하고, 사용자는 그대로 진행할 수 있다.</li><li>실제 상용 카드 사진은 명시적 허가 없이 저장소에 커밋하지 않는다. 공개 저장소에는 합성 픽스처만 둔다.</li><li>모든 기능은 실패 테스트 → 최소 구현 → 대상 테스트 통과 순서를 지킨다.</li><li>커밋 전 <code class="ic">flutter analyze</code>와 관련 테스트를 실행한다. 전체 작업 종료 전 <code class="ic">flutter test</code>를 실행한다.</li><li><strong>사용자 커밋 승인 게이트:</strong> 모든 <code class="ic">git commit</code> 전에 변경 파일·검증 결과·예정 메시지를 사용자에게 먼저 알리고, 명시적 승인을 기다린 뒤에만 커밋한다.</li></ul>
+<hr>
+<h2>File Map</h2>
+<div class="tablewrap"><table><thead><tr><th>경로</th><th>책임</th></tr></thead><tbody><tr><td><code class="ic">lib/services/ocr_service.dart</code></td><td>ML Kit 줄 텍스트·좌표·nullable confidence 반환</td></tr><tr><td><code class="ic">lib/services/photo_service.dart</code></td><td>최대 품질 촬영/선택, 컬러 사진 품질 85 저장, 미지원 형식 복사</td></tr><tr><td><code class="ic">lib/services/image_quality_analyzer.dart</code></td><td>1024px 분석 사본에서 저대비·흐림·강한 하이라이트 판정</td></tr><tr><td><code class="ic">lib/services/ocr_image_preprocessor.dart</code></td><td>OCR용 보정 PNG 생성·삭제</td></tr><tr><td><code class="ic">lib/features/beans/ocr/ocr_draft.dart</code></td><td>복수 구성과 유형 판정이 포함된 OCR 초안</td></tr><tr><td><code class="ic">lib/features/beans/ocr/ocr_type_inference.dart</code></td><td>문구·구성 수를 이용한 순수 유형 추론</td></tr><tr><td><code class="ic">lib/features/beans/ocr/ocr_component_parser.dart</code></td><td>국가 앵커와 지역·가공·비율을 구성별로 결합</td></tr><tr><td><code class="ic">lib/features/beans/ocr/ocr_parser.dart</code></td><td>기존 필드 파싱과 새 구성·유형 파서를 조합</td></tr><tr><td><code class="ic">lib/features/beans/ocr/ocr_candidate.dart</code></td><td>OCR 후보 순위, 약한 결과 판정, 안전한 보완</td></tr><tr><td><code class="ic">lib/features/beans/ocr/ocr_pipeline.dart</code></td><td>품질 분석 → 원본 OCR → 조건부 보정 OCR → 정리 조정</td></tr><tr><td><code class="ic">lib/features/beans/add_bean_sheet.dart</code></td><td>품질 경고, 재촬영 루프, 불명확 유형 확인, 폼 진입</td></tr><tr><td><code class="ic">lib/features/beans/bean_form_screen.dart</code></td><td>복수 구성 프리필, 불완전 블렌드 경고, 유형 전환 안전성</td></tr><tr><td><code class="ic">lib/providers.dart</code></td><td>새 analyzer/preprocessor/pipeline 프로바이더 배선</td></tr><tr><td><code class="ic">test/helpers.dart</code></td><td>큐 기반 OCR·사진·파이프라인 페이크와 provider override</td></tr><tr><td><code class="ic">scripts/generate_ocr_fixtures.dart</code></td><td>공개 가능한 영문 블렌드·저대비·흐림 합성 카드 생성</td></tr><tr><td><code class="ic">integration_test/ocr_probe_test.dart</code></td><td>기존 카드 비회귀와 새 파이프라인 실 ML Kit 검증</td></tr></tbody></table></div>
+<hr>
+<h3>Task 1: OCR 줄·초안 모델을 복수 구성 기반으로 전환</h3>
+<p><strong>Files:</strong></p>
+<ul><li>Modify: <code class="ic">lib/services/ocr_service.dart:4-36</code></li><li>Modify: <code class="ic">lib/features/beans/ocr/ocr_draft.dart:1-37</code></li><li>Modify: <code class="ic">lib/features/beans/ocr/ocr_parser.dart:170-218</code></li><li>Modify: <code class="ic">lib/features/beans/bean_form_screen.dart:10-78</code></li><li>Modify: <code class="ic">test/helpers.dart:80-91</code></li><li>Modify: <code class="ic">test/unit/ocr_parser_test.dart</code></li><li>Modify: <code class="ic">test/widget/ocr_form_test.dart</code></li><li>Modify: <code class="ic">integration_test/ocr_probe_test.dart</code></li><li>Create: <code class="ic">test/unit/ocr_draft_test.dart</code></li></ul>
+<p><strong>Interfaces:</strong></p>
+<ul><li>Produces: <code class="ic">OcrLine(String text, {double left, double top, double right, double bottom, double? confidence})</code>, <code class="ic">OcrComponentDraft</code>, <code class="ic">OcrTypeDecision</code>, <code class="ic">OcrTypeReason</code>, <code class="ic">OcrDraft.components</code>, <code class="ic">OcrDraft.inferredType</code></li><li>Preserves: <code class="ic">OcrService.recognize(String) -&gt; Future&lt;List&lt;OcrLine&gt;&gt;</code>, <code class="ic">parseOcr(List&lt;OcrLine&gt;) -&gt; OcrDraft</code></li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 1: Write failing model tests</strong></li></ul>
+<pre class="code" data-lang="dart"><code>import 'package:beanprofile/data/enums.dart';
+import 'package:beanprofile/features/beans/ocr/ocr_draft.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  test('certain type exposes inferredType', () {
+    expect(
+      const OcrDraft(typeDecision: OcrTypeDecision.certainBlend).inferredType,
+      BeanType.blend,
+    );
+    expect(
+      const OcrDraft(typeDecision: OcrTypeDecision.certainSingle).inferredType,
+      BeanType.singleOrigin,
+    );
+    expect(
+      const OcrDraft(typeDecision: OcrTypeDecision.ambiguous).inferredType,
+      isNull,
+    );
+  });
+
+  test('component list is part of non-empty draft', () {
+    const draft = OcrDraft(
+      components: [OcrComponentDraft(country: 'Ethiopia')],
+    );
+    expect(draft.isEmpty, isFalse);
+    expect(draft.components.single.process, isNull);
+  });
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 2: Run the new test to verify it fails</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/unit/ocr_draft_test.dart</code></p>
+<p>Expected: FAIL because <code class="ic">OcrComponentDraft</code>, <code class="ic">OcrTypeDecision</code>, and the new constructor fields do not exist.</p>
+<ul class="tasklist"><li class="task"><strong>Step 3: Implement the new model and confidence field</strong></li></ul>
+<p>Use this public shape in <code class="ic">ocr_draft.dart</code>:</p>
+<pre class="code" data-lang="dart"><code>import '../../../data/enums.dart';
+
+enum OcrTypeDecision { certainSingle, certainBlend, ambiguous }
+
+enum OcrTypeReason {
+  explicitSingle,
+  explicitBlend,
+  multipleComponents,
+  conflictingSignals,
+  insufficientEvidence,
+}
+
+class OcrComponentDraft {
+  final String? country;
+  final String? region;
+  final Process? process;
+  final int? ratioPercent;
+  const OcrComponentDraft({
+    this.country,
+    this.region,
+    this.process,
+    this.ratioPercent,
+  });
+
+  bool get isEmpty =&gt;
+      country == null &amp;&amp; region == null &amp;&amp; process == null &amp;&amp; ratioPercent == null;
+}
+
+class OcrDraft {
+  final String? name;
+  final String? roaster;
+  final DateTime? roastDate;
+  final RoastLevel? roastLevel;
+  final List&lt;OcrComponentDraft&gt; components;
+  final List&lt;String&gt; cupNotes;
+  final List&lt;String&gt; chips;
+  final OcrTypeDecision typeDecision;
+  final Set&lt;OcrTypeReason&gt; typeReasons;
+
+  const OcrDraft({
+    this.name,
+    this.roaster,
+    this.roastDate,
+    this.roastLevel,
+    this.components = const [],
+    this.cupNotes = const [],
+    this.chips = const [],
+    this.typeDecision = OcrTypeDecision.ambiguous,
+    this.typeReasons = const {OcrTypeReason.insufficientEvidence},
+  });
+
+  BeanType? get inferredType =&gt; switch (typeDecision) {
+        OcrTypeDecision.certainSingle =&gt; BeanType.singleOrigin,
+        OcrTypeDecision.certainBlend =&gt; BeanType.blend,
+        OcrTypeDecision.ambiguous =&gt; null,
+      };
+
+  bool get isEmpty =&gt;
+      name == null &amp;&amp;
+      roaster == null &amp;&amp;
+      roastDate == null &amp;&amp;
+      roastLevel == null &amp;&amp;
+      components.every((c) =&gt; c.isEmpty) &amp;&amp;
+      cupNotes.isEmpty &amp;&amp;
+      chips.isEmpty;
+}</code></pre>
+<p>Add <code class="ic">final double? confidence</code> to <code class="ic">OcrLine</code>, default it to <code class="ic">null</code>, and map <code class="ic">line.confidence</code> in <code class="ic">MlkitOcrService</code>.</p>
+<p>For this task only, keep existing parser behavior by returning zero or one component:</p>
+<pre class="code" data-lang="dart"><code>final country = _firstMatch(lower, _countries);
+return OcrDraft(
+  name: name,
+  roaster: roaster,
+  roastDate: _matchDate(joined),
+  roastLevel: _firstMatch(lower, _roastKeywords),
+  components: country == null
+      ? const []
+      : [
+          OcrComponentDraft(
+            country: country,
+            region: region,
+            process: _firstMatch(lower, _processKeywords),
+          ),
+        ],
+  cupNotes: cupNotes,
+  chips: _dedupe(texts),
+);</code></pre>
+<p>Update the form and tests to read/write <code class="ic">draft.components[index]</code>. Do not keep legacy <code class="ic">OcrDraft(country:, region:, process:)</code> constructor parameters.</p>
+<ul class="tasklist"><li class="task"><strong>Step 4: Run model, parser, form, and probe compile tests</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/unit/ocr_draft_test.dart test/unit/ocr_parser_test.dart test/widget/ocr_form_test.dart</code></p>
+<p>Expected: PASS, including all existing M3.3 8-field coordinate fixtures.</p>
+<ul class="tasklist"><li class="task"><strong>Step 5: Run static analysis</strong></li></ul>
+<p>Run: <code class="ic">flutter analyze</code></p>
+<p>Expected: <code class="ic">No issues found!</code></p>
+<ul class="tasklist"><li class="task"><strong>Step 6: Request commit approval</strong></li></ul>
+<p>Run: <code class="ic">git diff --check</code> and <code class="ic">git diff --stat</code></p>
+<p>Tell the user the changed files, the test/analyze results, and proposed message <code class="ic">refactor(ocr): model structured origin drafts</code>. Wait for explicit approval.</p>
+<ul class="tasklist"><li class="task"><strong>Step 7: Commit only after approval</strong></li></ul>
+<pre class="code" data-lang="bash"><code>git add lib/services/ocr_service.dart lib/features/beans/ocr/ocr_draft.dart lib/features/beans/ocr/ocr_parser.dart lib/features/beans/bean_form_screen.dart test/helpers.dart test/unit/ocr_draft_test.dart test/unit/ocr_parser_test.dart test/widget/ocr_form_test.dart integration_test/ocr_probe_test.dart
+git commit -m "refactor(ocr): model structured origin drafts"</code></pre>
+<p>Expected: one commit containing only Task 1 files.</p>
+<hr>
+<h3>Task 2: 확실/불명확 원두 유형 추론</h3>
+<p><strong>Files:</strong></p>
+<ul><li>Create: <code class="ic">lib/features/beans/ocr/ocr_type_inference.dart</code></li><li>Create: <code class="ic">test/unit/ocr_type_inference_test.dart</code></li><li>Modify: <code class="ic">lib/features/beans/ocr/ocr_parser.dart:170-205</code></li></ul>
+<p><strong>Interfaces:</strong></p>
+<ul><li>Consumes: <code class="ic">OcrLine</code>, <code class="ic">OcrComponentDraft</code>, <code class="ic">OcrTypeDecision</code>, <code class="ic">OcrTypeReason</code></li><li>Produces: <code class="ic">OcrTypeInference inferBeanType(List&lt;OcrLine&gt;, List&lt;OcrComponentDraft&gt;)</code></li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 1: Write failing inference tests</strong></li></ul>
+<pre class="code" data-lang="dart"><code>import 'package:beanprofile/features/beans/ocr/ocr_draft.dart';
+import 'package:beanprofile/features/beans/ocr/ocr_type_inference.dart';
+import 'package:beanprofile/services/ocr_service.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  OcrLine line(String text) =&gt; OcrLine(text);
+
+  test('explicit Blend is certain without two components', () {
+    final result = inferBeanType([line('House Blend')], const []);
+    expect(result.decision, OcrTypeDecision.certainBlend);
+    expect(result.reasons, contains(OcrTypeReason.explicitBlend));
+  });
+
+  test('two structural components are certain blend', () {
+    final result = inferBeanType(const [], const [
+      OcrComponentDraft(country: 'Brazil'),
+      OcrComponentDraft(country: 'Ethiopia'),
+    ]);
+    expect(result.decision, OcrTypeDecision.certainBlend);
+    expect(result.reasons, contains(OcrTypeReason.multipleComponents));
+  });
+
+  test('explicit single with one component is certain single', () {
+    final result = inferBeanType(
+      [line('Single-Origin')],
+      const [OcrComponentDraft(country: 'Kenya')],
+    );
+    expect(result.decision, OcrTypeDecision.certainSingle);
+  });
+
+  test('conflicting text or no evidence is ambiguous', () {
+    expect(
+      inferBeanType([line('Single Origin Blend')], const []).decision,
+      OcrTypeDecision.ambiguous,
+    );
+    expect(
+      inferBeanType([line('Ethiopia')], const [
+        OcrComponentDraft(country: 'Ethiopia'),
+      ]).decision,
+      OcrTypeDecision.ambiguous,
+    );
+    expect(
+      inferBeanType([line('Single Estate')], const []).decision,
+      OcrTypeDecision.ambiguous,
+    );
+  });
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 2: Run the inference test to verify it fails</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/unit/ocr_type_inference_test.dart</code></p>
+<p>Expected: FAIL because <code class="ic">inferBeanType</code> and <code class="ic">OcrTypeInference</code> do not exist.</p>
+<ul class="tasklist"><li class="task"><strong>Step 3: Implement deterministic inference</strong></li></ul>
+<p>Use an immutable result and boundary-safe phrase normalization:</p>
+<pre class="code" data-lang="dart"><code>class OcrTypeInference {
+  final OcrTypeDecision decision;
+  final Set&lt;OcrTypeReason&gt; reasons;
+  const OcrTypeInference(this.decision, this.reasons);
+}
+
+String _normalizedText(List&lt;OcrLine&gt; lines) =&gt; lines
+    .map((l) =&gt; l.text.toLowerCase())
+    .join(' ')
+    .replaceAll(RegExp(r'[-_]'), ' ')
+    .replaceAll(RegExp(r'[^a-z0-9가-힣]+'), ' ')
+    .replaceAll(RegExp(r'\s+'), ' ')
+    .trim();
+
+bool _hasEnglishPhrase(String text, String phrase) =&gt;
+    RegExp('(^| )${RegExp.escape(phrase)}( |$)').hasMatch(text);
+
+OcrTypeInference inferBeanType(
+  List&lt;OcrLine&gt; lines,
+  List&lt;OcrComponentDraft&gt; components,
+) {
+  final text = _normalizedText(lines);
+  final explicitBlend =
+      _hasEnglishPhrase(text, 'blend') ||
+      _hasEnglishPhrase(text, 'house blend') ||
+      text.split(' ').contains('블렌드');
+  final explicitSingle =
+      _hasEnglishPhrase(text, 'single origin') ||
+      text.contains('싱글 오리진');
+  final multiple = components.where((c) =&gt; c.country != null).length &gt;= 2;
+
+  if ((explicitBlend &amp;&amp; explicitSingle) || (explicitSingle &amp;&amp; multiple)) {
+    return const OcrTypeInference(
+      OcrTypeDecision.ambiguous,
+      {OcrTypeReason.conflictingSignals},
+    );
+  }
+  if (explicitBlend || multiple) {
+    return OcrTypeInference(OcrTypeDecision.certainBlend, {
+      if (explicitBlend) OcrTypeReason.explicitBlend,
+      if (multiple) OcrTypeReason.multipleComponents,
+    });
+  }
+  if (explicitSingle) {
+    return const OcrTypeInference(
+      OcrTypeDecision.certainSingle,
+      {OcrTypeReason.explicitSingle},
+    );
+  }
+  return const OcrTypeInference(
+    OcrTypeDecision.ambiguous,
+    {OcrTypeReason.insufficientEvidence},
+  );
+}</code></pre>
+<p>Call it at the end of <code class="ic">parseOcr</code> and copy <code class="ic">decision/reasons</code> into <code class="ic">OcrDraft</code>.</p>
+<ul class="tasklist"><li class="task"><strong>Step 4: Run inference and parser tests</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/unit/ocr_type_inference_test.dart test/unit/ocr_parser_test.dart</code></p>
+<p>Expected: PASS; existing cards without explicit type remain <code class="ic">ambiguous</code> but retain all 8 parsed fields.</p>
+<ul class="tasklist"><li class="task"><strong>Step 5: Request commit approval</strong></li></ul>
+<p>Run: <code class="ic">git diff --check</code> and <code class="ic">git diff --stat</code></p>
+<p>Tell the user the changed files, test result, and proposed message <code class="ic">feat(ocr): infer single and blend type</code>. Wait for explicit approval.</p>
+<ul class="tasklist"><li class="task"><strong>Step 6: Commit only after approval</strong></li></ul>
+<pre class="code" data-lang="bash"><code>git add lib/features/beans/ocr/ocr_type_inference.dart lib/features/beans/ocr/ocr_parser.dart test/unit/ocr_type_inference_test.dart
+git commit -m "feat(ocr): infer single and blend type"</code></pre>
+<p>Expected: one commit containing only Task 2 files.</p>
+<hr>
+<h3>Task 3: 국가 앵커 기반 복수 원산지 구성 파싱</h3>
+<p><strong>Files:</strong></p>
+<ul><li>Create: <code class="ic">lib/features/beans/ocr/ocr_component_parser.dart</code></li><li>Create: <code class="ic">test/unit/ocr_component_parser_test.dart</code></li><li>Modify: <code class="ic">lib/features/beans/ocr/ocr_parser.dart:6-203</code></li><li>Modify: <code class="ic">test/unit/ocr_parser_test.dart:115-272</code></li></ul>
+<p><strong>Interfaces:</strong></p>
+<ul><li>Consumes: <code class="ic">List&lt;OcrLine&gt;</code></li><li>Produces: <code class="ic">List&lt;OcrComponentDraft&gt; parseOcrComponents(List&lt;OcrLine&gt;)</code></li><li>Preserves: single-card region/process behavior and all M3.3 geometry fixtures</li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 1: Write failing component tests</strong></li></ul>
+<pre class="code" data-lang="dart"><code>import 'package:beanprofile/data/enums.dart';
+import 'package:beanprofile/features/beans/ocr/ocr_component_parser.dart';
+import 'package:beanprofile/services/ocr_service.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  test('repeated rows become two ordered components', () {
+    final components = parseOcrComponents(const [
+      OcrLine('BLEND', left: 20, top: 10, right: 140, bottom: 40),
+      OcrLine('Brazil 60%', left: 20, top: 80, right: 240, bottom: 120),
+      OcrLine('Cerrado Natural', left: 20, top: 130, right: 300, bottom: 170),
+      OcrLine('Ethiopia 40%', left: 20, top: 220, right: 270, bottom: 260),
+      OcrLine('Guji Washed', left: 20, top: 270, right: 260, bottom: 310),
+    ]);
+    expect(components, hasLength(2));
+    expect(components[0].country, 'Brazil');
+    expect(components[0].region, 'Cerrado');
+    expect(components[0].process, Process.natural);
+    expect(components[0].ratioPercent, 60);
+    expect(components[1].country, 'Ethiopia');
+    expect(components[1].region, 'Guji');
+    expect(components[1].process, Process.washed);
+    expect(components[1].ratioPercent, 40);
+  });
+
+  test('inline country ratios preserve textual order', () {
+    final components = parseOcrComponents(const [
+      OcrLine('Brazil 60% / Ethiopia 40%'),
+    ]);
+    expect(components.map((c) =&gt; c.country), ['Brazil', 'Ethiopia']);
+    expect(components.map((c) =&gt; c.ratioPercent), [60, 40]);
+  });
+
+  test('country in unrelated description does not create second component', () {
+    final components = parseOcrComponents(const [
+      OcrLine('Ethiopia Guji'),
+      OcrLine('Roasted in Colombia by Example Roasters'),
+    ]);
+    expect(components, hasLength(1));
+    expect(components.single.country, 'Ethiopia');
+  });
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 2: Run the component test to verify it fails</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/unit/ocr_component_parser_test.dart</code></p>
+<p>Expected: FAIL because the component parser does not exist.</p>
+<ul class="tasklist"><li class="task"><strong>Step 3: Implement country mentions, structural admission, and grouping</strong></li></ul>
+<p>Create private <code class="ic">_CountryMention</code> records with line index, text offset, country, optional ratio, and <code class="ic">OcrLine</code>. Apply these rules in order:</p>
+<pre class="code" data-lang="dart"><code>const countryKeywords = &lt;String, String&gt;{
+  'costa rica': 'Costa Rica', '코스타리카': 'Costa Rica',
+  'el salvador': 'El Salvador', '엘살바도르': 'El Salvador',
+  'ethiopia': 'Ethiopia', '에티오피아': 'Ethiopia',
+  'colombia': 'Colombia', '콜롬비아': 'Colombia',
+  'kenya': 'Kenya', '케냐': 'Kenya',
+  'brazil': 'Brazil', '브라질': 'Brazil',
+  'guatemala': 'Guatemala', '과테말라': 'Guatemala',
+  'panama': 'Panama', '파나마': 'Panama',
+  'honduras': 'Honduras', '온두라스': 'Honduras',
+  'indonesia': 'Indonesia', '인도네시아': 'Indonesia',
+  'rwanda': 'Rwanda', '르완다': 'Rwanda',
+  'burundi': 'Burundi', '부룬디': 'Burundi',
+  'peru': 'Peru', '페루': 'Peru',
+  'nicaragua': 'Nicaragua', '니카라과': 'Nicaragua',
+  'yemen': 'Yemen', '예멘': 'Yemen',
+  'tanzania': 'Tanzania', '탄자니아': 'Tanzania',
+  'mexico': 'Mexico', '멕시코': 'Mexico',
+  'uganda': 'Uganda', '우간다': 'Uganda',
+  'bolivia': 'Bolivia', '볼리비아': 'Bolivia',
+  'ecuador': 'Ecuador', '에콰도르': 'Ecuador',
+};
+
+final ratioPattern = RegExp(r'\b(100|[1-9]?\d)\s*%');
+final componentContext = RegExp(
+  r'blend|블렌드|origin|원산지|component|구성',
+  caseSensitive: false,
+);</code></pre>
+<ul><li>Sort keyword matching by key length descending so <code class="ic">Costa Rica</code> wins before shorter overlaps.</li><li>Always admit the first country mention to preserve single-origin behavior.</li><li>Admit later mentions only when they have a ratio, the joined card has component context, they share a line with another country, or their left coordinate matches another country row within <code class="ic">2 * max(line.height, 20)</code>.</li><li>Deduplicate the same country from the same line and coordinate, but keep the same country on a different row/inline segment.</li><li>Segment ordered lines from each admitted country anchor until the next admitted anchor. Parse the anchor ratio, a region token that is not a known label/country/process, and the first process keyword in the segment.</li><li>For a one-component result, overwrite its region/process with the existing global geometry parser when that produces a non-null value. This preserves M3.3.</li><li>Move <code class="ic">countryKeywords</code> and process keyword lookup into the component parser and import them from <code class="ic">ocr_parser.dart</code>; do not duplicate keyword tables.</li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 4: Integrate component parsing and type inference</strong></li></ul>
+<p>At the end of <code class="ic">parseOcr</code>:</p>
+<pre class="code" data-lang="dart"><code>final components = parseOcrComponents(lines);
+final type = inferBeanType(lines, components);
+return OcrDraft(
+  name: name,
+  roaster: roaster,
+  roastDate: _matchDate(joined),
+  roastLevel: _firstMatch(lower, _roastKeywords),
+  components: components,
+  cupNotes: cupNotes,
+  chips: _dedupe(texts),
+  typeDecision: type.decision,
+  typeReasons: type.reasons,
+);</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 5: Run component, inference, and full parser tests</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/unit/ocr_component_parser_test.dart test/unit/ocr_type_inference_test.dart test/unit/ocr_parser_test.dart</code></p>
+<p>Expected: PASS; both existing real-coordinate cards still fill 8 fields, and blend fixtures return two ordered components.</p>
+<ul class="tasklist"><li class="task"><strong>Step 6: Request commit approval</strong></li></ul>
+<p>Run: <code class="ic">git diff --check</code> and <code class="ic">git diff --stat</code></p>
+<p>Tell the user the changed files, test result, and proposed message <code class="ic">feat(ocr): parse structured blend components</code>. Wait for explicit approval.</p>
+<ul class="tasklist"><li class="task"><strong>Step 7: Commit only after approval</strong></li></ul>
+<pre class="code" data-lang="bash"><code>git add lib/features/beans/ocr/ocr_component_parser.dart lib/features/beans/ocr/ocr_parser.dart test/unit/ocr_component_parser_test.dart test/unit/ocr_parser_test.dart
+git commit -m "feat(ocr): parse structured blend components"</code></pre>
+<p>Expected: one commit containing only Task 3 files.</p>
+<hr>
+<h3>Task 4: 최대 품질 OCR 입력과 저장용 컬러 사진 압축</h3>
+<p><strong>Files:</strong></p>
+<ul><li>Modify: <code class="ic">pubspec.yaml:30-44</code></li><li>Modify: <code class="ic">pubspec.lock</code></li><li>Modify: <code class="ic">lib/services/photo_service.dart:1-42</code></li><li>Create: <code class="ic">test/unit/photo_service_test.dart</code></li></ul>
+<p><strong>Interfaces:</strong></p>
+<ul><li>Preserves: <code class="ic">PhotoService.pick({required bool fromCamera})</code>, <code class="ic">PhotoService.persist(String)</code></li><li>Produces: testable <code class="ic">ImagePickerPhotoService({Future&lt;Directory&gt; Function()? documentsDirectory})</code></li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 1: Add direct image dependency</strong></li></ul>
+<p>Add under main dependencies:</p>
+<pre class="code" data-lang="yaml"><code>  image: ^4.9.1</code></pre>
+<p>Run: <code class="ic">flutter pub get</code></p>
+<p>Expected: <code class="ic">image</code> remains at 4.9.1 in <code class="ic">pubspec.lock</code> and changes from transitive to direct main.</p>
+<ul class="tasklist"><li class="task"><strong>Step 2: Write failing persistence tests</strong></li></ul>
+<pre class="code" data-lang="dart"><code>import 'dart:io';
+import 'package:beanprofile/services/photo_service.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:image/image.dart' as img;
+
+void main() {
+  late Directory root;
+  late ImagePickerPhotoService service;
+
+  setUp(() async {
+    root = await Directory.systemTemp.createTemp('beanprofile-photo-');
+    service = ImagePickerPhotoService(documentsDirectory: () async =&gt; root);
+  });
+  tearDown(() =&gt; root.delete(recursive: true));
+
+  test('decodable image is persisted as quality-85 jpg', () async {
+    final source = File('${root.path}/source.png');
+    final image = img.Image(width: 32, height: 32);
+    img.fill(image, color: img.ColorRgb8(40, 80, 120));
+    await source.writeAsBytes(img.encodePng(image));
+
+    final result = await service.persist(source.path);
+
+    expect(result, endsWith('.jpg'));
+    expect(await img.decodeImageFile(result), isNotNull);
+    expect(await File(result).length(), greaterThan(0));
+  });
+
+  test('unsupported bytes are copied without failing save', () async {
+    final source = File('${root.path}/source.heic');
+    const bytes = [0, 1, 2, 3, 4, 5];
+    await source.writeAsBytes(bytes);
+
+    final result = await service.persist(source.path);
+
+    expect(result, endsWith('.heic'));
+    expect(await File(result).readAsBytes(), bytes);
+  });
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 3: Run persistence tests to verify they fail</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/unit/photo_service_test.dart</code></p>
+<p>Expected: FAIL because constructor injection and JPEG encoding do not exist.</p>
+<ul class="tasklist"><li class="task"><strong>Step 4: Implement full-quality pick and safe persistence</strong></li></ul>
+<p>Use this constructor seam and persist algorithm:</p>
+<pre class="code" data-lang="dart"><code>typedef DocumentsDirectory = Future&lt;Directory&gt; Function();
+
+class ImagePickerPhotoService implements PhotoService {
+  ImagePickerPhotoService({DocumentsDirectory? documentsDirectory})
+      : _documentsDirectory =
+            documentsDirectory ?? getApplicationDocumentsDirectory;
+
+  final ImagePicker _picker = ImagePicker();
+  final DocumentsDirectory _documentsDirectory;
+
+  @override
+  Future&lt;String?&gt; pick({required bool fromCamera}) async {
+    final x = await _picker.pickImage(
+      source: fromCamera ? ImageSource.camera : ImageSource.gallery,
+    );
+    return x?.path;
+  }
+
+  @override
+  Future&lt;String&gt; persist(String tempPath) async {
+    final dir = await _documentsDirectory();
+    final photos = Directory('${dir.path}/photos');
+    if (!await photos.exists()) await photos.create(recursive: true);
+    final stamp = DateTime.now().microsecondsSinceEpoch;
+    final decoded = await img.decodeImageFile(tempPath);
+    if (decoded != null) {
+      final dest = '${photos.path}/$stamp.jpg';
+      final oriented = img.bakeOrientation(decoded);
+      await File(dest).writeAsBytes(img.encodeJpg(oriented, quality: 85));
+      return dest;
+    }
+    final ext = tempPath.contains('.') ? tempPath.split('.').last : 'img';
+    final dest = '${photos.path}/$stamp.$ext';
+    await File(tempPath).copy(dest);
+    return dest;
+  }
+}</code></pre>
+<p>Do not pass <code class="ic">imageQuality</code> to <code class="ic">pickImage</code>; <code class="ic">null</code> returns original/max quality.</p>
+<ul class="tasklist"><li class="task"><strong>Step 5: Run persistence and existing photo tests</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/unit/photo_service_test.dart test/unit/photo_path_repository_test.dart test/widget/ocr_form_test.dart</code></p>
+<p>Expected: PASS; photo path round-trip and form persistence behavior remain intact.</p>
+<ul class="tasklist"><li class="task"><strong>Step 6: Run static analysis</strong></li></ul>
+<p>Run: <code class="ic">flutter analyze</code></p>
+<p>Expected: <code class="ic">No issues found!</code></p>
+<ul class="tasklist"><li class="task"><strong>Step 7: Request commit approval</strong></li></ul>
+<p>Run: <code class="ic">git diff --check</code> and <code class="ic">git diff --stat</code></p>
+<p>Tell the user the changed files, test/analyze results, and proposed message <code class="ic">feat(photo): preserve OCR input quality</code>. Wait for explicit approval.</p>
+<ul class="tasklist"><li class="task"><strong>Step 8: Commit only after approval</strong></li></ul>
+<pre class="code" data-lang="bash"><code>git add pubspec.yaml pubspec.lock lib/services/photo_service.dart test/unit/photo_service_test.dart
+git commit -m "feat(photo): preserve OCR input quality"</code></pre>
+<p>Expected: one commit containing only Task 4 files.</p>
+<hr>
+<h3>Task 5: 사진 품질 분석기와 OCR 보정 PNG</h3>
+<p><strong>Files:</strong></p>
+<ul><li>Create: <code class="ic">lib/services/image_quality_analyzer.dart</code></li><li>Create: <code class="ic">lib/services/ocr_image_preprocessor.dart</code></li><li>Create: <code class="ic">test/unit/image_quality_analyzer_test.dart</code></li><li>Create: <code class="ic">test/unit/ocr_image_preprocessor_test.dart</code></li></ul>
+<p><strong>Interfaces:</strong></p>
+<ul><li>Produces: <code class="ic">ImageQualityIssue</code>, <code class="ic">ImageQualityReport</code>, <code class="ic">ImageQualityAnalyzer.analyze(String)</code></li><li>Produces: <code class="ic">OcrImagePreprocessor.enhance(String) -&gt; Future&lt;String&gt;</code>, <code class="ic">delete(String)</code></li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 1: Write failing quality tests with synthetic pixels</strong></li></ul>
+<pre class="code" data-lang="dart"><code>import 'package:beanprofile/services/image_quality_analyzer.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:image/image.dart' as img;
+
+void main() {
+  img.Image checker(int a, int b) {
+    final image = img.Image(width: 128, height: 128);
+    for (var y = 0; y &lt; image.height; y++) {
+      for (var x = 0; x &lt; image.width; x++) {
+        final value = ((x ~/ 8 + y ~/ 8).isEven) ? a : b;
+        image.setPixelRgb(x, y, value, value, value);
+      }
+    }
+    return image;
+  }
+
+  test('narrow luminance range is low contrast', () {
+    final report = analyzeDecodedImage(checker(100, 130));
+    expect(report.issues, contains(ImageQualityIssue.lowContrast));
+  });
+
+  test('sharp black-white edges are not blurry or low contrast', () {
+    final report = analyzeDecodedImage(checker(0, 255));
+    expect(report.issues, isNot(contains(ImageQualityIssue.lowContrast)));
+    expect(report.issues, isNot(contains(ImageQualityIssue.blurry)));
+  });
+
+  test('large clipped highlight cluster is reported', () {
+    final image = img.Image(width: 128, height: 128);
+    img.fill(image, color: img.ColorRgb8(30, 30, 30));
+    img.fillRect(
+      image,
+      x1: 16,
+      y1: 16,
+      x2: 95,
+      y2: 95,
+      color: img.ColorRgb8(255, 255, 255),
+    );
+    final report = analyzeDecodedImage(image);
+    expect(report.issues, contains(ImageQualityIssue.strongHighlights));
+  });
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 2: Write failing preprocessor file test</strong></li></ul>
+<pre class="code" data-lang="dart"><code>import 'dart:io';
+import 'package:beanprofile/services/ocr_image_preprocessor.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:image/image.dart' as img;
+
+void main() {
+  test('enhance writes grayscale PNG and delete removes it', () async {
+    final root = await Directory.systemTemp.createTemp('beanprofile-enhance-');
+    addTearDown(() =&gt; root.delete(recursive: true));
+    final source = File('${root.path}/source.jpg');
+    final input = img.Image(width: 64, height: 32);
+    img.fill(input, color: img.ColorRgb8(80, 100, 120));
+    await source.writeAsBytes(img.encodeJpg(input));
+    final service = DartOcrImagePreprocessor(
+      temporaryDirectory: () async =&gt; root,
+    );
+
+    final enhancedPath = await service.enhance(source.path);
+    final enhanced = await img.decodeImageFile(enhancedPath);
+
+    expect(enhancedPath, endsWith('.png'));
+    expect(enhanced, isNotNull);
+    final pixel = enhanced!.getPixel(0, 0);
+    expect(pixel.r, pixel.g);
+    expect(pixel.g, pixel.b);
+    expect(await source.exists(), isTrue);
+
+    await service.delete(enhancedPath);
+    expect(await File(enhancedPath).exists(), isFalse);
+  });
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 3: Run both new tests to verify they fail</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/unit/image_quality_analyzer_test.dart test/unit/ocr_image_preprocessor_test.dart</code></p>
+<p>Expected: FAIL because the two services and public types do not exist.</p>
+<ul class="tasklist"><li class="task"><strong>Step 4: Implement quality report and normalized analysis</strong></li></ul>
+<p>Use these exact thresholds on a direction-baked grayscale image whose long edge is 1024px:</p>
+<pre class="code" data-lang="dart"><code>enum ImageQualityIssue { lowContrast, blurry, strongHighlights }
+
+class ImageQualityReport {
+  final Set&lt;ImageQualityIssue&gt; issues;
+  const ImageQualityReport([this.issues = const {}]);
+  bool get lowContrast =&gt; issues.contains(ImageQualityIssue.lowContrast);
+  bool get hasIssues =&gt; issues.isNotEmpty;
+}
+
+abstract interface class ImageQualityAnalyzer {
+  Future&lt;ImageQualityReport&gt; analyze(String imagePath);
+}</code></pre>
+<ul><li>Low contrast: <code class="ic">(p95 luminance - p05 luminance) &lt; 64</code> <strong>and</strong> luminance standard deviation <code class="ic">&lt; 30</code>.</li><li>Blurry: variance of the 3×3 Laplacian response <code class="ic">&lt; 100</code>.</li><li>Strong highlights: at least 6% of all pixels have luminance ≥250 and at least one 64×64 tile has ≥30% such pixels.</li><li><code class="ic">DartImageQualityAnalyzer.analyze</code> uses <code class="ic">Isolate.run</code>; decode failure returns <code class="ic">const ImageQualityReport()</code> rather than throwing.</li><li>Keep <code class="ic">analyzeDecodedImage(img.Image)</code> public for deterministic host tests.</li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 5: Implement one enhanced temporary variant</strong></li></ul>
+<pre class="code" data-lang="dart"><code>typedef TemporaryDirectory = Future&lt;Directory&gt; Function();
+
+abstract interface class OcrImagePreprocessor {
+  Future&lt;String&gt; enhance(String imagePath);
+  Future&lt;void&gt; delete(String imagePath);
+}
+
+class DartOcrImagePreprocessor implements OcrImagePreprocessor {
+  DartOcrImagePreprocessor({TemporaryDirectory? temporaryDirectory})
+      : _temporaryDirectory = temporaryDirectory ?? getTemporaryDirectory;
+  final TemporaryDirectory _temporaryDirectory;
+
+  @override
+  Future&lt;String&gt; enhance(String imagePath) async {
+    final dir = await _temporaryDirectory();
+    final output =
+        '${dir.path}/beanprofile_ocr_${DateTime.now().microsecondsSinceEpoch}.png';
+    await Isolate.run(() async {
+      var image = await img.decodeImageFile(imagePath);
+      if (image == null) throw const FormatException('Unsupported image');
+      image = img.bakeOrientation(image);
+      image = img.grayscale(image);
+      image = img.histogramStretch(
+        image,
+        mode: img.HistogramEqualizeMode.grayscale,
+        stretchClipRatio: 0.015,
+      );
+      image = img.adjustColor(image, contrast: 1.2);
+      await File(output).writeAsBytes(img.encodePng(image));
+    });
+    return output;
+  }
+
+  @override
+  Future&lt;void&gt; delete(String imagePath) async {
+    try {
+      final file = File(imagePath);
+      if (await file.exists()) await file.delete();
+    } catch (_) {
+      return;
+    }
+  }
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 6: Run service tests and analysis</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/unit/image_quality_analyzer_test.dart test/unit/ocr_image_preprocessor_test.dart</code></p>
+<p>Expected: PASS.</p>
+<p>Run: <code class="ic">flutter analyze</code></p>
+<p>Expected: <code class="ic">No issues found!</code></p>
+<ul class="tasklist"><li class="task"><strong>Step 7: Request commit approval</strong></li></ul>
+<p>Run: <code class="ic">git diff --check</code> and <code class="ic">git diff --stat</code></p>
+<p>Tell the user the changed files, test/analyze results, and proposed message <code class="ic">feat(ocr): analyze and enhance input images</code>. Wait for explicit approval.</p>
+<ul class="tasklist"><li class="task"><strong>Step 8: Commit only after approval</strong></li></ul>
+<pre class="code" data-lang="bash"><code>git add lib/services/image_quality_analyzer.dart lib/services/ocr_image_preprocessor.dart test/unit/image_quality_analyzer_test.dart test/unit/ocr_image_preprocessor_test.dart
+git commit -m "feat(ocr): analyze and enhance input images"</code></pre>
+<p>Expected: one commit containing only Task 5 files.</p>
+<hr>
+<h3>Task 6: 결정적 후보 점수와 조건부 두 번째 OCR 파이프라인</h3>
+<p><strong>Files:</strong></p>
+<ul><li>Create: <code class="ic">lib/features/beans/ocr/ocr_candidate.dart</code></li><li>Create: <code class="ic">lib/features/beans/ocr/ocr_pipeline.dart</code></li><li>Create: <code class="ic">test/unit/ocr_candidate_test.dart</code></li><li>Create: <code class="ic">test/unit/ocr_pipeline_test.dart</code></li><li>Modify: <code class="ic">test/helpers.dart:80-109</code></li></ul>
+<p><strong>Interfaces:</strong></p>
+<ul><li>Produces: <code class="ic">OcrCandidate</code>, <code class="ic">isWeakOcr</code>, <code class="ic">compareOcrCandidates</code>, <code class="ic">mergeOcrCandidates</code></li><li>Produces: <code class="ic">OcrPipeline.analyze(String) -&gt; Future&lt;OcrPipelineResult&gt;</code></li><li>Consumes: <code class="ic">OcrService</code>, <code class="ic">ImageQualityAnalyzer</code>, <code class="ic">OcrImagePreprocessor</code>, <code class="ic">parseOcr</code></li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 1: Write failing candidate-order tests</strong></li></ul>
+<pre class="code" data-lang="dart"><code>import 'package:beanprofile/features/beans/ocr/ocr_candidate.dart';
+import 'package:beanprofile/features/beans/ocr/ocr_draft.dart';
+import 'package:beanprofile/services/ocr_service.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  test('required fields outrank line confidence', () {
+    const complete = OcrCandidate(
+      lines: [OcrLine('Name: A', confidence: .7), OcrLine('Brazil', confidence: .7)],
+      draft: OcrDraft(
+        name: 'A',
+        components: [OcrComponentDraft(country: 'Brazil')],
+      ),
+      knownLabelCount: 1,
+      fromEnhanced: true,
+    );
+    const confidentButEmpty = OcrCandidate(
+      lines: [OcrLine('Decorative', confidence: .99)],
+      draft: OcrDraft(),
+      knownLabelCount: 0,
+      fromEnhanced: false,
+    );
+    expect(compareOcrCandidates(complete, confidentButEmpty), greaterThan(0));
+  });
+
+  test('merge fills blanks but never overwrites conflicts', () {
+    const primary = OcrCandidate(
+      lines: [],
+      draft: OcrDraft(name: 'Primary'),
+      knownLabelCount: 0,
+      fromEnhanced: false,
+    );
+    const secondary = OcrCandidate(
+      lines: [],
+      draft: OcrDraft(name: 'Secondary', roaster: 'Roaster'),
+      knownLabelCount: 0,
+      fromEnhanced: true,
+    );
+    final merged = mergeOcrCandidates(primary, secondary);
+    expect(merged.name, 'Primary');
+    expect(merged.roaster, 'Roaster');
+  });
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 2: Write failing orchestration tests</strong></li></ul>
+<p>Define fakes local to <code class="ic">ocr_pipeline_test.dart</code> and verify these cases:</p>
+<pre class="code" data-lang="dart"><code>test('strong original skips enhancement and second OCR', () async {
+  final ocr = QueueOcrService([
+    [
+      const OcrLine('Name: House Blend', confidence: .9),
+      const OcrLine('Brazil', confidence: .9),
+      const OcrLine('Natural', confidence: .9),
+      const OcrLine('Notes: Cocoa', confidence: .9),
+    ],
+  ]);
+  final preprocessor = FakePreprocessor('/tmp/enhanced.png');
+  final pipeline = DefaultOcrPipeline(
+    ocr: ocr,
+    qualityAnalyzer: FakeQualityAnalyzer(const ImageQualityReport()),
+    preprocessor: preprocessor,
+  );
+
+  final result = await pipeline.analyze('/tmp/original.jpg');
+
+  expect(ocr.paths, ['/tmp/original.jpg']);
+  expect(preprocessor.enhanceCalls, 0);
+  expect(result.usedEnhanced, isFalse);
+});
+
+test('low contrast retries once and always deletes temporary image', () async {
+  final ocr = QueueOcrService([
+    [const OcrLine('Decorative', confidence: .4)],
+    [
+      const OcrLine('Name: House Blend', confidence: .9),
+      const OcrLine('Brazil 60%', confidence: .9),
+      const OcrLine('Ethiopia 40%', confidence: .9),
+      const OcrLine('Notes: Cocoa', confidence: .9),
+    ],
+  ]);
+  final preprocessor = FakePreprocessor('/tmp/enhanced.png');
+  final pipeline = DefaultOcrPipeline(
+    ocr: ocr,
+    qualityAnalyzer: FakeQualityAnalyzer(
+      const ImageQualityReport({ImageQualityIssue.lowContrast}),
+    ),
+    preprocessor: preprocessor,
+  );
+
+  final result = await pipeline.analyze('/tmp/original.jpg');
+
+  expect(ocr.paths, ['/tmp/original.jpg', '/tmp/enhanced.png']);
+  expect(preprocessor.deleted, ['/tmp/enhanced.png']);
+  expect(result.usedEnhanced, isTrue);
+});</code></pre>
+<p>Add these failure/edge tests in the same file:</p>
+<pre class="code" data-lang="dart"><code>test('analyzer failure still returns original OCR', () async {
+  final pipeline = DefaultOcrPipeline(
+    ocr: QueueOcrService([
+      [
+        const OcrLine('Name: A', confidence: .9),
+        const OcrLine('Brazil', confidence: .9),
+        const OcrLine('Natural', confidence: .9),
+        const OcrLine('Notes: Cocoa', confidence: .9),
+      ],
+    ]),
+    qualityAnalyzer: ThrowingQualityAnalyzer(),
+    preprocessor: FakePreprocessor('/tmp/enhanced.png'),
+  );
+  final result = await pipeline.analyze('/tmp/original.jpg');
+  expect(result.draft.name, 'A');
+  expect(result.quality.issues, isEmpty);
+});
+
+test('preprocessor failure keeps weak original and warns only with quality issue', () async {
+  final pipeline = DefaultOcrPipeline(
+    ocr: QueueOcrService([
+      [const OcrLine('Decorative', confidence: .4)],
+    ]),
+    qualityAnalyzer: FakeQualityAnalyzer(
+      const ImageQualityReport({ImageQualityIssue.blurry}),
+    ),
+    preprocessor: ThrowingPreprocessor(),
+  );
+  final result = await pipeline.analyze('/tmp/original.jpg');
+  expect(result.draft.chips, ['Decorative']);
+  expect(result.usedEnhanced, isFalse);
+  expect(result.shouldWarnQuality, isTrue);
+});
+
+test('all-null confidence is ignored and strong fields suppress warning', () async {
+  const candidate = OcrCandidate(
+    lines: [
+      OcrLine('Name: A'),
+      OcrLine('Brazil'),
+      OcrLine('Natural'),
+      OcrLine('Notes: Cocoa'),
+    ],
+    draft: OcrDraft(
+      name: 'A',
+      components: [OcrComponentDraft(country: 'Brazil')],
+    ),
+    knownLabelCount: 2,
+    fromEnhanced: false,
+  );
+  expect(candidate.meanConfidence, isNull);
+  expect(isWeakOcr(candidate), isFalse);
+});</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 3: Run candidate and pipeline tests to verify they fail</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/unit/ocr_candidate_test.dart test/unit/ocr_pipeline_test.dart</code></p>
+<p>Expected: FAIL because candidate and pipeline types do not exist.</p>
+<ul class="tasklist"><li class="task"><strong>Step 4: Implement candidate tuple and safe merge</strong></li></ul>
+<pre class="code" data-lang="dart"><code>class OcrCandidate {
+  final List&lt;OcrLine&gt; lines;
+  final OcrDraft draft;
+  final int knownLabelCount;
+  final bool fromEnhanced;
+  const OcrCandidate({
+    required this.lines,
+    required this.draft,
+    required this.knownLabelCount,
+    required this.fromEnhanced,
+  });
+
+  int get requiredCount =&gt;
+      (draft.name == null ? 0 : 1) +
+      (draft.components.any((c) =&gt; c.country != null) ? 1 : 0);
+  int get countryComponentCount =&gt;
+      draft.components.where((c) =&gt; c.country != null).length;
+  double? get meanConfidence {
+    final values = lines.map((l) =&gt; l.confidence).whereType&lt;double&gt;().toList();
+    if (values.isEmpty) return null;
+    return values.reduce((a, b) =&gt; a + b) / values.length;
+  }
+}
+
+bool isWeakOcr(OcrCandidate candidate) {
+  final confidence = candidate.meanConfidence;
+  return candidate.draft.name == null ||
+      candidate.countryComponentCount == 0 ||
+      candidate.lines.where((l) =&gt; l.text.trim().isNotEmpty).length &lt; 4 ||
+      (confidence != null &amp;&amp; confidence &lt; .65);
+}</code></pre>
+<p>Implement lexicographic comparison in this exact order: required count, country component count, total filled scalar+component fields, known label count, mean confidence only if both are non-null, then original over enhanced. <code class="ic">mergeOcrCandidates</code> fills only missing scalar values, chooses the whole component list with more country-filled components, and appends unique secondary chips.</p>
+<ul class="tasklist"><li class="task"><strong>Step 5: Implement pipeline and cleanup guarantee</strong></li></ul>
+<pre class="code" data-lang="dart"><code>class OcrPipelineResult {
+  final OcrDraft draft;
+  final ImageQualityReport quality;
+  final bool usedEnhanced;
+  final bool shouldWarnQuality;
+  const OcrPipelineResult({
+    required this.draft,
+    required this.quality,
+    required this.usedEnhanced,
+    required this.shouldWarnQuality,
+  });
+}
+
+abstract interface class OcrPipeline {
+  Future&lt;OcrPipelineResult&gt; analyze(String imagePath);
+}
+
+class DefaultOcrPipeline implements OcrPipeline {
+  final OcrService ocr;
+  final ImageQualityAnalyzer qualityAnalyzer;
+  final OcrImagePreprocessor preprocessor;
+  const DefaultOcrPipeline({
+    required this.ocr,
+    required this.qualityAnalyzer,
+    required this.preprocessor,
+  });
+
+  @override
+  Future&lt;OcrPipelineResult&gt; analyze(String imagePath) async {
+    ImageQualityReport quality;
+    try {
+      quality = await qualityAnalyzer.analyze(imagePath);
+    } catch (_) {
+      quality = const ImageQualityReport();
+    }
+    final original = buildOcrCandidate(await ocr.recognize(imagePath), false);
+    if (!quality.lowContrast &amp;&amp; !isWeakOcr(original)) {
+      return OcrPipelineResult(
+        draft: original.draft,
+        quality: quality,
+        usedEnhanced: false,
+        shouldWarnQuality: false,
+      );
+    }
+
+    String? enhancedPath;
+    OcrCandidate? enhanced;
+    try {
+      enhancedPath = await preprocessor.enhance(imagePath);
+      enhanced = buildOcrCandidate(await ocr.recognize(enhancedPath), true);
+    } catch (_) {
+      enhanced = null;
+    } finally {
+      if (enhancedPath != null) await preprocessor.delete(enhancedPath);
+    }
+
+    final best = enhanced == null
+        ? original
+        : compareOcrCandidates(original, enhanced) &gt;= 0
+            ? original
+            : enhanced;
+    final other = identical(best, original) ? enhanced : original;
+    final draft = other == null ? best.draft : mergeOcrCandidates(best, other);
+    final finalCandidate = OcrCandidate(
+      lines: best.lines,
+      draft: draft,
+      knownLabelCount: best.knownLabelCount,
+      fromEnhanced: best.fromEnhanced,
+    );
+    return OcrPipelineResult(
+      draft: draft,
+      quality: quality,
+      usedEnhanced: best.fromEnhanced,
+      shouldWarnQuality: quality.hasIssues &amp;&amp; isWeakOcr(finalCandidate),
+    );
+  }
+}</code></pre>
+<p><code class="ic">buildOcrCandidate</code> must call <code class="ic">parseOcr(lines)</code> and count the known labels already defined by the parser; expose a pure <code class="ic">isKnownOcrLabel(String)</code> rather than duplicating the label set.</p>
+<ul class="tasklist"><li class="task"><strong>Step 6: Run candidate, pipeline, and parser regressions</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/unit/ocr_candidate_test.dart test/unit/ocr_pipeline_test.dart test/unit/ocr_parser_test.dart</code></p>
+<p>Expected: PASS.</p>
+<p>Run: <code class="ic">flutter analyze</code></p>
+<p>Expected: <code class="ic">No issues found!</code></p>
+<ul class="tasklist"><li class="task"><strong>Step 7: Request commit approval</strong></li></ul>
+<p>Run: <code class="ic">git diff --check</code> and <code class="ic">git diff --stat</code></p>
+<p>Tell the user the changed files, test/analyze results, and proposed message <code class="ic">feat(ocr): add conditional enhancement pipeline</code>. Wait for explicit approval.</p>
+<ul class="tasklist"><li class="task"><strong>Step 8: Commit only after approval</strong></li></ul>
+<pre class="code" data-lang="bash"><code>git add lib/features/beans/ocr/ocr_candidate.dart lib/features/beans/ocr/ocr_pipeline.dart lib/features/beans/ocr/ocr_parser.dart test/helpers.dart test/unit/ocr_candidate_test.dart test/unit/ocr_pipeline_test.dart
+git commit -m "feat(ocr): add conditional enhancement pipeline"</code></pre>
+<p>Expected: one commit containing only Task 6 files.</p>
+<hr>
+<h3>Task 7: 파이프라인 프로바이더와 재촬영·유형 확인 흐름</h3>
+<p><strong>Files:</strong></p>
+<ul><li>Modify: <code class="ic">lib/providers.dart:1-31</code></li><li>Modify: <code class="ic">lib/features/beans/add_bean_sheet.dart:1-70</code></li><li>Modify: <code class="ic">lib/features/beans/bean_form_screen.dart:10-48</code></li><li>Modify: <code class="ic">test/helpers.dart:24-108</code></li><li>Create: <code class="ic">test/widget/add_bean_sheet_ocr_test.dart</code></li></ul>
+<p><strong>Interfaces:</strong></p>
+<ul><li>Consumes: <code class="ic">OcrPipelineResult</code>, <code class="ic">OcrDraft.typeDecision</code>, <code class="ic">OcrDraft.inferredType</code></li><li>Produces: <code class="ic">ocrPipelineProvider</code>, quality choice dialog, ambiguous type dialog, retake loop</li><li>Passes: <code class="ic">BeanFormScreen(initialType:, draft:, photoTempPath:)</code></li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 1: Add failing widget harness tests</strong></li></ul>
+<pre class="code" data-lang="dart"><code>class AddHarness extends ConsumerWidget {
+  const AddHarness({super.key});
+  @override
+  Widget build(BuildContext context, WidgetRef ref) =&gt; Scaffold(
+        body: FilledButton(
+          key: const Key('open-add'),
+          onPressed: () =&gt; showAddBeanSheet(context, ref),
+          child: const Text('add'),
+        ),
+      );
+}
+
+Future&lt;void&gt; openCamera(WidgetTester t) async {
+  await t.tap(find.byKey(const Key('open-add')));
+  await t.pumpAndSettle();
+  await t.tap(find.byKey(const Key('add-camera')));
+  await t.pump();
+  await t.pumpAndSettle();
+}
+
+testWidgets('certain blend opens form without type dialog', (t) async {
+  final db = testDatabase();
+  addTearDown(db.close);
+  final pipeline = FakeOcrPipeline([
+    const OcrPipelineResult(
+      draft: OcrDraft(
+        name: 'House Blend',
+        typeDecision: OcrTypeDecision.certainBlend,
+        typeReasons: {OcrTypeReason.explicitBlend},
+        components: [
+          OcrComponentDraft(country: 'Brazil'),
+          OcrComponentDraft(country: 'Ethiopia'),
+        ],
+      ),
+      quality: ImageQualityReport(),
+      usedEnhanced: false,
+      shouldWarnQuality: false,
+    ),
+  ]);
+  await t.pumpWidget(wrapApp(
+    const AddHarness(),
+    db: db,
+    photo: FakePhotoService(pickResult: '/tmp/a.jpg'),
+    pipeline: pipeline,
+  ));
+
+  await openCamera(t);
+
+  expect(find.text('원두 유형을 확인해 주세요'), findsNothing);
+  expect(find.byType(BeanFormScreen), findsOneWidget);
+  expect(find.text('OCR 자동'), findsWidgets);
+});
+
+testWidgets('ambiguous result asks type exactly once', (t) async {
+  final db = testDatabase();
+  addTearDown(db.close);
+  await t.pumpWidget(wrapApp(
+    const AddHarness(),
+    db: db,
+    photo: FakePhotoService(pickResult: '/tmp/a.jpg'),
+    pipeline: FakeOcrPipeline([
+      const OcrPipelineResult(
+        draft: OcrDraft(name: 'Mystery Coffee'),
+        quality: ImageQualityReport(),
+        usedEnhanced: false,
+        shouldWarnQuality: false,
+      ),
+    ]),
+  ));
+
+  await openCamera(t);
+  expect(find.text('원두 유형을 확인해 주세요'), findsOneWidget);
+  await t.tap(find.byKey(const Key('confirm-type-blend')));
+  await t.pumpAndSettle();
+  expect(find.byType(BeanFormScreen), findsOneWidget);
+  expect(find.text('원두 유형을 확인해 주세요'), findsNothing);
+});</code></pre>
+<p>Add these tests in the same file:</p>
+<pre class="code" data-lang="dart"><code>testWidgets('quality warning precedes ambiguous type confirmation', (t) async {
+  final db = testDatabase();
+  addTearDown(db.close);
+  await t.pumpWidget(wrapApp(
+    const AddHarness(),
+    db: db,
+    photo: FakePhotoService(pickResult: '/tmp/a.jpg'),
+    pipeline: FakeOcrPipeline([
+      const OcrPipelineResult(
+        draft: OcrDraft(name: 'Weak Mystery'),
+        quality: ImageQualityReport({ImageQualityIssue.blurry}),
+        usedEnhanced: true,
+        shouldWarnQuality: true,
+      ),
+    ]),
+  ));
+  await openCamera(t);
+
+  expect(find.text('사진을 충분히 읽지 못했어요'), findsOneWidget);
+  expect(find.text('원두 유형을 확인해 주세요'), findsNothing);
+  await t.tap(find.byKey(const Key('quality-continue')));
+  await t.pumpAndSettle();
+  expect(find.text('원두 유형을 확인해 주세요'), findsOneWidget);
+});
+
+testWidgets('retake discards first draft and uses second photo result', (t) async {
+  final db = testDatabase();
+  addTearDown(db.close);
+  final photo = FakePhotoService(
+    pickResults: const ['/tmp/first.jpg', '/tmp/second.jpg'],
+  );
+  final pipeline = FakeOcrPipeline([
+    const OcrPipelineResult(
+      draft: OcrDraft(name: 'Discard Me'),
+      quality: ImageQualityReport({ImageQualityIssue.blurry}),
+      usedEnhanced: false,
+      shouldWarnQuality: true,
+    ),
+    const OcrPipelineResult(
+      draft: OcrDraft(
+        name: 'Keep Me',
+        typeDecision: OcrTypeDecision.certainSingle,
+        typeReasons: {OcrTypeReason.explicitSingle},
+        components: [OcrComponentDraft(country: 'Kenya')],
+      ),
+      quality: ImageQualityReport(),
+      usedEnhanced: false,
+      shouldWarnQuality: false,
+    ),
+  ]);
+  await t.pumpWidget(wrapApp(
+    const AddHarness(),
+    db: db,
+    photo: photo,
+    pipeline: pipeline,
+  ));
+  await openCamera(t);
+  await t.tap(find.byKey(const Key('quality-retake')));
+  await t.pumpAndSettle();
+
+  expect(photo.pickCalls, 2);
+  expect(pipeline.paths, ['/tmp/first.jpg', '/tmp/second.jpg']);
+  expect(find.text('Keep Me'), findsOneWidget);
+  expect(find.text('Discard Me'), findsNothing);
+});</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 2: Run widget tests to verify they fail</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/widget/add_bean_sheet_ocr_test.dart</code></p>
+<p>Expected: FAIL because the pipeline provider, fake, dialogs, and <code class="ic">initialType</code> parameter do not exist.</p>
+<ul class="tasklist"><li class="task"><strong>Step 3: Wire providers and fakes</strong></li></ul>
+<p>Add these providers:</p>
+<pre class="code" data-lang="dart"><code>final imageQualityAnalyzerProvider = Provider&lt;ImageQualityAnalyzer&gt;(
+  (ref) =&gt; DartImageQualityAnalyzer(),
+);
+final ocrImagePreprocessorProvider = Provider&lt;OcrImagePreprocessor&gt;(
+  (ref) =&gt; DartOcrImagePreprocessor(),
+);
+final ocrPipelineProvider = Provider&lt;OcrPipeline&gt;(
+  (ref) =&gt; DefaultOcrPipeline(
+    ocr: ref.watch(ocrServiceProvider),
+    qualityAnalyzer: ref.watch(imageQualityAnalyzerProvider),
+    preprocessor: ref.watch(ocrImagePreprocessorProvider),
+  ),
+);</code></pre>
+<p>Extend <code class="ic">wrapApp</code> with <code class="ic">OcrPipeline? pipeline</code>. Add a queue-based fake:</p>
+<pre class="code" data-lang="dart"><code>class FakeOcrPipeline implements OcrPipeline {
+  FakeOcrPipeline(this.results);
+  final List&lt;OcrPipelineResult&gt; results;
+  final paths = &lt;String&gt;[];
+  var _index = 0;
+
+  @override
+  Future&lt;OcrPipelineResult&gt; analyze(String imagePath) async {
+    paths.add(imagePath);
+    return results[_index++];
+  }
+}</code></pre>
+<p>Extend <code class="ic">FakePhotoService</code> with an optional <code class="ic">List&lt;String?&gt; pickResults</code>, a <code class="ic">pickCalls</code> counter, and ordered return values while preserving the existing <code class="ic">pickResult</code> constructor behavior.</p>
+<p>Add <code class="ic">BeanFormScreen.initialType</code> now so the add flow has a defined consumer before Task 8 expands component behavior:</p>
+<pre class="code" data-lang="dart"><code>class BeanFormScreen extends ConsumerStatefulWidget {
+  const BeanFormScreen({
+    super.key,
+    this.existing,
+    this.draft,
+    this.initialType,
+    this.photoTempPath,
+  });
+  final BeanDetail? existing;
+  final OcrDraft? draft;
+  final BeanType? initialType;
+  final String? photoTempPath;
+}</code></pre>
+<p>For new beans initialize <code class="ic">_type</code> from <code class="ic">widget.initialType ?? widget.draft?.inferredType ?? BeanType.singleOrigin</code>; existing bean type still has highest priority.</p>
+<ul class="tasklist"><li class="task"><strong>Step 4: Implement dialog ordering and retake loop</strong></li></ul>
+<p>Replace <code class="ic">_recognize</code> with <code class="ic">ref.read(ocrPipelineProvider).analyze(path)</code> under the existing non-dismissible spinner. Structure the camera/gallery branch as a loop:</p>
+<pre class="code" data-lang="dart"><code>while (context.mounted) {
+  final tempPath = await ref
+      .read(photoServiceProvider)
+      .pick(fromCamera: choice == _AddChoice.camera);
+  if (tempPath == null || !context.mounted) return;
+
+  final result = await _analyze(context, ref, tempPath);
+  if (result == null || !context.mounted) return;
+
+  if (result.shouldWarnQuality) {
+    final qualityChoice = await _showQualityWarning(context);
+    if (!context.mounted || qualityChoice == null) return;
+    if (qualityChoice == _QualityChoice.retake) continue;
+  }
+
+  var type = result.draft.inferredType;
+  if (type == null) type = await _confirmBeanType(context);
+  if (type == null || !context.mounted) return;
+
+  await Navigator.of(context).push(MaterialPageRoute(
+    builder: (_) =&gt; BeanFormScreen(
+      draft: result.draft,
+      initialType: type,
+      photoTempPath: tempPath,
+    ),
+  ));
+  return;
+}</code></pre>
+<p>Dialog copy and keys are fixed:</p>
+<ul><li>Quality title: <code class="ic">사진을 충분히 읽지 못했어요</code></li><li>Quality body: <code class="ic">사진이 어둡거나 흐리거나 빛이 반사됐을 수 있어요.</code></li><li>Buttons: <code class="ic">quality-continue</code> / <code class="ic">quality-retake</code></li><li>Type title: <code class="ic">원두 유형을 확인해 주세요</code></li><li>Buttons: <code class="ic">confirm-type-single</code> / <code class="ic">confirm-type-blend</code></li><li>Both dialogs return <code class="ic">null</code> on system back and terminate the add flow without saving.</li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 5: Run add-flow and existing OCR form tests</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/widget/add_bean_sheet_ocr_test.dart test/widget/ocr_form_test.dart</code></p>
+<p>Expected: PASS; certain type has no dialog, ambiguous type has one dialog, retake uses the second result, and direct form tests remain green.</p>
+<ul class="tasklist"><li class="task"><strong>Step 6: Run static analysis</strong></li></ul>
+<p>Run: <code class="ic">flutter analyze</code></p>
+<p>Expected: <code class="ic">No issues found!</code></p>
+<ul class="tasklist"><li class="task"><strong>Step 7: Request commit approval</strong></li></ul>
+<p>Run: <code class="ic">git diff --check</code> and <code class="ic">git diff --stat</code></p>
+<p>Tell the user the changed files, test/analyze results, and proposed message <code class="ic">feat(ocr): confirm uncertain scans and offer retake</code>. Wait for explicit approval.</p>
+<ul class="tasklist"><li class="task"><strong>Step 8: Commit only after approval</strong></li></ul>
+<pre class="code" data-lang="bash"><code>git add lib/providers.dart lib/features/beans/add_bean_sheet.dart lib/features/beans/bean_form_screen.dart test/helpers.dart test/widget/add_bean_sheet_ocr_test.dart
+git commit -m "feat(ocr): confirm uncertain scans and offer retake"</code></pre>
+<p>Expected: one commit containing only Task 7 files.</p>
+<hr>
+<h3>Task 8: 복수 구성 폼·불완전 블렌드 저장·유형 전환 안전성</h3>
+<p><strong>Files:</strong></p>
+<ul><li>Modify: <code class="ic">lib/features/beans/bean_form_screen.dart:10-326</code></li><li>Modify: <code class="ic">test/widget/ocr_form_test.dart</code></li><li>Modify: <code class="ic">test/widget/bean_form_test.dart</code></li><li>Modify: <code class="ic">test/data/bean_repository_test.dart</code></li></ul>
+<p><strong>Interfaces:</strong></p>
+<ul><li>Consumes: <code class="ic">BeanFormScreen.initialType</code>, <code class="ic">OcrDraft.components</code></li><li>Produces: component rows keyed <code class="ic">field-country-N</code>, <code class="ic">field-region-N</code>, <code class="ic">field-ratio-N</code>; incomplete blend banner; safe type transition</li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 1: Write failing multi-component prefill and warning tests</strong></li></ul>
+<pre class="code" data-lang="dart"><code>testWidgets('blend draft prefills two component rows and ratios', (t) async {
+  final db = testDatabase();
+  addTearDown(db.close);
+  t.view.physicalSize = const Size(2400, 4000);
+  t.view.devicePixelRatio = 3;
+  addTearDown(t.view.reset);
+  await t.pumpWidget(wrapApp(
+    const BeanFormScreen(
+      initialType: BeanType.blend,
+      draft: OcrDraft(
+        typeDecision: OcrTypeDecision.certainBlend,
+        components: [
+          OcrComponentDraft(
+            country: 'Brazil',
+            region: 'Cerrado',
+            process: Process.natural,
+            ratioPercent: 60,
+          ),
+          OcrComponentDraft(
+            country: 'Ethiopia',
+            region: 'Guji',
+            process: Process.washed,
+            ratioPercent: 40,
+          ),
+        ],
+      ),
+    ),
+    db: db,
+  ));
+  await t.pump();
+
+  expect(find.byKey(const Key('field-country-0')), findsOneWidget);
+  expect(find.byKey(const Key('field-country-1')), findsOneWidget);
+  expect(find.text('Brazil'), findsOneWidget);
+  expect(find.text('Ethiopia'), findsOneWidget);
+  expect(find.text('60'), findsOneWidget);
+  expect(find.text('40'), findsOneWidget);
+  expect(find.textContaining('충분히 읽지 못했어요'), findsNothing);
+});
+
+testWidgets('incomplete blend warns but saves with zero components', (t) async {
+  final db = testDatabase();
+  addTearDown(db.close);
+  final repo = testRepository(db);
+  t.view.physicalSize = const Size(2400, 4000);
+  t.view.devicePixelRatio = 3;
+  addTearDown(t.view.reset);
+  await t.pumpWidget(wrapApp(
+    const BeanFormScreen(
+      initialType: BeanType.blend,
+      draft: OcrDraft(typeDecision: OcrTypeDecision.certainBlend),
+    ),
+    db: db,
+  ));
+  await t.pump();
+
+  expect(find.textContaining('아는 내용만 입력해도 저장할 수 있어요'), findsOneWidget);
+  await t.enterText(find.byKey(const Key('field-name')), '비공개 블렌드');
+  await t.tap(find.byKey(const Key('save-bean')));
+  await t.pumpAndSettle();
+
+  final list = await repo.watchBeanSummaries().first;
+  final detail = await repo.getBeanDetail(list.single.bean.id);
+  expect(list.single.bean.type, BeanType.blend);
+  expect(list.single.originLabel, isNull);
+  expect(detail!.components, isEmpty);
+  await db.close();
+});</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 2: Write failing type-transition tests</strong></li></ul>
+<p>Add these tests:</p>
+<pre class="code" data-lang="dart"><code>testWidgets('single to blend preserves first row and adds a second', (t) async {
+  final db = testDatabase();
+  addTearDown(db.close);
+  await t.pumpWidget(wrapApp(
+    const BeanFormScreen(
+      draft: OcrDraft(
+        components: [OcrComponentDraft(country: 'Kenya')],
+      ),
+      initialType: BeanType.singleOrigin,
+    ),
+    db: db,
+  ));
+  await t.pump();
+  await t.tap(find.text('블렌드'));
+  await t.pump();
+  expect(find.byKey(const Key('field-country-0')), findsOneWidget);
+  expect(find.byKey(const Key('field-country-1')), findsOneWidget);
+  expect(find.text('Kenya'), findsOneWidget);
+});
+
+testWidgets('blend to single can cancel or confirm component removal', (t) async {
+  final db = testDatabase();
+  addTearDown(db.close);
+  await t.pumpWidget(wrapApp(
+    const BeanFormScreen(
+      initialType: BeanType.blend,
+      draft: OcrDraft(components: [
+        OcrComponentDraft(country: 'Brazil'),
+        OcrComponentDraft(country: 'Ethiopia'),
+      ]),
+    ),
+    db: db,
+  ));
+  await t.pump();
+
+  await t.tap(find.text('싱글'));
+  await t.pumpAndSettle();
+  expect(find.text('첫 번째 구성만 남아요.'), findsOneWidget);
+  await t.tap(find.byKey(const Key('keep-blend')));
+  await t.pumpAndSettle();
+  expect(find.byKey(const Key('field-country-1')), findsOneWidget);
+
+  await t.tap(find.text('싱글'));
+  await t.pumpAndSettle();
+  await t.tap(find.byKey(const Key('confirm-single')));
+  await t.pumpAndSettle();
+  expect(find.byKey(const Key('field-country-0')), findsOneWidget);
+  expect(find.byKey(const Key('field-country-1')), findsNothing);
+});
+
+testWidgets('single still requires first country', (t) async {
+  final db = testDatabase();
+  addTearDown(db.close);
+  await t.pumpWidget(wrapApp(
+    const BeanFormScreen(initialType: BeanType.singleOrigin),
+    db: db,
+  ));
+  await t.pump();
+  await t.enterText(find.byKey(const Key('field-name')), 'Missing Origin');
+  await t.tap(find.byKey(const Key('save-bean')));
+  await t.pump();
+  expect(find.text('제품명과 첫 원산지 국가는 필수예요'), findsOneWidget);
+});
+
+testWidgets('unknown OCR process is shown as other, not washed', (t) async {
+  final db = testDatabase();
+  addTearDown(db.close);
+  await t.pumpWidget(wrapApp(
+    const BeanFormScreen(
+      draft: OcrDraft(
+        components: [OcrComponentDraft(country: 'Kenya')],
+      ),
+    ),
+    db: db,
+  ));
+  await t.pump();
+  final dropdown = t.widget&lt;DropdownButtonFormField&lt;Process&gt;&gt;(
+    find.byType(DropdownButtonFormField&lt;Process&gt;).first,
+  );
+  expect(dropdown.initialValue, Process.other);
+});</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 3: Run form tests to verify they fail</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/widget/ocr_form_test.dart test/widget/bean_form_test.dart</code></p>
+<p>Expected: FAIL because <code class="ic">initialType</code>, multi-component initialization, warning, and safe transitions are absent.</p>
+<ul class="tasklist"><li class="task"><strong>Step 4: Implement initialization and incomplete blend warning</strong></li></ul>
+<p>Add <code class="ic">final BeanType? initialType</code> to <code class="ic">BeanFormScreen</code>. Initialization priority is existing bean → <code class="ic">initialType</code> → <code class="ic">draft.inferredType</code> → <code class="ic">BeanType.singleOrigin</code>.</p>
+<p>Build draft rows with this exact fallback:</p>
+<pre class="code" data-lang="dart"><code>for (final component in draft.components) {
+  final row = _ComponentDraft();
+  row.country.text = component.country ?? '';
+  row.region.text = component.region ?? '';
+  row.process = component.process ?? Process.other;
+  row.ratio.text = component.ratioPercent?.toString() ?? '';
+  _components.add(row);
+}
+if (_components.isEmpty) _components.add(_ComponentDraft());
+if (_type == BeanType.blend) {
+  while (_components.length &lt; 2) {
+    _components.add(_ComponentDraft(process: Process.other));
+  }
+}</code></pre>
+<p>Allow <code class="ic">_ComponentDraft({Process process = Process.washed})</code> so manual entry keeps its current washed default while OCR-created unknown processes use <code class="ic">other</code>.</p>
+<p>Show the approved banner when <code class="ic">_type == BeanType.blend</code> and fewer than two rows have a non-empty country:</p>
+<pre class="code" data-lang="dart"><code>const Text(
+  '블렌드 구성 정보를 충분히 읽지 못했어요. '
+  '아는 내용만 입력해도 저장할 수 있어요.',
+  key: Key('incomplete-blend-warning'),
+)</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 5: Implement validation and type transition</strong></li></ul>
+<pre class="code" data-lang="dart"><code>Future&lt;void&gt; _changeType(BeanType next) async {
+  if (next == _type) return;
+  if (next == BeanType.blend) {
+    setState(() {
+      _type = next;
+      while (_components.length &lt; 2) {
+        _components.add(_ComponentDraft());
+      }
+    });
+    return;
+  }
+
+  final filled = _components.where((c) =&gt; c.country.text.trim().isNotEmpty).length;
+  if (filled &gt;= 2) {
+    final confirmed = await showDialog&lt;bool&gt;(
+      context: context,
+      builder: (ctx) =&gt; AlertDialog(
+        title: const Text('싱글 오리진으로 변경할까요?'),
+        content: const Text('첫 번째 구성만 남아요.'),
+        actions: [
+          TextButton(
+            key: const Key('keep-blend'),
+            onPressed: () =&gt; Navigator.pop(ctx, false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            key: const Key('confirm-single'),
+            onPressed: () =&gt; Navigator.pop(ctx, true),
+            child: const Text('변경'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+  }
+  setState(() {
+    _type = BeanType.singleOrigin;
+    for (final row in _components.skip(1)) {
+      row.dispose();
+    }
+    _components.removeRange(1, _components.length);
+  });
+}</code></pre>
+<p>Validation becomes:</p>
+<pre class="code" data-lang="dart"><code>final missingName = _name.text.trim().isEmpty;
+final missingSingleCountry = _type == BeanType.singleOrigin &amp;&amp;
+    _components.first.country.text.trim().isEmpty;
+if (missingName || missingSingleCountry) {
+  final message = _type == BeanType.singleOrigin
+      ? '제품명과 첫 원산지 국가는 필수예요'
+      : '제품명은 필수예요';
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text(message)),
+  );
+  return;
+}</code></pre>
+<p>Continue filtering empty-country rows when building <code class="ic">BeanInput.components</code>. Add <code class="ic">Key('field-ratio-$i')</code> to ratio fields and call <code class="ic">_changeType</code> from the segmented button without an immediate <code class="ic">setState</code>.</p>
+<ul class="tasklist"><li class="task"><strong>Step 6: Run form and repository regressions</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/widget/ocr_form_test.dart test/widget/bean_form_test.dart test/data/bean_repository_test.dart</code></p>
+<p>Expected: PASS, including zero-component blend list/detail and all existing single save tests.</p>
+<p>Run: <code class="ic">flutter analyze</code></p>
+<p>Expected: <code class="ic">No issues found!</code></p>
+<ul class="tasklist"><li class="task"><strong>Step 7: Request commit approval</strong></li></ul>
+<p>Run: <code class="ic">git diff --check</code> and <code class="ic">git diff --stat</code></p>
+<p>Tell the user the changed files, test/analyze results, and proposed message <code class="ic">feat(beans): review structured OCR components</code>. Wait for explicit approval.</p>
+<ul class="tasklist"><li class="task"><strong>Step 8: Commit only after approval</strong></li></ul>
+<pre class="code" data-lang="bash"><code>git add lib/features/beans/bean_form_screen.dart test/widget/ocr_form_test.dart test/widget/bean_form_test.dart test/data/bean_repository_test.dart
+git commit -m "feat(beans): review structured OCR components"</code></pre>
+<p>Expected: one commit containing only Task 8 files.</p>
+<hr>
+<h3>Task 9: 합성 카드·실 ML Kit 통합 검증·전체 회귀</h3>
+<p><strong>Files:</strong></p>
+<ul><li>Create: <code class="ic">scripts/generate_ocr_fixtures.dart</code></li><li>Create: <code class="ic">assets/test/ocr_blend_en.png</code></li><li>Create: <code class="ic">assets/test/ocr_dark_blend_en.png</code></li><li>Create: <code class="ic">assets/test/ocr_bad_quality_en.png</code></li><li>Modify: <code class="ic">pubspec.yaml:87-90</code></li><li>Modify: <code class="ic">integration_test/ocr_probe_test.dart</code></li><li>Modify: <code class="ic">docs/plans/photo-ocr-reliability-design.md</code></li><li>Regenerate: <code class="ic">docs/plans/photo-ocr-reliability-design.html</code></li></ul>
+<p><strong>Interfaces:</strong></p>
+<ul><li>Exercises: <code class="ic">MlkitOcrService</code> and <code class="ic">DefaultOcrPipeline</code> on Android emulator/device</li><li>Verifies: existing bright-card non-regression, certain blend, enhanced retry, quality warning</li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 1: Add deterministic ASCII fixture generator</strong></li></ul>
+<p>Use <code class="ic">package:image</code> built-in bitmap fonts so generation needs no private photo or system font:</p>
+<pre class="code" data-lang="dart"><code>import 'dart:io';
+import 'package:image/image.dart' as img;
+
+img.Image card({required img.Color background, required img.Color ink}) {
+  final image = img.Image(width: 1080, height: 1440);
+  img.fill(image, color: background);
+  const lines = [
+    'HOUSE BLEND',
+    'ORIGIN 1  BRAZIL 60%',
+    'REGION  CERRADO',
+    'PROCESS  NATURAL',
+    'ORIGIN 2  ETHIOPIA 40%',
+    'REGION  GUJI',
+    'PROCESS  WASHED',
+    'ROAST  MEDIUM',
+    'NOTES  COCOA, BERRY',
+  ];
+  for (var i = 0; i &lt; lines.length; i++) {
+    img.drawString(
+      image,
+      lines[i],
+      font: i == 0 ? img.arial48 : img.arial24,
+      x: 80,
+      y: 90 + i * 130,
+      color: ink,
+    );
+  }
+  return image;
+}
+
+void main() {
+  final dir = Directory('assets/test')..createSync(recursive: true);
+  final bright = card(
+    background: img.ColorRgb8(245, 242, 232),
+    ink: img.ColorRgb8(25, 20, 15),
+  );
+  final dark = card(
+    background: img.ColorRgb8(38, 38, 42),
+    ink: img.ColorRgb8(82, 82, 88),
+  );
+  final bad = img.gaussianBlur(dark.clone(), radius: 8);
+  img.fillRect(
+    bad,
+    x1: 540,
+    y1: 180,
+    x2: 1000,
+    y2: 900,
+    color: img.ColorRgb8(255, 255, 255),
+  );
+  File('${dir.path}/ocr_blend_en.png').writeAsBytesSync(img.encodePng(bright));
+  File('${dir.path}/ocr_dark_blend_en.png').writeAsBytesSync(img.encodePng(dark));
+  File('${dir.path}/ocr_bad_quality_en.png').writeAsBytesSync(img.encodePng(bad));
+}</code></pre>
+<p>Run: <code class="ic">dart run scripts/generate_ocr_fixtures.dart</code></p>
+<p>Expected: three 1080×1440 PNGs under <code class="ic">assets/test/</code>.</p>
+<ul class="tasklist"><li class="task"><strong>Step 2: Register fixtures and write integration expectations</strong></li></ul>
+<p>Add all three files to <code class="ic">flutter.assets</code>. In <code class="ic">ocr_probe_test.dart</code>, keep both existing 8-field tests and add helpers that copy bundled assets to a temporary file.</p>
+<p>Add these end-to-end assertions:</p>
+<pre class="code" data-lang="dart"><code>testWidgets('bright blend is certain and has two components', (tester) async {
+  final path = await copyAssetToTemp('assets/test/ocr_blend_en.png');
+  final lines = await MlkitOcrService().recognize(path);
+  final draft = parseOcr(lines);
+  expect(draft.typeDecision, OcrTypeDecision.certainBlend);
+  expect(draft.components, hasLength(2));
+  expect(draft.components.map((c) =&gt; c.country), ['Brazil', 'Ethiopia']);
+  expect(draft.components.map((c) =&gt; c.ratioPercent), [60, 40]);
+});
+
+testWidgets('dark blend uses enhanced candidate and restores required data', (tester) async {
+  final path = await copyAssetToTemp('assets/test/ocr_dark_blend_en.png');
+  final pipeline = DefaultOcrPipeline(
+    ocr: MlkitOcrService(),
+    qualityAnalyzer: DartImageQualityAnalyzer(),
+    preprocessor: DartOcrImagePreprocessor(),
+  );
+  final result = await pipeline.analyze(path);
+  expect(result.usedEnhanced, isTrue);
+  expect(result.draft.name, isNotNull);
+  expect(result.draft.components.where((c) =&gt; c.country != null), hasLength(2));
+});
+
+testWidgets('blur and glare produce non-blocking quality warning', (tester) async {
+  final path = await copyAssetToTemp('assets/test/ocr_bad_quality_en.png');
+  final pipeline = DefaultOcrPipeline(
+    ocr: MlkitOcrService(),
+    qualityAnalyzer: DartImageQualityAnalyzer(),
+    preprocessor: DartOcrImagePreprocessor(),
+  );
+  final result = await pipeline.analyze(path);
+  expect(result.quality.hasIssues, isTrue);
+  expect(result.shouldWarnQuality, isTrue);
+});</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 3: Run the generator and host-side suite</strong></li></ul>
+<p>Run: <code class="ic">dart run scripts/generate_ocr_fixtures.dart</code></p>
+<p>Expected: exit 0 and three fixture files updated deterministically.</p>
+<p>Run: <code class="ic">flutter test</code></p>
+<p>Expected: all host unit, data, and widget tests PASS.</p>
+<ul class="tasklist"><li class="task"><strong>Step 4: Run real ML Kit integration tests on Android emulator</strong></li></ul>
+<p>Run: <code class="ic">flutter test integration_test/ocr_probe_test.dart -d emulator-5554</code></p>
+<p>Expected: existing two cards retain 8 fields; bright blend returns two components; dark blend selects enhanced result; bad-quality card requests a non-blocking warning.</p>
+<p>If actual ML Kit output exposes a threshold mismatch, adjust only the named constants in <code class="ic">image_quality_analyzer.dart</code> or the synthetic fixture ink/background values, rerun the targeted unit tests, then rerun this integration command. Do not weaken field/type assertions or add card-specific parser branches.</p>
+<ul class="tasklist"><li class="task"><strong>Step 5: Run final formatting, analysis, and complete regression</strong></li></ul>
+<p>Run: <code class="ic">dart format --output=none --set-exit-if-changed lib test integration_test scripts</code></p>
+<p>Expected: exit 0.</p>
+<p>Run: <code class="ic">flutter analyze</code></p>
+<p>Expected: <code class="ic">No issues found!</code></p>
+<p>Run: <code class="ic">flutter test</code></p>
+<p>Expected: all tests PASS with zero failures.</p>
+<ul class="tasklist"><li class="task"><strong>Step 6: Update design status and render documentation</strong></li></ul>
+<p>Change the design header to:</p>
+<pre class="code" data-lang="markdown"><code>&gt; 상태: 구현 완료, 실기기 검증 대기. 구현 계획: `photo-ocr-reliability-plan.md`.</code></pre>
+<p>Run: <code class="ic">python scripts/md2html.py docs/plans/photo-ocr-reliability-design.md docs/plans/photo-ocr-reliability-plan.md</code></p>
+<p>Expected: both sibling HTML files regenerate successfully.</p>
+<ul class="tasklist"><li class="task"><strong>Step 7: Perform final review before completion claim</strong></li></ul>
+<p>Invoke <code class="ic">superpowers:verification-before-completion</code>, then <code class="ic">superpowers:requesting-code-review</code>. Verify the complete branch diff against every design section, with special attention to zero-component blends, temporary-file cleanup, original-card non-regression, and no private photo assets.</p>
+<p>Expected: review has no unresolved Critical or Important findings; all fixes are reverified with targeted tests and the full suite.</p>
+<ul class="tasklist"><li class="task"><strong>Step 8: Request final implementation commit approval</strong></li></ul>
+<p>Run: <code class="ic">git diff --check</code>, <code class="ic">git diff --stat</code>, and <code class="ic">git status --short</code>.</p>
+<p>Tell the user the changed files, generator/integration/full-suite results, review result, and proposed message <code class="ic">test(ocr): verify blend and low-contrast scans</code>. Wait for explicit approval.</p>
+<ul class="tasklist"><li class="task"><strong>Step 9: Commit only after approval</strong></li></ul>
+<pre class="code" data-lang="bash"><code>git add scripts/generate_ocr_fixtures.dart assets/test/ocr_blend_en.png assets/test/ocr_dark_blend_en.png assets/test/ocr_bad_quality_en.png pubspec.yaml integration_test/ocr_probe_test.dart docs/plans/photo-ocr-reliability-design.md docs/plans/photo-ocr-reliability-design.html docs/plans/photo-ocr-reliability-plan.md docs/plans/photo-ocr-reliability-plan.html
+git commit -m "test(ocr): verify blend and low-contrast scans"</code></pre>
+<p>Expected: final task commit contains fixtures, integration coverage, and regenerated documentation only.</p>
+<hr>
+<h2>Execution Completion Checklist</h2>
+<ul class="tasklist"><li class="task">Every task followed red → green TDD and its targeted test command passed.</li><li class="task">Every commit was announced with scope/message and explicitly approved by the user before execution.</li><li class="task">No implementation commit includes <code class="ic">.claude/</code>, <code class="ic">AGENTS.md</code>, private photos, unrelated formatting, or adjacent refactors.</li><li class="task">Existing <code class="ic">ocr_card_ko.png</code> and <code class="ic">ocr_card_orig.png</code> still produce their 8 expected fields.</li><li class="task"><code class="ic">flutter analyze</code> reports no issues.</li><li class="task"><code class="ic">flutter test</code> finishes with zero failures.</li><li class="task">Android emulator ML Kit integration test passes.</li><li class="task">Final review has no unresolved Critical or Important findings.</li><li class="task">User performs final physical-device checks for representative explicit-blend, multi-component, dark, glare, and blur photos before a release tag.</li></ul>
+</article>

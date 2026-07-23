@@ -1,6 +1,7 @@
 import '../../../data/enums.dart';
 import '../../../services/ocr_service.dart';
 import 'ocr_draft.dart';
+import 'ocr_type_inference.dart';
 
 /// 원산지 사전: 소문자 키워드 → 표준 표기. 복합어(Costa Rica)를 먼저.
 const Map<String, String> _countries = {
@@ -189,22 +190,26 @@ OcrDraft parseOcr(List<OcrLine> lines) {
   if (cupNotes.isEmpty) cupNotes = _matchCupNotes(texts);
 
   final country = _firstMatch(lower, _countries);
+  final components = country == null
+      ? const <OcrComponentDraft>[]
+      : [
+          OcrComponentDraft(
+            country: country,
+            region: region,
+            process: _firstMatch(lower, _processKeywords),
+          ),
+        ];
+  final typeInference = inferBeanType(lines, components);
   return OcrDraft(
     name: name,
     roaster: roaster,
     roastDate: _matchDate(joined),
     roastLevel: _firstMatch(lower, _roastKeywords),
-    components: country == null
-        ? const []
-        : [
-            OcrComponentDraft(
-              country: country,
-              region: region,
-              process: _firstMatch(lower, _processKeywords),
-            ),
-          ],
+    components: components,
     cupNotes: cupNotes,
     chips: _dedupe(texts),
+    typeDecision: typeInference.decision,
+    typeReasons: typeInference.reasons,
   );
 }
 

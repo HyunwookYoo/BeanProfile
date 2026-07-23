@@ -65,6 +65,20 @@ bool _isBareLabel(String text) {
 /// 라벨"보다 넓게, "값으로 오채움하면 안 되는 줄"을 가르는 데 쓴다(값 후보 제외 + 아래-폴백 차단).
 bool _isLabel(String text) => _isBareLabel(text) || _otherLabelTokens.contains(_norm(text));
 
+/// 바레 라벨과 `Label: value` 형태를 기존 파서 어휘로 판별한다.
+bool isKnownOcrLabel(String text) {
+  final trimmed = text.trim();
+  if (_isLabel(trimmed) ||
+      _noteLabel.hasMatch(trimmed) ||
+      _regionLabel.hasMatch(trimmed) ||
+      _nameLabel.hasMatch(trimmed) ||
+      _roasterLabel.hasMatch(trimmed)) {
+    return true;
+  }
+  final separator = trimmed.indexOf(RegExp(r'[:：]'));
+  return separator >= 0 && _isLabel(trimmed.substring(0, separator));
+}
+
 /// 토큰의 바레-라벨 줄을 찾아 공간적으로 값을 매칭.
 String? _spatialValue(List<OcrLine> lines, Set<String> tokens) {
   for (final label in lines) {

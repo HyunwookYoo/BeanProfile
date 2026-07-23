@@ -55,4 +55,22 @@ void main() {
     final list = await repo.watchBeanSummaries().first;
     expect(list.first.originLabel, 'Brazil 외 1');
   });
+
+  test('blend with zero components has no origin label and empty detail', () async {
+    final id = await repo.createBean(const BeanInput(
+      name: '비공개 블렌드',
+      roaster: '',
+      type: BeanType.blend,
+      roastLevel: null,
+      roastDate: null,
+      cupNotes: [],
+      memo: null,
+      components: [],
+    ));
+
+    final list = await repo.watchBeanSummaries().first;
+    final detail = await repo.getBeanDetail(id);
+    expect(list.single.originLabel, isNull);
+    expect(detail!.components, isEmpty);
+  });
 }

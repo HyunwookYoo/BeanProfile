@@ -24,9 +24,15 @@ class BeanFormScreen extends ConsumerStatefulWidget {
 }
 
 class _ComponentDraft {
+  _ComponentDraft({
+    this.process = Process.washed,
+    this.processProvidedOrEdited = false,
+  });
+
   final country = TextEditingController();
   final region = TextEditingController();
-  Process process = Process.washed;
+  Process process;
+  bool processProvidedOrEdited;
   final ratio = TextEditingController();
   void dispose() { country.dispose(); region.dispose(); ratio.dispose(); }
 }
@@ -77,24 +83,38 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
     if (e == null && d != null) {
       if (d.name != null) _name.text = d.name!;
       if (d.roaster != null) _roaster.text = d.roaster!;
-      if (d.components.isNotEmpty) {
-        _components.first.dispose();
-        _components
-          ..clear()
-          ..addAll(d.components.map((component) {
-            final draft = _ComponentDraft();
-            if (component.country != null) draft.country.text = component.country!;
-            if (component.region != null) draft.region.text = component.region!;
-            draft.process = component.process ?? Process.other;
-            if (component.ratioPercent != null) {
-              draft.ratio.text = component.ratioPercent.toString();
-            }
-            return draft;
-          }));
+      for (final component in _components) {
+        component.dispose();
+      }
+      _components.clear();
+      for (final component in d.components) {
+        final row = _ComponentDraft(
+          process: component.process ?? Process.other,
+          processProvidedOrEdited: component.process != null,
+        );
+        row.country.text = component.country ?? '';
+        row.region.text = component.region ?? '';
+        row.ratio.text = component.ratioPercent?.toString() ?? '';
+        _components.add(row);
+      }
+      if (_components.isEmpty) {
+        _components.add(_ComponentDraft(process: Process.other));
       }
       _roast = d.roastLevel;
       _roastDate = d.roastDate;
       if (d.cupNotes.isNotEmpty) _cupNotes.text = d.cupNotes.join(', ');
+    }
+    if (_type == BeanType.singleOrigin && _components.length > 1) {
+      for (final row in _components.skip(1)) {
+        row.dispose();
+      }
+      _components.removeRange(1, _components.length);
+    } else if (_type == BeanType.blend) {
+      while (_components.length < 2) {
+        _components.add(_ComponentDraft(
+          process: e == null && d != null ? Process.other : Process.washed,
+        ));
+      }
     }
   }
 
@@ -158,10 +178,64 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
 
   bool get _auto => widget.existing == null && widget.draft != null;
 
+  Future<void> _changeType(BeanType next) async {
+    if (next == _type) return;
+    if (next == BeanType.blend) {
+      setState(() {
+        _type = next;
+        while (_components.length < 2) {
+          _components.add(_ComponentDraft());
+        }
+      });
+      return;
+    }
+
+    final removesMeaningfulRows = _components.skip(1).any((component) =>
+        component.country.text.trim().isNotEmpty ||
+        component.region.text.trim().isNotEmpty ||
+        component.ratio.text.trim().isNotEmpty ||
+        component.processProvidedOrEdited);
+    if (removesMeaningfulRows) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('싱글 오리진으로 변경할까요?'),
+          content: const Text('첫 번째 구성만 남아요.'),
+          actions: [
+            TextButton(
+              key: const Key('keep-blend'),
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('취소'),
+            ),
+            FilledButton(
+              key: const Key('confirm-single'),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('변경'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+    }
+    setState(() {
+      _type = BeanType.singleOrigin;
+      for (final row in _components.skip(1)) {
+        row.dispose();
+      }
+      _components.removeRange(1, _components.length);
+    });
+  }
+
   Future<void> _save() async {
-    if (_name.text.trim().isEmpty || _components.first.country.text.trim().isEmpty) {
+    final missingName = _name.text.trim().isEmpty;
+    final missingSingleCountry = _type == BeanType.singleOrigin &&
+        _components.first.country.text.trim().isEmpty;
+    if (missingName || missingSingleCountry) {
+      final message = _type == BeanType.singleOrigin
+          ? '제품명과 첫 원산지 국가는 필수예요'
+          : '제품명은 필수예요';
       ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('제품명과 첫 원산지 국가는 필수예요')));
+          SnackBar(content: Text(message)));
       return;
     }
     setState(() => _saving = true);
@@ -232,10 +306,18 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
             ButtonSegment(value: BeanType.blend, label: Text('블렌드')),
           ],
           selected: {_type},
-          onSelectionChanged: (s) => setState(() => _type = s.first),
+          onSelectionChanged: (s) => _changeType(s.first),
         ),
         const SizedBox(height: 14),
         Text('원산지 구성', style: TextStyle(fontWeight: FontWeight.w700, color: c.espresso)),
+        if (_type == BeanType.blend &&
+            _components.where((component) =>
+                    component.country.text.trim().isNotEmpty).length < 2)
+          const Text(
+            '블렌드 구성 정보를 충분히 읽지 못했어요. '
+            '아는 내용만 입력해도 저장할 수 있어요.',
+            key: Key('incomplete-blend-warning'),
+          ),
         for (var i = 0; i < _components.length; i++) _componentEditor(i),
         if (_type == BeanType.blend)
           TextButton.icon(
@@ -316,6 +398,9 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
             child: TextField(
               key: Key('field-country-$i'),
               controller: comp.country,
+              onChanged: (_) {
+                if (_type == BeanType.blend) setState(() {});
+              },
               decoration: InputDecoration(
                   labelText: i == 0 ? '원산지 국가 *' : '국가',
                   helperText: _auto && i < widget.draft!.components.length &&
@@ -324,7 +409,7 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
                       : null),
             ),
           ),
-          if (_type == BeanType.blend && _components.length > 1)
+          if (_type == BeanType.blend && _components.length > 2)
             IconButton(
               onPressed: () => setState(() { _components.removeAt(i).dispose(); }),
               icon: const Icon(Icons.remove_circle_outline),
@@ -348,12 +433,17 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
               initialValue: comp.process,
               decoration: const InputDecoration(labelText: '가공'),
               items: [for (final p in Process.values) DropdownMenuItem(value: p, child: Text(p.label))],
-              onChanged: (v) => setState(() => comp.process = v ?? Process.washed),
+              onChanged: (v) => setState(() {
+                comp.process = v ?? Process.washed;
+                comp.processProvidedOrEdited = true;
+              }),
             ),
           ),
           if (_type == BeanType.blend) ...[
             const SizedBox(width: 10),
-            SizedBox(width: 64, child: TextField(controller: comp.ratio,
+            SizedBox(width: 64, child: TextField(
+                key: Key('field-ratio-$i'),
+                controller: comp.ratio,
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(labelText: '%'))),
           ],

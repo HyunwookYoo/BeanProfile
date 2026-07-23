@@ -7,6 +7,129 @@ import 'package:flutter_test/flutter_test.dart';
 import '../helpers.dart';
 
 void main() {
+  testWidgets('blend draft prefills two component rows and ratios', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    t.view.physicalSize = const Size(2400, 4000);
+    t.view.devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(wrapApp(
+      const BeanFormScreen(
+        initialType: BeanType.blend,
+        draft: OcrDraft(
+          typeDecision: OcrTypeDecision.certainBlend,
+          components: [
+            OcrComponentDraft(
+              country: 'Brazil',
+              region: 'Cerrado',
+              process: Process.natural,
+              ratioPercent: 60,
+            ),
+            OcrComponentDraft(
+              country: 'Ethiopia',
+              region: 'Guji',
+              process: Process.washed,
+              ratioPercent: 40,
+            ),
+          ],
+        ),
+      ),
+      db: db,
+    ));
+    await t.pump();
+
+    expect(find.byKey(const Key('field-country-0')), findsOneWidget);
+    expect(find.byKey(const Key('field-country-1')), findsOneWidget);
+    expect(find.text('Brazil'), findsOneWidget);
+    expect(find.text('Ethiopia'), findsOneWidget);
+    expect(t.widget<TextField>(find.byKey(const Key('field-region-0')))
+        .controller!.text, 'Cerrado');
+    expect(t.widget<TextField>(find.byKey(const Key('field-region-1')))
+        .controller!.text, 'Guji');
+    final processes = t.widgetList<DropdownButtonFormField<Process>>(
+        find.byType(DropdownButtonFormField<Process>)).toList();
+    expect(processes[0].initialValue, Process.natural);
+    expect(processes[1].initialValue, Process.washed);
+    expect(t.widget<TextField>(find.byKey(const Key('field-ratio-0')))
+        .controller!.text, '60');
+    expect(t.widget<TextField>(find.byKey(const Key('field-ratio-1')))
+        .controller!.text, '40');
+    expect(find.textContaining('충분히 읽지 못했어요'), findsNothing);
+  });
+
+  testWidgets('incomplete blend warns but saves with zero components', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    final repo = testRepository(db);
+    t.view.physicalSize = const Size(2400, 4000);
+    t.view.devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(wrapApp(
+      const BeanFormScreen(
+        initialType: BeanType.blend,
+        draft: OcrDraft(typeDecision: OcrTypeDecision.certainBlend),
+      ),
+      db: db,
+    ));
+    await t.pump();
+
+    expect(find.textContaining('아는 내용만 입력해도 저장할 수 있어요'),
+        findsOneWidget);
+    await t.enterText(find.byKey(const Key('field-name')), '비공개 블렌드');
+    await t.tap(find.byKey(const Key('save-bean')));
+    await t.pump();
+
+    final beans = await db.select(db.beans).get();
+    final detail = await repo.getBeanDetail(beans.single.id);
+    expect(beans.single.type, BeanType.blend);
+    expect(detail!.components, isEmpty);
+  });
+
+  testWidgets('single type keeps and saves only the first OCR component', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    final repo = testRepository(db);
+    t.view.physicalSize = const Size(2400, 4000);
+    t.view.devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(wrapApp(
+      const BeanFormScreen(
+        initialType: BeanType.singleOrigin,
+        draft: OcrDraft(
+          typeDecision: OcrTypeDecision.ambiguous,
+          components: [
+            OcrComponentDraft(
+              country: 'Kenya',
+              region: 'Nyeri',
+              process: Process.washed,
+            ),
+            OcrComponentDraft(
+              country: 'Ethiopia',
+              region: 'Guji',
+              process: Process.natural,
+            ),
+          ],
+        ),
+      ),
+      db: db,
+    ));
+    await t.pump();
+
+    expect(find.byKey(const Key('field-country-0')), findsOneWidget);
+    expect(find.byKey(const Key('field-country-1')), findsNothing);
+    expect(find.text('Kenya'), findsOneWidget);
+    expect(find.text('Ethiopia'), findsNothing);
+
+    await t.enterText(find.byKey(const Key('field-name')), '싱글 초안');
+    await t.tap(find.byKey(const Key('save-bean')));
+    await t.pump();
+
+    final beans = await db.select(db.beans).get();
+    final detail = await repo.getBeanDetail(beans.single.id);
+    expect(detail!.components, hasLength(1));
+    expect(detail.components.single.country, 'Kenya');
+  });
+
   testWidgets('draft 프리필 + OCR 자동 하이라이트 + 칩 렌더', (t) async {
     final db = testDatabase();
     addTearDown(db.close);

@@ -1,4 +1,5 @@
 import 'package:beanprofile/data/enums.dart';
+import 'package:beanprofile/features/beans/ocr/ocr_draft.dart';
 import 'package:beanprofile/features/beans/ocr/ocr_parser.dart';
 import 'package:beanprofile/services/ocr_service.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -26,6 +27,31 @@ void main() {
     });
     test('원산지 아니면 null', () {
       expect(parseOcrText('Fritz Coffee Company').components, isEmpty);
+    });
+    test('설명문의 다른 국가는 두 번째 구성으로 채택하지 않음', () {
+      final d = parseOcrText(
+          'Ethiopia Guji\nRoasted in Colombia by Example Roasters');
+      expect(d.components, hasLength(1));
+      expect(d.components.single.country, 'Ethiopia');
+    });
+    test('좌표 없는 제목 국가와 구조화 원산지 중복은 한 구성으로 합침', () {
+      final d = parseOcrText('Colombia Pink Bourbon\nOrigin\nColombia');
+      expect(d.components, hasLength(1));
+      expect(d.components.single.country, 'Colombia');
+      expect(d.typeDecision, isNot(OcrTypeDecision.certainBlend));
+    });
+    test('구조적인 복수 원산지가 parseOcr 구성과 유형 판별까지 연결됨', () {
+      final d = parseOcr(const [
+        OcrLine('BLEND', left: 20, top: 10, right: 140, bottom: 40),
+        OcrLine('Brazil 60%', left: 20, top: 80, right: 240, bottom: 120),
+        OcrLine('Cerrado Natural', left: 20, top: 130, right: 300, bottom: 170),
+        OcrLine('Ethiopia 40%', left: 20, top: 220, right: 270, bottom: 260),
+        OcrLine('Guji Washed', left: 20, top: 270, right: 260, bottom: 310),
+      ]);
+      expect(d.components.map((c) => c.country), ['Brazil', 'Ethiopia']);
+      expect(d.components.map((c) => c.ratioPercent), [60, 40]);
+      expect(d.typeDecision, OcrTypeDecision.certainBlend);
+      expect(d.typeReasons, contains(OcrTypeReason.multipleComponents));
     });
   });
 
@@ -66,6 +92,11 @@ void main() {
       expect(parseOcrText('Ethiopia 내추럴').components.single.process, Process.natural);
       expect(parseOcrText('Ethiopia Honey process').components.single.process, Process.honey);
       expect(parseOcrText('Ethiopia Anaerobic').components.single.process, Process.anaerobic);
+    });
+    test('라벨된 미인식 가공값은 전역 키워드보다 Process.other가 우선', () {
+      final d = parseOcrText('Ethiopia\n가공\n무산소 발효');
+      expect(d.components.single.process, Process.other);
+      expect(d.components.single.region, isNull);
     });
   });
 

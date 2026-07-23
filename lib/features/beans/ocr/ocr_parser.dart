@@ -1,31 +1,8 @@
 import '../../../data/enums.dart';
 import '../../../services/ocr_service.dart';
+import 'ocr_component_parser.dart';
 import 'ocr_draft.dart';
 import 'ocr_type_inference.dart';
-
-/// 원산지 사전: 소문자 키워드 → 표준 표기. 복합어(Costa Rica)를 먼저.
-const Map<String, String> _countries = {
-  'costa rica': 'Costa Rica', '코스타리카': 'Costa Rica',
-  'el salvador': 'El Salvador', '엘살바도르': 'El Salvador',
-  'ethiopia': 'Ethiopia', '에티오피아': 'Ethiopia',
-  'colombia': 'Colombia', '콜롬비아': 'Colombia',
-  'kenya': 'Kenya', '케냐': 'Kenya',
-  'brazil': 'Brazil', '브라질': 'Brazil',
-  'guatemala': 'Guatemala', '과테말라': 'Guatemala',
-  'panama': 'Panama', '파나마': 'Panama',
-  'honduras': 'Honduras', '온두라스': 'Honduras',
-  'indonesia': 'Indonesia', '인도네시아': 'Indonesia',
-  'rwanda': 'Rwanda', '르완다': 'Rwanda',
-  'burundi': 'Burundi', '부룬디': 'Burundi',
-  'peru': 'Peru', '페루': 'Peru',
-  'nicaragua': 'Nicaragua', '니카라과': 'Nicaragua',
-  'yemen': 'Yemen', '예멘': 'Yemen',
-  'tanzania': 'Tanzania', '탄자니아': 'Tanzania',
-  'mexico': 'Mexico', '멕시코': 'Mexico',
-  'uganda': 'Uganda', '우간다': 'Uganda',
-  'bolivia': 'Bolivia', '볼리비아': 'Bolivia',
-  'ecuador': 'Ecuador', '에콰도르': 'Ecuador',
-};
 
 /// 복합어(라이트미디엄·미디엄다크·풀시티)를 단일어보다 먼저.
 const Map<String, RoastLevel> _roastKeywords = {
@@ -36,13 +13,6 @@ const Map<String, RoastLevel> _roastKeywords = {
   '미디엄': RoastLevel.medium, 'medium': RoastLevel.medium, 'city': RoastLevel.medium, '시티': RoastLevel.medium,
   '라이트': RoastLevel.light, 'light': RoastLevel.light,
   '다크': RoastLevel.dark, 'dark': RoastLevel.dark, 'french': RoastLevel.dark, 'italian': RoastLevel.dark,
-};
-
-const Map<String, Process> _processKeywords = {
-  '워시드': Process.washed, 'washed': Process.washed, '수세식': Process.washed,
-  '내추럴': Process.natural, 'natural': Process.natural, '건식': Process.natural,
-  '허니': Process.honey, 'honey': Process.honey,
-  '무산소': Process.anaerobic, 'anaerobic': Process.anaerobic, '애너로빅': Process.anaerobic,
 };
 
 final List<RegExp> _datePatterns = [
@@ -189,17 +159,22 @@ OcrDraft parseOcr(List<OcrLine> lines) {
   region ??= _firstLabel(texts, _regionLabel);
   if (cupNotes.isEmpty) cupNotes = _matchCupNotes(texts);
 
-  final country = _firstMatch(lower, _countries);
-  final components = country == null
-      ? const <OcrComponentDraft>[]
-      : [
-          OcrComponentDraft(
-            country: country,
-            region: region,
-            process: _firstMatch(lower, _processKeywords),
-          ),
-        ];
-  final typeInference = inferBeanType(lines, components);
+  var components = parseOcrComponents(lines);
+  if (components.length == 1) {
+    final component = components.single;
+    final process = firstProcessMatch(lower);
+    components = [
+      OcrComponentDraft(
+        country: component.country,
+        region: region ?? component.region,
+        process: component.process == Process.other
+            ? Process.other
+            : process ?? component.process,
+        ratioPercent: component.ratioPercent,
+      ),
+    ];
+  }
+  final type = inferBeanType(lines, components);
   return OcrDraft(
     name: name,
     roaster: roaster,
@@ -208,19 +183,16 @@ OcrDraft parseOcr(List<OcrLine> lines) {
     components: components,
     cupNotes: cupNotes,
     chips: _dedupe(texts),
-    typeDecision: typeInference.decision,
-    typeReasons: typeInference.reasons,
+    typeDecision: type.decision,
+    typeReasons: type.reasons,
   );
 }
 
-/// 문자열 하위호환: 줄을 세로로 쌓은 합성 라인으로 감싸 parseOcr에 위임.
+/// 문자열 하위호환: 좌표 없는 합성 라인으로 감싸 parseOcr에 위임.
 /// 프로덕션 호출부 없음 — 문자열 코퍼스/비회귀 테스트 진입점으로 의도적으로 유지.
 OcrDraft parseOcrText(String rawText) {
   final texts = rawText.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
-  final lines = [
-    for (final (i, t) in texts.indexed)
-      OcrLine(t, left: 0, top: i * 10.0, right: 100, bottom: i * 10.0 + 10),
-  ];
+  final lines = [for (final t in texts) OcrLine(t)];
   return parseOcr(lines);
 }
 

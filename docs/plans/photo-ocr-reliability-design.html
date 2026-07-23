@@ -51,7 +51,7 @@ ul.tasklist li.task.done::before{content:"\2713";background:var(--accent);color:
 </style>
 <article class="doc"><div class="crumb">BeanProfile · docs/plans</div>
 <h1>사진 OCR 신뢰성 개선 — 설계</h1>
-<blockquote>상태: 승인됨(2026-07-22). 구현 계획은 이 문서 승인 후 별도로 작성한다.</blockquote>
+<blockquote>상태: 구현 완료, 실기기 검증 대기. 구현 계획: <code class="ic">photo-ocr-reliability-plan.md</code>.</blockquote>
 <h2>1. 배경</h2>
 <p>현재 사진 입력은 <code class="ic">image_picker</code>가 반환한 사진을 ML Kit에 한 번 전달하고, 좌표 기반 파서가 하나의 원산지 구성만 포함한 <code class="ic">OcrDraft</code>를 만든다. 폼은 OCR 입력에서도 <code class="ic">싱글 오리진</code>으로 시작한다.</p>
 <p>실사용에서 다음 문제가 확인됐다.</p>

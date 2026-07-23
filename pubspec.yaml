@@ -88,6 +88,9 @@ flutter:
   assets:
     - assets/test/ocr_card_ko.png
     - assets/test/ocr_card_orig.png
+    - assets/test/ocr_blend_en.png
+    - assets/test/ocr_dark_blend_en.png
+    - assets/test/ocr_bad_quality_en.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:

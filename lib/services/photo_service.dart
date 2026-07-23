@@ -1,4 +1,6 @@
 import 'dart:io';
+
+import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -12,25 +14,43 @@ abstract class PhotoService {
   Future<String> persist(String tempPath);
 }
 
+typedef DocumentsDirectory = Future<Directory> Function();
+
 class ImagePickerPhotoService implements PhotoService {
+  ImagePickerPhotoService({DocumentsDirectory? documentsDirectory})
+    : _documentsDirectory =
+          documentsDirectory ?? getApplicationDocumentsDirectory;
+
   final ImagePicker _picker = ImagePicker();
+  final DocumentsDirectory _documentsDirectory;
 
   @override
   Future<String?> pick({required bool fromCamera}) async {
     final x = await _picker.pickImage(
       source: fromCamera ? ImageSource.camera : ImageSource.gallery,
-      imageQuality: 85,
     );
     return x?.path;
   }
 
   @override
   Future<String> persist(String tempPath) async {
-    final dir = await getApplicationDocumentsDirectory();
+    final dir = await _documentsDirectory();
     final photos = Directory('${dir.path}/photos');
     if (!await photos.exists()) await photos.create(recursive: true);
-    final ext = tempPath.contains('.') ? tempPath.split('.').last : 'jpg';
-    final dest = '${photos.path}/${DateTime.now().millisecondsSinceEpoch}.$ext';
+    final stamp = DateTime.now().microsecondsSinceEpoch;
+    final decoded = await img.decodeImageFile(tempPath);
+    if (decoded != null) {
+      final dest = '${photos.path}/$stamp.jpg';
+      final oriented = img.bakeOrientation(decoded);
+      await File(dest).writeAsBytes(img.encodeJpg(oriented, quality: 85));
+      return dest;
+    }
+    final basename = tempPath.split(RegExp(r'[/\\]')).last;
+    final dot = basename.lastIndexOf('.');
+    final ext = dot > 0 && dot < basename.length - 1
+        ? basename.substring(dot + 1)
+        : 'img';
+    final dest = '${photos.path}/$stamp.$ext';
     await File(tempPath).copy(dest);
     return dest;
   }

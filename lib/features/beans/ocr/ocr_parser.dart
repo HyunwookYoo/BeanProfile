@@ -188,14 +188,21 @@ OcrDraft parseOcr(List<OcrLine> lines) {
   region ??= _firstLabel(texts, _regionLabel);
   if (cupNotes.isEmpty) cupNotes = _matchCupNotes(texts);
 
+  final country = _firstMatch(lower, _countries);
   return OcrDraft(
     name: name,
     roaster: roaster,
-    country: _firstMatch(lower, _countries),
-    region: region,
     roastDate: _matchDate(joined),
     roastLevel: _firstMatch(lower, _roastKeywords),
-    process: _firstMatch(lower, _processKeywords),
+    components: country == null
+        ? const []
+        : [
+            OcrComponentDraft(
+              country: country,
+              region: region,
+              process: _firstMatch(lower, _processKeywords),
+            ),
+          ],
     cupNotes: cupNotes,
     chips: _dedupe(texts),
   );

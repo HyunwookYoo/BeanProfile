@@ -20,12 +20,12 @@ void main() {
 
   group('country', () {
     test('영문/한글 원산지를 표준 표기로', () {
-      expect(parseOcrText('Ethiopia Yirgacheffe G1').country, 'Ethiopia');
-      expect(parseOcrText('에티오피아 예가체프').country, 'Ethiopia');
-      expect(parseOcrText('Costa Rica Tarrazu').country, 'Costa Rica');
+      expect(parseOcrText('Ethiopia Yirgacheffe G1').components.single.country, 'Ethiopia');
+      expect(parseOcrText('에티오피아 예가체프').components.single.country, 'Ethiopia');
+      expect(parseOcrText('Costa Rica Tarrazu').components.single.country, 'Costa Rica');
     });
     test('원산지 아니면 null', () {
-      expect(parseOcrText('Fritz Coffee Company').country, isNull);
+      expect(parseOcrText('Fritz Coffee Company').components, isEmpty);
     });
   });
 
@@ -62,10 +62,10 @@ void main() {
 
   group('process', () {
     test('영/한 키워드', () {
-      expect(parseOcrText('Washed').process, Process.washed);
-      expect(parseOcrText('내추럴').process, Process.natural);
-      expect(parseOcrText('Honey process').process, Process.honey);
-      expect(parseOcrText('Anaerobic').process, Process.anaerobic);
+      expect(parseOcrText('Ethiopia Washed').components.single.process, Process.washed);
+      expect(parseOcrText('Ethiopia 내추럴').components.single.process, Process.natural);
+      expect(parseOcrText('Ethiopia Honey process').components.single.process, Process.honey);
+      expect(parseOcrText('Ethiopia Anaerobic').components.single.process, Process.anaerobic);
     });
   });
 
@@ -82,13 +82,13 @@ void main() {
 
   group('region', () {
     test('지역/Region 라벨에서 추출', () {
-      expect(parseOcrText('지역: 후일라').region, '후일라');
-      expect(parseOcrText('Region: Yirgacheffe').region, 'Yirgacheffe');
-      expect(parseOcrText('REGION : Yirgacheffe · Kochere').region, 'Yirgacheffe · Kochere');
+      expect(parseOcrText('Ethiopia\n지역: 후일라').components.single.region, '후일라');
+      expect(parseOcrText('Ethiopia\nRegion: Yirgacheffe').components.single.region, 'Yirgacheffe');
+      expect(parseOcrText('Ethiopia\nREGION : Yirgacheffe · Kochere').components.single.region, 'Yirgacheffe · Kochere');
     });
     test('라벨 없으면 null; 국가 라벨(원산지:)은 지역 아님', () {
-      expect(parseOcrText('Ethiopia Yirgacheffe').region, isNull);
-      expect(parseOcrText('원산지: 콜롬비아').region, isNull);
+      expect(parseOcrText('Ethiopia Yirgacheffe').components.single.region, isNull);
+      expect(parseOcrText('원산지: 콜롬비아').components.single.region, isNull);
     });
   });
 
@@ -104,8 +104,8 @@ void main() {
     test('실제 라벨 종합', () {
       final d = parseOcrText(
           'Fritz Coffee\nEthiopia Yirgacheffe\nWashed\nRoasted 2026.07.02\nNotes: Blueberry, Jasmine');
-      expect(d.country, 'Ethiopia');
-      expect(d.process, Process.washed);
+      expect(d.components.single.country, 'Ethiopia');
+      expect(d.components.single.process, Process.washed);
       expect(d.roastDate, DateTime(2026, 7, 2));
       expect(d.cupNotes, ['Blueberry', 'Jasmine']);
       expect(d.chips, contains('Fritz Coffee'));
@@ -118,7 +118,7 @@ void main() {
         OcrLine('지역', left: 10, top: 100, right: 60, bottom: 130),
         OcrLine('후일라', left: 120, top: 100, right: 260, bottom: 130),
       ]);
-      expect(d.region, '후일라');
+      expect(d.components, isEmpty);
     });
     test('라벨 아래 값 → cupNotes(구분자 분리)', () {
       final d = parseOcr(const [
@@ -129,7 +129,7 @@ void main() {
     });
     test('값 없으면 region null', () {
       final d = parseOcr(const [OcrLine('지역', left: 10, top: 100, right: 60, bottom: 130)]);
-      expect(d.region, isNull);
+      expect(d.components, isEmpty);
     });
     test('2열 카드: 지역=같은 행, 국가=키워드', () {
       final d = parseOcr(const [
@@ -138,8 +138,8 @@ void main() {
         OcrLine('콜롬비아', left: 120, top: 100, right: 260, bottom: 130),
         OcrLine('후일라', left: 120, top: 150, right: 260, bottom: 180),
       ]);
-      expect(d.country, 'Colombia');
-      expect(d.region, '후일라');
+      expect(d.components.single.country, 'Colombia');
+      expect(d.components.single.region, '후일라');
     });
   });
 
@@ -185,14 +185,14 @@ void main() {
         OcrLine('', left: 120, top: 100, right: 200, bottom: 130),
         OcrLine('품종', left: 10, top: 150, right: 70, bottom: 180),
       ]);
-      expect(d.region, isNull);
+      expect(d.components, isEmpty);
     });
     test('바레 라벨 바로 다음 줄도 바레 라벨이면 region null', () {
       final d = parseOcr(const [
         OcrLine('지역', left: 10, top: 100, right: 60, bottom: 130),
         OcrLine('품종', left: 10, top: 150, right: 70, bottom: 180),
       ]);
-      expect(d.region, isNull);
+      expect(d.components, isEmpty);
     });
     test('스큐로 같은 행 정렬 실패 시 아래 이웃 라벨을 값으로 오채움하지 않음(region null)', () {
       final d = parseOcr(const [
@@ -201,7 +201,7 @@ void main() {
         OcrLine('후일라', left: 200, top: 210, right: 300, bottom: 240),
         OcrLine('품종', left: 10, top: 200, right: 70, bottom: 230),
       ]);
-      expect(d.region, isNull);
+      expect(d.components, isEmpty);
     });
   });
 
@@ -221,9 +221,9 @@ void main() {
       ]);
       expect(d.name, '예가체프 코체레');
       expect(d.roaster, '아우어사이드');
-      expect(d.country, 'Ethiopia');
-      expect(d.region, '예가체프 코체레');
-      expect(d.process, Process.washed);
+      expect(d.components.single.country, 'Ethiopia');
+      expect(d.components.single.region, '예가체프 코체레');
+      expect(d.components.single.process, Process.washed);
       expect(d.roastLevel, RoastLevel.lightMedium);
       expect(d.roastDate, DateTime(2026, 7, 10));
       expect(d.cupNotes, ['블루베리', '자스민', '홍차']);
@@ -250,11 +250,11 @@ void main() {
         OcrLine('1,750 m', left: 347, top: 778, right: 525, bottom: 817),
         OcrLine('딸기, 복숭아, 레드와인', left: 62, top: 967, right: 558, bottom: 1022),
       ]);
-      expect(d.country, 'Colombia');
-      expect(d.process, Process.natural);
+      expect(d.components.single.country, 'Colombia');
+      expect(d.components.single.process, Process.natural);
       expect(d.roastLevel, RoastLevel.medium);
       expect(d.roastDate, DateTime(2026, 7, 5));
-      expect(d.region, '후일라');
+      expect(d.components.single.region, '후일라');
       expect(d.cupNotes, ['딸기', '복숭아', '레드와인']);
       expect(d.name, '콜롬비아 핑크버번 내추럴');
       expect(d.roaster, contains('베이스캠프'));

@@ -67,9 +67,21 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
     if (e == null && d != null) {
       if (d.name != null) _name.text = d.name!;
       if (d.roaster != null) _roaster.text = d.roaster!;
-      if (d.country != null) _components.first.country.text = d.country!;
-      if (d.region != null) _components.first.region.text = d.region!;
-      if (d.process != null) _components.first.process = d.process!;
+      if (d.components.isNotEmpty) {
+        _components.first.dispose();
+        _components
+          ..clear()
+          ..addAll(d.components.map((component) {
+            final draft = _ComponentDraft();
+            if (component.country != null) draft.country.text = component.country!;
+            if (component.region != null) draft.region.text = component.region!;
+            draft.process = component.process ?? Process.other;
+            if (component.ratioPercent != null) {
+              draft.ratio.text = component.ratioPercent.toString();
+            }
+            return draft;
+          }));
+      }
       _roast = d.roastLevel;
       _roastDate = d.roastDate;
       if (d.cupNotes.isNotEmpty) _cupNotes.text = d.cupNotes.join(', ');
@@ -296,7 +308,10 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
               controller: comp.country,
               decoration: InputDecoration(
                   labelText: i == 0 ? '원산지 국가 *' : '국가',
-                  helperText: i == 0 && _auto && widget.draft!.country != null ? 'OCR 자동' : null),
+                  helperText: _auto && i < widget.draft!.components.length &&
+                          widget.draft!.components[i].country != null
+                      ? 'OCR 자동'
+                      : null),
             ),
           ),
           if (_type == BeanType.blend && _components.length > 1)
@@ -313,7 +328,10 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
               controller: comp.region,
               decoration: InputDecoration(
                   labelText: '지역',
-                  helperText: i == 0 && _auto && widget.draft!.region != null ? 'OCR 자동' : null))),
+                  helperText: _auto && i < widget.draft!.components.length &&
+                          widget.draft!.components[i].region != null
+                      ? 'OCR 자동'
+                      : null))),
           const SizedBox(width: 10),
           Expanded(
             child: DropdownButtonFormField<Process>(

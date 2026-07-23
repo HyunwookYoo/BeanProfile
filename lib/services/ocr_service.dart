@@ -4,7 +4,14 @@ import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart
 class OcrLine {
   final String text;
   final double left, top, right, bottom;
-  const OcrLine(this.text, {this.left = 0, this.top = 0, this.right = 0, this.bottom = 0});
+  final double? confidence;
+  const OcrLine(this.text, {
+    this.left = 0,
+    this.top = 0,
+    this.right = 0,
+    this.bottom = 0,
+    this.confidence,
+  });
   double get centerY => (top + bottom) / 2;
   double get height => bottom - top;
 }
@@ -30,7 +37,8 @@ class MlkitOcrService implements OcrService {
                 left: line.boundingBox.left,
                 top: line.boundingBox.top,
                 right: line.boundingBox.right,
-                bottom: line.boundingBox.bottom),
+                bottom: line.boundingBox.bottom,
+                confidence: line.confidence),
       ];
     } catch (_) {
       return const []; // 인식 실패/모델 미다운로드 → 빈 리스트(폼의 '자동 인식 실패' 배너로 이어짐)

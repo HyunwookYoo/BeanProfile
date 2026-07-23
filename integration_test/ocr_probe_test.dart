@@ -29,9 +29,10 @@ void main() {
     // ignore: avoid_print
     print('===OCR_LINES_END===');
     final d = parseOcr(lines);
+    final component = d.components.single;
     // ignore: avoid_print
-    print('PARSED name=${d.name} | roaster=${d.roaster} | country=${d.country} '
-        '| region=${d.region} | process=${d.process} | roast=${d.roastLevel} '
+    print('PARSED name=${d.name} | roaster=${d.roaster} | country=${component.country} '
+        '| region=${component.region} | process=${component.process} | roast=${d.roastLevel} '
         '| date=${d.roastDate} | notes=${d.cupNotes}');
     // ignore: avoid_print
     print('CHIPS=${d.chips}');
@@ -40,9 +41,9 @@ void main() {
     expect(lines, isNotEmpty);
     expect(d.name, '예가체프 코체레');
     expect(d.roaster, '아우어사이드');
-    expect(d.country, 'Ethiopia');
-    expect(d.region, '예가체프 코체레');
-    expect(d.process, Process.washed);
+    expect(component.country, 'Ethiopia');
+    expect(component.region, '예가체프 코체레');
+    expect(component.process, Process.washed);
     expect(d.roastLevel, RoastLevel.lightMedium);
     expect(d.roastDate, DateTime(2026, 7, 10));
     expect(d.cupNotes, ['블루베리', '자스민', '홍차']);
@@ -66,18 +67,19 @@ void main() {
     // ignore: avoid_print
     print('===ORIG_LINES_END===');
     final d = parseOcr(lines);
+    final component = d.components.single;
     // ignore: avoid_print
-    print('ORIG_PARSED name=${d.name} | roaster=${d.roaster} | country=${d.country} '
-        '| region=${d.region} | process=${d.process} | roast=${d.roastLevel} '
+    print('ORIG_PARSED name=${d.name} | roaster=${d.roaster} | country=${component.country} '
+        '| region=${component.region} | process=${component.process} | roast=${d.roastLevel} '
         '| date=${d.roastDate} | notes=${d.cupNotes}');
 
     // 실제 ML Kit OCR → 스타일 카드(콜론 없음) 8개 필드(그중 지역·컵노트·제품명·로스터리가 좌표 기반).
     expect(lines, isNotEmpty);
-    expect(d.country, 'Colombia');
-    expect(d.process, Process.natural);
+    expect(component.country, 'Colombia');
+    expect(component.process, Process.natural);
     expect(d.roastLevel, RoastLevel.medium);
     expect(d.roastDate, DateTime(2026, 7, 5));
-    expect(d.region, '후일라');
+    expect(component.region, '후일라');
     expect(d.cupNotes, ['딸기', '복숭아', '레드와인']);
     expect(d.name, '콜롬비아 핑크버번 내추럴');
     expect(d.roaster, contains('베이스캠프')); // '베이스캠프 로스 터스'(자간 오독 허용)

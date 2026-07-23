@@ -20,8 +20,7 @@ void main() {
     await t.pumpWidget(wrapApp(
       const BeanFormScreen(
         draft: OcrDraft(
-          country: 'Ethiopia',
-          process: Process.washed,
+          components: [OcrComponentDraft(country: 'Ethiopia', process: Process.washed)],
           cupNotes: ['블루베리'],
           chips: ['프릳츠', 'G1'],
         ),
@@ -37,6 +36,25 @@ void main() {
     expect(find.text('프릳츠'), findsOneWidget);
   });
 
+  testWidgets('OCR 가공 미인식 구성은 other로 프리필', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    await t.pumpWidget(wrapApp(
+      const BeanFormScreen(
+        draft: OcrDraft(components: [OcrComponentDraft(country: 'Ethiopia')]),
+      ),
+      db: db,
+    ));
+    await t.pump();
+
+    expect(
+      t.widget<DropdownButtonFormField<Process>>(
+        find.byType(DropdownButtonFormField<Process>),
+      ).initialValue,
+      Process.other,
+    );
+  });
+
   testWidgets('draft.name/roaster → 제품명·로스터리 프리필 + OCR 자동', (t) async {
     final db = testDatabase();
     addTearDown(db.close);
@@ -45,7 +63,11 @@ void main() {
     addTearDown(t.view.reset);
     await t.pumpWidget(wrapApp(
       const BeanFormScreen(
-          draft: OcrDraft(name: '예가체프', roaster: '아우어사이드', country: 'Ethiopia')),
+          draft: OcrDraft(
+            name: '예가체프',
+            roaster: '아우어사이드',
+            components: [OcrComponentDraft(country: 'Ethiopia')],
+          )),
       db: db,
     ));
     await t.pump();
@@ -55,14 +77,18 @@ void main() {
     expect(find.text('OCR 자동'), findsNWidgets(3)); // 제품명 + 로스터리 + 국가
   });
 
-  testWidgets('draft.region → 지역 칸 프리필 + OCR 자동', (t) async {
+  testWidgets('draft.components[0].region → 지역 칸 프리필 + OCR 자동', (t) async {
     final db = testDatabase();
     addTearDown(db.close);
     t.view.physicalSize = const Size(2400, 4000);
     t.view.devicePixelRatio = 3.0;
     addTearDown(t.view.reset);
     await t.pumpWidget(wrapApp(
-      const BeanFormScreen(draft: OcrDraft(country: 'Ethiopia', region: '예가체프')),
+      const BeanFormScreen(
+        draft: OcrDraft(
+          components: [OcrComponentDraft(country: 'Ethiopia', region: '예가체프')],
+        ),
+      ),
       db: db,
     ));
     await t.pump();
@@ -139,7 +165,12 @@ void main() {
     t.view.devicePixelRatio = 3.0;
     addTearDown(t.view.reset);
     await t.pumpWidget(wrapApp(
-      const BeanFormScreen(draft: OcrDraft(country: 'Ethiopia', chips: ['Colombia'])),
+      const BeanFormScreen(
+        draft: OcrDraft(
+          components: [OcrComponentDraft(country: 'Ethiopia')],
+          chips: ['Colombia'],
+        ),
+      ),
       db: db,
     ));
     await t.pump();
@@ -173,7 +204,7 @@ void main() {
     final repo = testRepository(db);
     await t.pumpWidget(wrapApp(
       const BeanFormScreen(
-        draft: OcrDraft(country: 'Ethiopia'),
+        draft: OcrDraft(components: [OcrComponentDraft(country: 'Ethiopia')]),
         photoTempPath: '/tmp/pick.jpg',
       ),
       db: db,
@@ -201,7 +232,7 @@ void main() {
     addTearDown(db.close);
     await t.pumpWidget(wrapApp(
       const BeanFormScreen(
-        draft: OcrDraft(country: 'Ethiopia'),
+        draft: OcrDraft(components: [OcrComponentDraft(country: 'Ethiopia')]),
         photoTempPath: '/tmp/pick.jpg',
       ),
       db: db,
@@ -231,7 +262,11 @@ void main() {
       t.view.devicePixelRatio = 3.0;
       addTearDown(t.view.reset);
       await t.pumpWidget(wrapApp(
-        BeanFormScreen(draft: OcrDraft(country: 'Ethiopia', region: region)),
+        BeanFormScreen(
+          draft: OcrDraft(
+            components: [OcrComponentDraft(country: 'Ethiopia', region: region)],
+          ),
+        ),
         db: db,
       ));
       await t.pump();

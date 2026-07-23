@@ -1,6 +1,7 @@
 import 'package:beanprofile/data/bean_repository.dart';
 import 'package:beanprofile/data/database.dart';
 import 'package:beanprofile/data/enums.dart';
+import 'package:beanprofile/features/beans/ocr/ocr_pipeline.dart';
 import 'package:beanprofile/providers.dart';
 import 'package:beanprofile/services/backup_service.dart';
 import 'package:beanprofile/services/ocr_service.dart';
@@ -22,11 +23,16 @@ ProviderContainer testContainer(AppDatabase db) =>
 
 /// 위젯 테스트용: 테마 + (선택) DB/OCR/Photo/Backup override로 화면을 감싼다.
 Widget wrapApp(Widget child,
-        {AppDatabase? db, OcrService? ocr, PhotoService? photo, BackupService? backup}) =>
+        {AppDatabase? db,
+        OcrService? ocr,
+        OcrPipeline? pipeline,
+        PhotoService? photo,
+        BackupService? backup}) =>
     ProviderScope(
       overrides: [
         if (db != null) databaseProvider.overrideWithValue(db),
         if (ocr != null) ocrServiceProvider.overrideWithValue(ocr),
+        if (pipeline != null) ocrPipelineProvider.overrideWithValue(pipeline),
         if (photo != null) photoServiceProvider.overrideWithValue(photo),
         if (backup != null) backupServiceProvider.overrideWithValue(backup),
       ],
@@ -90,13 +96,38 @@ class FakeOcrService implements OcrService {
       s.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
 }
 
+class FakeOcrPipeline implements OcrPipeline {
+  FakeOcrPipeline(this.results);
+  final List<OcrPipelineResult> results;
+  final paths = <String>[];
+  var _index = 0;
+
+  @override
+  Future<OcrPipelineResult> analyze(String imagePath) async {
+    paths.add(imagePath);
+    return results[_index++];
+  }
+}
+
 class FakePhotoService implements PhotoService {
-  FakePhotoService({this.pickResult, this.persistResult = '/app/photos/persisted.jpg', this.throwOnPersist = false});
+  FakePhotoService({
+    this.pickResult,
+    this.pickResults,
+    this.persistResult = '/app/photos/persisted.jpg',
+    this.throwOnPersist = false,
+  });
   final String? pickResult;
+  final List<String?>? pickResults;
   final String persistResult;
   final bool throwOnPersist;
+  int pickCalls = 0;
+
   @override
-  Future<String?> pick({required bool fromCamera}) async => pickResult;
+  Future<String?> pick({required bool fromCamera}) async {
+    final index = pickCalls++;
+    return pickResults == null ? pickResult : pickResults![index];
+  }
+
   @override
   Future<String> persist(String tempPath) async {
     if (throwOnPersist) throw Exception('persist failed');

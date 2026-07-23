@@ -1,5 +1,9 @@
+import 'package:beanprofile/data/enums.dart';
 import 'package:beanprofile/features/beans/bean_form_screen.dart';
 import 'package:beanprofile/features/beans/bean_list_screen.dart';
+import 'package:beanprofile/features/beans/ocr/ocr_draft.dart';
+import 'package:beanprofile/features/beans/ocr/ocr_pipeline.dart';
+import 'package:beanprofile/services/image_quality_analyzer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import '../helpers.dart';
@@ -45,7 +49,24 @@ void main() {
     await t.pumpWidget(wrapApp(
       const BeanListScreen(),
       db: db,
-      ocr: FakeOcrService.text('Ethiopia\nWashed\nNotes: 블루베리'),
+      pipeline: FakeOcrPipeline([
+        const OcrPipelineResult(
+          draft: OcrDraft(
+            typeDecision: OcrTypeDecision.certainSingle,
+            typeReasons: {OcrTypeReason.explicitSingle},
+            components: [
+              OcrComponentDraft(
+                country: 'Ethiopia',
+                process: Process.washed,
+              ),
+            ],
+            cupNotes: ['블루베리'],
+          ),
+          quality: ImageQualityReport(),
+          usedEnhanced: false,
+          shouldWarnQuality: false,
+        ),
+      ]),
       photo: FakePhotoService(pickResult: '/tmp/pick.jpg'),
     ));
     await t.pump();
@@ -95,13 +116,23 @@ void main() {
     await t.pumpWidget(wrapApp(
       const BeanListScreen(),
       db: db,
-      ocr: FakeOcrService.text(''), // 인식 실패 → 빈 라인
+      pipeline: FakeOcrPipeline([
+        const OcrPipelineResult(
+          draft: OcrDraft(),
+          quality: ImageQualityReport(),
+          usedEnhanced: false,
+          shouldWarnQuality: false,
+        ),
+      ]),
       photo: FakePhotoService(pickResult: '/tmp/pick.jpg'),
     ));
     await t.pump(const Duration(milliseconds: 300));
     await t.tap(find.byType(FloatingActionButton));
     await t.pumpAndSettle();
     await t.tap(find.byKey(const Key('add-camera')));
+    await t.pumpAndSettle();
+    expect(find.text('원두 유형을 확인해 주세요'), findsOneWidget);
+    await t.tap(find.byKey(const Key('confirm-type-single')));
     await t.pumpAndSettle();
     expect(find.byType(BeanFormScreen), findsOneWidget); // 막다른 길 아님
     expect(find.textContaining('자동 인식하지 못'), findsOneWidget); // 실패 배너

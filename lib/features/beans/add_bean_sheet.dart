@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../data/enums.dart';
 import '../../providers.dart';
-import 'ocr/ocr_draft.dart';
-import 'ocr/ocr_parser.dart';
 import 'bean_form_screen.dart';
+import 'ocr/ocr_pipeline.dart';
 
 enum _AddChoice { camera, gallery, manual }
+enum _QualityChoice { continueWithResult, retake }
 
 /// FAB에서 호출: 촬영/갤러리 → OCR → 폼, 또는 직접 입력.
 Future<void> showAddBeanSheet(BuildContext context, WidgetRef ref) async {
@@ -45,26 +46,91 @@ Future<void> showAddBeanSheet(BuildContext context, WidgetRef ref) async {
     return;
   }
 
-  final tempPath =
-      await ref.read(photoServiceProvider).pick(fromCamera: choice == _AddChoice.camera);
-  if (tempPath == null || !context.mounted) return;
+  while (context.mounted) {
+    final tempPath = await ref
+        .read(photoServiceProvider)
+        .pick(fromCamera: choice == _AddChoice.camera);
+    if (tempPath == null || !context.mounted) return;
 
-  final draft = await _recognize(context, ref, tempPath);
-  if (draft == null || !context.mounted) return;
+    final result = await _analyze(context, ref, tempPath);
+    if (result == null || !context.mounted) return;
 
-  await Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => BeanFormScreen(draft: draft, photoTempPath: tempPath)));
+    if (result.shouldWarnQuality) {
+      final qualityChoice = await _showQualityWarning(context);
+      if (!context.mounted || qualityChoice == null) return;
+      if (qualityChoice == _QualityChoice.retake) continue;
+    }
+
+    var type = result.draft.inferredType;
+    type ??= await _confirmBeanType(context);
+    if (type == null || !context.mounted) return;
+
+    await Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => BeanFormScreen(
+        draft: result.draft,
+        initialType: type,
+        photoTempPath: tempPath,
+      ),
+    ));
+    return;
+  }
 }
 
-Future<OcrDraft?> _recognize(BuildContext context, WidgetRef ref, String path) async {
+Future<OcrPipelineResult?> _analyze(
+    BuildContext context, WidgetRef ref, String path) async {
   showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator()));
+      builder: (_) => const PopScope(
+          canPop: false,
+          child: Center(child: CircularProgressIndicator())));
   try {
-    final lines = await ref.read(ocrServiceProvider).recognize(path);
-    return parseOcr(lines);
+    return await ref.read(ocrPipelineProvider).analyze(path);
   } finally {
     if (context.mounted) Navigator.of(context).pop(); // 스피너 닫기
   }
+}
+
+Future<_QualityChoice?> _showQualityWarning(BuildContext context) {
+  return showDialog<_QualityChoice>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('사진을 충분히 읽지 못했어요'),
+      content: const Text('사진이 어둡거나 흐리거나 빛이 반사됐을 수 있어요.'),
+      actions: [
+        TextButton(
+          key: const Key('quality-retake'),
+          onPressed: () => Navigator.pop(dialogContext, _QualityChoice.retake),
+          child: const Text('다시 촬영'),
+        ),
+        FilledButton(
+          key: const Key('quality-continue'),
+          onPressed: () =>
+              Navigator.pop(dialogContext, _QualityChoice.continueWithResult),
+          child: const Text('인식 결과로 계속'),
+        ),
+      ],
+    ),
+  );
+}
+
+Future<BeanType?> _confirmBeanType(BuildContext context) {
+  return showDialog<BeanType>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('원두 유형을 확인해 주세요'),
+      actions: [
+        TextButton(
+          key: const Key('confirm-type-single'),
+          onPressed: () => Navigator.pop(dialogContext, BeanType.singleOrigin),
+          child: const Text('싱글 오리진'),
+        ),
+        FilledButton(
+          key: const Key('confirm-type-blend'),
+          onPressed: () => Navigator.pop(dialogContext, BeanType.blend),
+          child: const Text('블렌드'),
+        ),
+      ],
+    ),
+  );
 }

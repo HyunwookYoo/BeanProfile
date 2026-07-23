@@ -8,9 +8,16 @@ import 'ocr/ocr_draft.dart';
 import 'widgets/ocr_chips_panel.dart';
 
 class BeanFormScreen extends ConsumerStatefulWidget {
-  const BeanFormScreen({super.key, this.existing, this.draft, this.photoTempPath});
+  const BeanFormScreen({
+    super.key,
+    this.existing,
+    this.draft,
+    this.initialType,
+    this.photoTempPath,
+  });
   final BeanDetail? existing;
   final OcrDraft? draft;
+  final BeanType? initialType;
   final String? photoTempPath;
   @override
   ConsumerState<BeanFormScreen> createState() => _BeanFormScreenState();
@@ -64,6 +71,9 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
       if (_components.isEmpty) _components.add(_ComponentDraft());
     }
     final d = widget.draft;
+    if (e == null) {
+      _type = widget.initialType ?? d?.inferredType ?? BeanType.singleOrigin;
+    }
     if (e == null && d != null) {
       if (d.name != null) _name.text = d.name!;
       if (d.roaster != null) _roaster.text = d.roaster!;

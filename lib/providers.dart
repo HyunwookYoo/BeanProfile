@@ -2,8 +2,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'data/bean_repository.dart';
 import 'data/database.dart';
 import 'features/beans/bean_sort.dart';
+import 'features/beans/ocr/ocr_pipeline.dart';
 import 'features/profile/taste_profile.dart';
 import 'services/backup_service.dart';
+import 'services/image_quality_analyzer.dart';
+import 'services/ocr_image_preprocessor.dart';
 import 'services/ocr_service.dart';
 import 'services/photo_service.dart';
 
@@ -27,6 +30,19 @@ final beanDetailProvider =
 );
 
 final ocrServiceProvider = Provider<OcrService>((ref) => MlkitOcrService());
+final imageQualityAnalyzerProvider = Provider<ImageQualityAnalyzer>(
+  (ref) => DartImageQualityAnalyzer(),
+);
+final ocrImagePreprocessorProvider = Provider<OcrImagePreprocessor>(
+  (ref) => DartOcrImagePreprocessor(),
+);
+final ocrPipelineProvider = Provider<OcrPipeline>(
+  (ref) => DefaultOcrPipeline(
+    ocr: ref.watch(ocrServiceProvider),
+    qualityAnalyzer: ref.watch(imageQualityAnalyzerProvider),
+    preprocessor: ref.watch(ocrImagePreprocessorProvider),
+  ),
+);
 final photoServiceProvider = Provider<PhotoService>((ref) => ImagePickerPhotoService());
 final backupServiceProvider = Provider<BackupService>((ref) => SharePlusBackupService());
 

@@ -1,0 +1,982 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>BeanProfile — 블렌드 OCR 테스트 카드</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --page: #151311;
+      --panel: #211e1b;
+      --panel-raised: #2a2622;
+      --panel-line: #3b3530;
+      --page-ink: #f1ebe1;
+      --page-muted: #a99e91;
+      --accent: #c68b3d;
+      --accent-soft: #3f3020;
+      --focus: #f3bd68;
+      --shadow: 0 30px 80px rgba(0, 0, 0, 0.38);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      min-height: 100%;
+      background: var(--page);
+    }
+
+    body {
+      min-width: 320px;
+      min-height: 100vh;
+      margin: 0;
+      background:
+        radial-gradient(circle at 10% 0%, rgba(198, 139, 61, 0.1), transparent 30rem),
+        var(--page);
+      color: var(--page-ink);
+      font-family: "Segoe UI", "Noto Sans KR", sans-serif;
+    }
+
+    button {
+      font: inherit;
+    }
+
+    button:focus-visible,
+    summary:focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 3px;
+    }
+
+    .tester {
+      width: min(1160px, 100%);
+      margin: 0 auto;
+      padding: 28px clamp(16px, 4vw, 52px) 52px;
+    }
+
+    .page-header {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 18px;
+      align-items: end;
+      margin-bottom: 20px;
+    }
+
+    .page-kicker {
+      margin: 0 0 7px;
+      color: var(--accent);
+      font: 700 11px/1.2 Consolas, "Courier New", monospace;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    .page-header h1 {
+      max-width: 720px;
+      margin: 0;
+      font: 720 clamp(26px, 4vw, 44px)/1.06 "Bahnschrift Condensed", "Arial Narrow", "Segoe UI", sans-serif;
+      letter-spacing: -0.025em;
+    }
+
+    .page-header > p:last-child {
+      max-width: 290px;
+      margin: 0;
+      color: var(--page-muted);
+      font-size: 13px;
+      line-height: 1.55;
+      text-align: right;
+    }
+
+    .controls {
+      position: sticky;
+      z-index: 10;
+      top: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      padding: 10px;
+      border: 1px solid var(--panel-line);
+      border-radius: 16px;
+      background: color-mix(in srgb, var(--panel) 92%, transparent);
+      box-shadow: 0 14px 36px rgba(0, 0, 0, 0.2);
+      backdrop-filter: blur(16px);
+    }
+
+    .segmented {
+      display: inline-flex;
+      gap: 3px;
+      padding: 3px;
+      border: 1px solid var(--panel-line);
+      border-radius: 11px;
+      background: #181614;
+    }
+
+    .segmented button,
+    #fullscreen-button {
+      min-height: 38px;
+      padding: 0 13px;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--page-muted);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 700;
+      transition: background-color 150ms ease, color 150ms ease, transform 150ms ease;
+    }
+
+    .segmented button:hover,
+    #fullscreen-button:hover {
+      color: var(--page-ink);
+    }
+
+    .segmented button[aria-pressed="true"] {
+      background: var(--panel-raised);
+      color: var(--page-ink);
+      box-shadow: inset 0 0 0 1px #4a423a;
+    }
+
+    #fullscreen-button {
+      margin-left: auto;
+      padding-inline: 17px;
+      background: var(--accent);
+      color: #21170c;
+    }
+
+    #fullscreen-button:hover {
+      color: #21170c;
+      transform: translateY(-1px);
+    }
+
+    .state-line {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin: 15px 2px 10px;
+      color: var(--page-muted);
+      font: 700 11px/1.3 Consolas, "Courier New", monospace;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .state-line::before {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 0 5px rgba(198, 139, 61, 0.11);
+      content: "";
+    }
+
+    .capture-stage {
+      display: grid;
+      place-items: center;
+      min-height: 0;
+      padding: clamp(16px, 3vw, 28px);
+      border: 1px solid var(--panel-line);
+      border-radius: 24px;
+      background:
+        linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+        #1b1816;
+      background-size: 24px 24px;
+    }
+
+    #coffee-card {
+      --card-bg: #f5f2e8;
+      --card-ink: #19140f;
+      --card-muted: #756858;
+      --card-rule: #d8cfbf;
+      --card-accent: #a76110;
+      --meter-one: #b86d18;
+      --meter-two: #d8bd8e;
+
+      position: relative;
+      display: grid;
+      grid-template-rows: auto 10px 1fr auto;
+      aspect-ratio: 3 / 4;
+      width: min(92vw, 56vh, 680px);
+      height: min(122.667vw, 74.667vh, 906.667px);
+      min-width: 0;
+      min-height: 0;
+      overflow: hidden;
+      border: 1px solid color-mix(in srgb, var(--card-rule) 86%, transparent);
+      border-radius: clamp(4px, 1.3vw, 14px);
+      background: var(--card-bg);
+      box-shadow: var(--shadow);
+      color: var(--card-ink);
+      font-family: "Segoe UI", "Noto Sans KR", sans-serif;
+      isolation: isolate;
+    }
+
+    #coffee-card > * {
+      min-width: 0;
+      min-height: 0;
+    }
+
+    #coffee-card::after {
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      opacity: 0.045;
+      background-image: repeating-linear-gradient(
+        96deg,
+        transparent 0,
+        transparent 13px,
+        currentColor 14px
+      );
+      pointer-events: none;
+      content: "";
+    }
+
+    #coffee-card[data-contrast="light"] {
+      --card-bg: #f5f2e8;
+      --card-ink: #19140f;
+      --card-muted: #756858;
+      --card-rule: #d8cfbf;
+      --card-accent: #a76110;
+      --meter-one: #b86d18;
+      --meter-two: #d8bd8e;
+    }
+
+    #coffee-card[data-contrast="dark"] {
+      --card-bg: #26262a;
+      --card-ink: #3a3a3e;
+      --card-muted: #35353a;
+      --card-rule: #303035;
+      --card-accent: #414146;
+      --meter-one: #3b3b40;
+      --meter-two: #303035;
+      box-shadow: 0 32px 80px rgba(0, 0, 0, 0.56);
+    }
+
+    .lab-rail {
+      display: none;
+    }
+
+    .card-header {
+      padding: 7.2% 7.6% 5.3%;
+      border-bottom: 1px solid var(--card-rule);
+    }
+
+    .card-header-topline {
+      display: flex;
+      gap: 14px;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 4.6%;
+    }
+
+    .roaster,
+    .type,
+    .component-number,
+    .notes p,
+    .rail-label,
+    .rail-copy,
+    .origin-label {
+      margin: 0;
+      font-family: Consolas, "Courier New", monospace;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .roaster {
+      color: var(--card-muted);
+      font-size: clamp(7px, 1.2vw, 13px);
+    }
+
+    .type {
+      color: var(--card-accent);
+      font-size: clamp(7px, 1.25vw, 14px);
+    }
+
+    .card-header h1 {
+      max-width: 94%;
+      margin: 0;
+      font: 760 clamp(25px, 5.6vw, 61px)/0.92 "Bahnschrift Condensed", "Arial Narrow", "Segoe UI", sans-serif;
+      letter-spacing: -0.025em;
+      text-transform: uppercase;
+    }
+
+    .blend-meter {
+      background: linear-gradient(
+        90deg,
+        var(--meter-one) 0,
+        var(--meter-one) 60%,
+        var(--meter-two) 60%,
+        var(--meter-two) 100%
+      );
+    }
+
+    .components {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      min-height: 0;
+    }
+
+    .component {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      padding: 11% 14% 10%;
+    }
+
+    .component + .component {
+      border-left: 1px solid var(--card-rule);
+    }
+
+    .component-number {
+      margin-bottom: 9%;
+      color: var(--card-muted);
+      font-size: clamp(6px, 1vw, 11px);
+    }
+
+    .component h2 {
+      display: grid;
+      gap: 5px;
+      margin: 0 0 14%;
+      font: 760 clamp(20px, 4.1vw, 45px)/0.95 "Bahnschrift Condensed", "Arial Narrow", "Segoe UI", sans-serif;
+      letter-spacing: -0.02em;
+      text-transform: uppercase;
+    }
+
+    .component h2 strong {
+      color: var(--card-accent);
+      font: 760 0.68em/1 Consolas, "Courier New", monospace;
+      letter-spacing: -0.05em;
+    }
+
+    .component dl,
+    .roast-data {
+      display: grid;
+      gap: 0;
+      margin: auto 0 0;
+    }
+
+    .component dl > div,
+    .roast-data > div {
+      display: grid;
+      grid-template-columns: 0.74fr 1.35fr;
+      gap: 8px;
+      align-items: baseline;
+      padding: 9% 0;
+      border-top: 1px solid var(--card-rule);
+    }
+
+    dt {
+      color: var(--card-muted);
+      font: 700 clamp(7px, 1.05vw, 12px)/1.2 Consolas, "Courier New", monospace;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    dd {
+      min-width: 0;
+      margin: 0;
+      font: 720 clamp(10px, 1.75vw, 20px)/1.15 "Bahnschrift Condensed", "Arial Narrow", "Segoe UI", sans-serif;
+      letter-spacing: 0.01em;
+      overflow-wrap: anywhere;
+    }
+
+    .card-footer {
+      display: grid;
+      grid-template-columns: 1fr 1.2fr;
+      border-top: 1px solid var(--card-rule);
+    }
+
+    .roast-data {
+      padding: 7% 11%;
+      border-right: 1px solid var(--card-rule);
+    }
+
+    .roast-data > div {
+      grid-template-columns: 0.8fr 1.2fr;
+      padding: 5.5% 0;
+    }
+
+    .notes {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 8% 10%;
+    }
+
+    .notes p {
+      margin-bottom: 6%;
+      color: var(--card-muted);
+      font-size: clamp(7px, 1vw, 11px);
+    }
+
+    .notes strong {
+      font: 760 clamp(12px, 2vw, 23px)/1.18 "Bahnschrift Condensed", "Arial Narrow", "Segoe UI", sans-serif;
+      letter-spacing: 0.015em;
+    }
+
+    /* C: the same facts compressed into a cupping-lab analysis ledger. */
+    #coffee-card[data-card="c"] {
+      grid-template-columns: 27% 73%;
+      grid-template-rows: 24% 6px 47% 29%;
+      grid-template-areas:
+        "rail header"
+        "rail meter"
+        "rail components"
+        "rail footer";
+      border-radius: 2px;
+    }
+
+    #coffee-card[data-card="c"]::after {
+      opacity: 0.025;
+      background-image:
+        linear-gradient(currentColor 1px, transparent 1px),
+        linear-gradient(90deg, currentColor 1px, transparent 1px);
+      background-size: 18px 18px;
+    }
+
+    #coffee-card[data-card="c"] .lab-rail {
+      grid-area: rail;
+      display: flex;
+      flex-direction: column;
+      padding: 17% 14%;
+      border-right: 1px solid var(--card-rule);
+    }
+
+    .rail-mark {
+      position: relative;
+      width: min(42%, 42px);
+      aspect-ratio: 1;
+      margin-bottom: 22%;
+      border: 1px solid var(--card-accent);
+      border-radius: 50%;
+    }
+
+    .rail-mark::before,
+    .rail-mark::after {
+      position: absolute;
+      background: var(--card-accent);
+      content: "";
+    }
+
+    .rail-mark::before {
+      top: 50%;
+      left: -24%;
+      width: 148%;
+      height: 1px;
+    }
+
+    .rail-mark::after {
+      top: -24%;
+      left: 50%;
+      width: 1px;
+      height: 148%;
+    }
+
+    .rail-label {
+      color: var(--card-accent);
+      font-size: clamp(6px, 0.92vw, 10px);
+    }
+
+    .rail-index {
+      margin: 7% 0 0;
+      font: 760 clamp(29px, 5vw, 54px)/0.86 "Bahnschrift Condensed", "Arial Narrow", sans-serif;
+      letter-spacing: -0.06em;
+    }
+
+    .rail-copy {
+      margin-top: auto;
+      color: var(--card-muted);
+      font-size: clamp(5px, 0.76vw, 9px);
+      line-height: 1.65;
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+    }
+
+    #coffee-card[data-card="c"] .card-header {
+      grid-area: header;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      min-width: 0;
+      padding: 7% 8%;
+      border-bottom: 0;
+    }
+
+    #coffee-card[data-card="c"] .card-header-topline {
+      margin-bottom: 3%;
+    }
+
+    #coffee-card[data-card="c"] .card-header h1 {
+      max-width: 100%;
+      font-size: clamp(18px, 3.8vw, 41px);
+      line-height: 0.9;
+    }
+
+    #coffee-card[data-card="c"] .blend-meter {
+      grid-area: meter;
+    }
+
+    #coffee-card[data-card="c"] .components {
+      grid-area: components;
+      grid-template-columns: 1fr;
+      border-top: 1px solid var(--card-rule);
+    }
+
+    #coffee-card[data-card="c"] .component {
+      display: grid;
+      grid-template-columns: 22% 36% 42%;
+      align-items: stretch;
+      padding: 0;
+    }
+
+    #coffee-card[data-card="c"] .component + .component {
+      border-top: 1px solid var(--card-rule);
+      border-left: 0;
+    }
+
+    #coffee-card[data-card="c"] .component-number {
+      display: grid;
+      place-items: center start;
+      margin: 0;
+      padding: 0 12%;
+      border-right: 1px solid var(--card-rule);
+      font-size: clamp(5px, 0.75vw, 9px);
+      line-height: 1.45;
+    }
+
+    #coffee-card[data-card="c"] .component h2 {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 4%;
+      margin: 0;
+      padding: 0 10%;
+      border-right: 1px solid var(--card-rule);
+      font-size: clamp(14px, 2.7vw, 29px);
+    }
+
+    #coffee-card[data-card="c"] .component h2 strong {
+      font-size: 0.62em;
+    }
+
+    #coffee-card[data-card="c"] .component dl {
+      align-self: stretch;
+      margin: 0;
+    }
+
+    #coffee-card[data-card="c"] .component dl > div {
+      grid-template-columns: 0.68fr 1fr;
+      height: 50%;
+      padding: 7% 8%;
+      border-top: 0;
+    }
+
+    #coffee-card[data-card="c"] .component dl > div + div {
+      border-top: 1px solid var(--card-rule);
+    }
+
+    #coffee-card[data-card="c"] dt {
+      font-size: clamp(5px, 0.75vw, 9px);
+    }
+
+    #coffee-card[data-card="c"] dd {
+      font-size: clamp(8px, 1.3vw, 15px);
+    }
+
+    #coffee-card[data-card="c"] .card-footer {
+      grid-area: footer;
+      grid-template-columns: 1fr;
+    }
+
+    #coffee-card[data-card="c"] .roast-data {
+      grid-template-columns: 1fr 1fr;
+      padding: 0;
+      border-right: 0;
+      border-bottom: 1px solid var(--card-rule);
+    }
+
+    #coffee-card[data-card="c"] .roast-data > div {
+      grid-template-columns: 0.76fr 1.2fr;
+      padding: 6% 7%;
+      border-top: 0;
+    }
+
+    #coffee-card[data-card="c"] .roast-data > div + div {
+      border-left: 1px solid var(--card-rule);
+    }
+
+    #coffee-card[data-card="c"] .notes {
+      padding: 6% 7%;
+    }
+
+    #coffee-card[data-card="c"] .notes p {
+      margin-bottom: 3%;
+      font-size: clamp(5px, 0.75vw, 9px);
+    }
+
+    #coffee-card[data-card="c"] .notes strong {
+      font-size: clamp(10px, 1.75vw, 20px);
+    }
+
+    .reference {
+      display: grid;
+      grid-template-columns: 0.72fr 1fr;
+      gap: 18px;
+      margin-top: 18px;
+    }
+
+    .guide,
+    .ground-truth {
+      border: 1px solid var(--panel-line);
+      border-radius: 17px;
+      background: var(--panel);
+    }
+
+    .guide {
+      padding: 18px;
+    }
+
+    .guide h2,
+    .ground-truth summary {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 750;
+    }
+
+    .guide ol {
+      margin: 12px 0 0;
+      padding-left: 19px;
+      color: var(--page-muted);
+      font-size: 13px;
+      line-height: 1.65;
+    }
+
+    .ground-truth summary {
+      padding: 18px;
+      cursor: pointer;
+      list-style-position: inside;
+    }
+
+    .truth-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1px;
+      margin: 0 18px 18px;
+      overflow: hidden;
+      border: 1px solid var(--panel-line);
+      border-radius: 10px;
+      background: var(--panel-line);
+    }
+
+    .truth-grid div {
+      min-width: 0;
+      padding: 10px;
+      background: #1b1917;
+    }
+
+    .truth-grid dt {
+      margin-bottom: 4px;
+      color: var(--page-muted);
+      font-size: 9px;
+    }
+
+    .truth-grid dd {
+      color: var(--page-ink);
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 11px;
+      overflow-wrap: anywhere;
+    }
+
+    body.fallback-fullscreen {
+      overflow: hidden;
+    }
+
+    #coffee-card.fullscreen-fallback {
+      position: fixed;
+      z-index: 1000;
+      inset: 0;
+      width: min(75vh, 100vw);
+      height: min(100vh, 133.333vw);
+      max-width: none;
+      margin: auto;
+      border: 0;
+      border-radius: 0;
+      box-shadow: 0 0 0 100vmax #000;
+    }
+
+    #coffee-card:fullscreen {
+      width: min(75vh, 100vw);
+      height: min(100vh, 133.333vw);
+      max-width: none;
+      margin: auto;
+      border: 0;
+      border-radius: 0;
+      box-shadow: none;
+    }
+
+    @media (max-width: 720px) {
+      .tester {
+        padding: 18px 12px 36px;
+      }
+
+      .page-header {
+        grid-template-columns: 1fr;
+      }
+
+      .page-header > p:last-child {
+        max-width: 520px;
+        text-align: left;
+      }
+
+      .controls {
+        position: static;
+        display: grid;
+        grid-template-columns: 1fr;
+      }
+
+      .segmented {
+        width: 100%;
+        min-width: 0;
+      }
+
+      .segmented button {
+        flex: 1;
+      }
+
+      #fullscreen-button {
+        flex: 1 0 100%;
+        margin-left: 0;
+      }
+
+      .capture-stage {
+        padding: 12px;
+        border-radius: 18px;
+      }
+
+      #coffee-card {
+        width: min(86vw, 52vh, 680px);
+        height: min(114.667vw, 69.333vh, 906.667px);
+      }
+
+      .reference {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.001ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="tester">
+    <header class="page-header">
+      <div>
+        <p class="page-kicker">BeanProfile · camera OCR target</p>
+        <h1>블렌드 카드 촬영 테스트</h1>
+      </div>
+      <p>같은 원두 정보를 두 가지 배치와 두 가지 대비로 바꿔가며 촬영하세요. 카드 밖의 안내 문구는 전체화면에서 제외됩니다.</p>
+    </header>
+
+    <section class="controls" aria-label="테스트 카드 설정">
+      <div class="segmented" aria-label="카드 레이아웃">
+        <button type="button" data-card-button="b">B 실제형</button>
+        <button type="button" data-card-button="c">C 스트레스형</button>
+      </div>
+      <div class="segmented" aria-label="카드 대비">
+        <button type="button" data-contrast-button="light">밝은 배경</button>
+        <button type="button" data-contrast-button="dark">어두운 저대비</button>
+      </div>
+      <button type="button" id="fullscreen-button">카드만 전체화면</button>
+    </section>
+
+    <p class="state-line" id="state-line" aria-live="polite">B 실제형 · 밝은 배경</p>
+
+    <section class="capture-stage">
+      <article id="coffee-card" data-card="b" data-contrast="light" aria-label="블렌드 원두 OCR 촬영 카드">
+        <aside class="lab-rail" aria-hidden="true">
+          <span class="rail-mark"></span>
+          <span class="rail-label">Blend analysis</span>
+          <strong class="rail-index">60<br>40</strong>
+          <span class="rail-copy">CUPPING LAB · TWO ORIGINS · ROAST PROFILE 04</span>
+        </aside>
+
+        <header class="card-header">
+          <div class="card-header-topline">
+            <p class="roaster">BEANPROFILE LAB</p>
+            <p class="type">BLEND</p>
+          </div>
+          <h1>DAYBREAK HOUSE BLEND</h1>
+        </header>
+
+        <div class="blend-meter" aria-hidden="true"></div>
+
+        <section class="components" aria-label="블렌드 구성">
+          <article class="component component-one">
+            <p class="component-number">ORIGIN 01 · 구성 1</p>
+            <h2>BRAZIL <strong>60%</strong></h2>
+            <dl>
+              <div><dt>지역</dt><dd>CERRADO</dd></div>
+              <div><dt>가공</dt><dd>NATURAL</dd></div>
+            </dl>
+          </article>
+
+          <article class="component component-two">
+            <p class="component-number">ORIGIN 02 · 구성 2</p>
+            <h2>ETHIOPIA <strong>40%</strong></h2>
+            <dl>
+              <div><dt>지역</dt><dd>GUJI</dd></div>
+              <div><dt>가공</dt><dd>WASHED</dd></div>
+            </dl>
+          </article>
+        </section>
+
+        <footer class="card-footer">
+          <dl class="roast-data">
+            <div><dt>로스팅</dt><dd>MEDIUM</dd></div>
+            <div><dt>로스팅일</dt><dd>2026.07.24</dd></div>
+          </dl>
+          <div class="notes">
+            <p>컵노트</p>
+            <strong>COCOA, BERRY, JASMINE</strong>
+          </div>
+        </footer>
+      </article>
+    </section>
+
+    <section class="reference">
+      <div class="guide">
+        <h2>촬영 순서</h2>
+        <ol>
+          <li>B/C와 대비를 선택합니다.</li>
+          <li>카드만 전체화면으로 띄웁니다.</li>
+          <li>BeanProfile 앱에서 화면 전체가 프레임에 들어오게 촬영합니다.</li>
+          <li>아래 정답표와 자동 입력 결과를 비교합니다.</li>
+        </ol>
+      </div>
+
+      <details class="ground-truth">
+        <summary>OCR 정답 데이터 보기</summary>
+        <dl class="truth-grid">
+          <div><dt>제품명</dt><dd>DAYBREAK HOUSE BLEND</dd></div>
+          <div><dt>로스터리</dt><dd>BEANPROFILE LAB</dd></div>
+          <div><dt>구성 1</dt><dd>BRAZIL · CERRADO · NATURAL · 60%</dd></div>
+          <div><dt>구성 2</dt><dd>ETHIOPIA · GUJI · WASHED · 40%</dd></div>
+          <div><dt>로스팅</dt><dd>MEDIUM · 2026.07.24</dd></div>
+          <div><dt>컵노트</dt><dd>COCOA, BERRY, JASMINE</dd></div>
+        </dl>
+      </details>
+    </section>
+  </main>
+
+  <script>
+    const card = document.querySelector('#coffee-card');
+    const stateLine = document.querySelector('#state-line');
+    const fullscreenButton = document.querySelector('#fullscreen-button');
+
+    function applyState() {
+      const params = new URLSearchParams(location.search);
+      const cardMode = params.get('card') === 'c' ? 'c' : 'b';
+      const contrast = params.get('contrast') === 'dark' ? 'dark' : 'light';
+
+      card.dataset.card = cardMode;
+      card.dataset.contrast = contrast;
+
+      document.querySelectorAll('[data-card-button]').forEach((button) => {
+        button.setAttribute(
+          'aria-pressed',
+          String(button.dataset.cardButton === cardMode),
+        );
+      });
+
+      document.querySelectorAll('[data-contrast-button]').forEach((button) => {
+        button.setAttribute(
+          'aria-pressed',
+          String(button.dataset.contrastButton === contrast),
+        );
+      });
+
+      const cardLabel = cardMode === 'c' ? 'C 스트레스형' : 'B 실제형';
+      const contrastLabel = contrast === 'dark' ? '어두운 저대비' : '밝은 배경';
+      stateLine.textContent = `${cardLabel} · ${contrastLabel}`;
+    }
+
+    function setCardMode(mode) {
+      const params = new URLSearchParams(location.search);
+      params.set('card', mode === 'c' ? 'c' : 'b');
+      history.replaceState(null, '', `?${params}`);
+      applyState();
+    }
+
+    function setContrast(mode) {
+      const params = new URLSearchParams(location.search);
+      params.set('contrast', mode === 'dark' ? 'dark' : 'light');
+      history.replaceState(null, '', `?${params}`);
+      applyState();
+    }
+
+    function isFullscreen() {
+      return Boolean(document.fullscreenElement) ||
+        card.classList.contains('fullscreen-fallback');
+    }
+
+    function updateFullscreenLabel() {
+      fullscreenButton.textContent = isFullscreen()
+        ? '전체화면 나가기'
+        : '카드만 전체화면';
+    }
+
+    async function toggleCardFullscreen() {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+        return;
+      }
+
+      if (card.classList.contains('fullscreen-fallback')) {
+        card.classList.remove('fullscreen-fallback');
+        document.body.classList.remove('fallback-fullscreen');
+        updateFullscreenLabel();
+        return;
+      }
+
+      if (card.requestFullscreen) {
+        await card.requestFullscreen();
+      } else {
+        card.classList.add('fullscreen-fallback');
+        document.body.classList.add('fallback-fullscreen');
+        updateFullscreenLabel();
+      }
+    }
+
+    document.querySelectorAll('[data-card-button]').forEach((button) => {
+      button.addEventListener('click', () => setCardMode(button.dataset.cardButton));
+    });
+
+    document.querySelectorAll('[data-contrast-button]').forEach((button) => {
+      button.addEventListener(
+        'click',
+        () => setContrast(button.dataset.contrastButton),
+      );
+    });
+
+    fullscreenButton.addEventListener('click', toggleCardFullscreen);
+    document.addEventListener('fullscreenchange', updateFullscreenLabel);
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && card.classList.contains('fullscreen-fallback')) {
+        card.classList.remove('fullscreen-fallback');
+        document.body.classList.remove('fallback-fullscreen');
+        updateFullscreenLabel();
+      }
+    });
+
+    applyState();
+    updateFullscreenLabel();
+  </script>
+</body>
+</html>

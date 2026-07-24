@@ -16,7 +16,14 @@ import 'package:path_provider/path_provider.dart';
 
 Future<String> _copyAssetToTemp(String assetPath) async {
   final bytes = await rootBundle.load(assetPath);
-  final dir = await getTemporaryDirectory();
+  final temp = await getTemporaryDirectory();
+  final dir = await Directory(
+    '${temp.path}/beanprofile_ocr_probe_'
+    '${DateTime.now().microsecondsSinceEpoch}',
+  ).create();
+  addTearDown(() async {
+    if (await dir.exists()) await dir.delete(recursive: true);
+  });
   final file = File('${dir.path}/${assetPath.split('/').last}');
   await file.writeAsBytes(bytes.buffer.asUint8List());
   return file.path;

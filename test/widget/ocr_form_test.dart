@@ -7,6 +7,54 @@ import 'package:flutter_test/flutter_test.dart';
 import '../helpers.dart';
 
 void main() {
+  testWidgets('certain OCR type, process, and ratio show field provenance',
+      (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    t.view.physicalSize = const Size(2400, 4000);
+    t.view.devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(wrapApp(
+      const BeanFormScreen(
+        initialType: BeanType.blend,
+        draft: OcrDraft(
+          typeDecision: OcrTypeDecision.certainBlend,
+          components: [
+            OcrComponentDraft(
+              country: 'Brazil',
+              process: Process.natural,
+              ratioPercent: 60,
+            ),
+          ],
+        ),
+      ),
+      db: db,
+    ));
+    await t.pump();
+
+    expect(find.byKey(const Key('ocr-auto-type')), findsOneWidget);
+    expect(find.byKey(const Key('ocr-auto-process-0')), findsOneWidget);
+    expect(find.byKey(const Key('ocr-auto-ratio-0')), findsOneWidget);
+    expect(find.byKey(const Key('ocr-auto-process-1')), findsNothing);
+    expect(find.byKey(const Key('ocr-auto-ratio-1')), findsNothing);
+  });
+
+  testWidgets('user-confirmed ambiguous type is not labeled OCR automatic',
+      (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    await t.pumpWidget(wrapApp(
+      const BeanFormScreen(
+        initialType: BeanType.blend,
+        draft: OcrDraft(typeDecision: OcrTypeDecision.ambiguous),
+      ),
+      db: db,
+    ));
+    await t.pump();
+
+    expect(find.byKey(const Key('ocr-auto-type')), findsNothing);
+  });
+
   testWidgets('blend draft prefills two component rows and ratios', (t) async {
     final db = testDatabase();
     addTearDown(db.close);
@@ -154,7 +202,7 @@ void main() {
 
     expect(find.text('Ethiopia'), findsOneWidget);         // 국가 프리필
     expect(find.text('블루베리'), findsOneWidget);           // 컵노트 프리필
-    expect(find.text('OCR 자동'), findsNWidgets(2));        // 하이라이트: 국가+컵노트 (로스팅단계·날짜는 null)
+    expect(find.text('OCR 자동'), findsNWidgets(3));        // 하이라이트: 국가+가공+컵노트 (로스팅단계·날짜는 null)
     expect(find.byType(OcrChipsPanel), findsOneWidget);
     expect(find.text('프릳츠'), findsOneWidget);
   });

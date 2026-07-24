@@ -1,5 +1,6 @@
 import 'package:beanprofile/data/enums.dart';
 import 'package:beanprofile/features/beans/ocr/ocr_component_parser.dart';
+import 'package:beanprofile/features/beans/ocr/ocr_draft.dart';
 import 'package:beanprofile/services/ocr_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -38,6 +39,517 @@ void main() {
     ]);
     expect(components, hasLength(1));
     expect(components.single.country, 'Ethiopia');
+  });
+
+  test(
+    'Origin label does not globally admit a later roasting-address country',
+    () {
+      final components = parseOcrComponents(const [
+        OcrLine('Origin: Ethiopia'),
+        OcrLine('Roasted in Colombia by Example Roasters'),
+      ]);
+
+      expect(components.map((component) => component.country), ['Ethiopia']);
+    },
+  );
+
+  test(
+    'address country before a structured Origin is not the fallback anchor',
+    () {
+      final components = parseOcrComponents(const [
+        OcrLine('Roasted in Colombia by Example Roasters'),
+        OcrLine('Origin: Ethiopia'),
+      ]);
+
+      expect(components.map((component) => component.country), ['Ethiopia']);
+    },
+  );
+
+  test('descriptive country before a local Origin label is not admitted', () {
+    final components = parseOcrComponents(const [
+      OcrLine('Stories from Colombia'),
+      OcrLine('Origin'),
+      OcrLine('Ethiopia'),
+    ]);
+
+    expect(components.map((component) => component.country), ['Ethiopia']);
+  });
+
+  test('Origin story prefix is not a local component label', () {
+    final components = parseOcrComponents(const [
+      OcrLine('Ethiopia'),
+      OcrLine('Origin story of Colombia'),
+    ]);
+
+    expect(components.map((component) => component.country), ['Ethiopia']);
+  });
+
+  test('descriptive same-line countries are not structural components', () {
+    final components = parseOcrComponents(const [
+      OcrLine('Inspired by Brazil and Colombia'),
+    ]);
+
+    expect(components.map((component) => component.country), ['Brazil']);
+  });
+
+  test('separator-only and ratio inline groups admit every country', () {
+    final separator = parseOcrComponents(const [OcrLine('Brazil / Ethiopia')]);
+    final ratios = parseOcrComponents(const [
+      OcrLine('Brazil 60% Ethiopia 40%'),
+    ]);
+
+    expect(separator.map((component) => component.country), [
+      'Brazil',
+      'Ethiopia',
+    ]);
+    expect(ratios.map((component) => component.country), [
+      'Brazil',
+      'Ethiopia',
+    ]);
+    expect(ratios.map((component) => component.ratioPercent), [60, 40]);
+  });
+
+  const labeledInlineCases = <(String, String, List<int?>)>[
+    ('English Origin without ratios', 'Origin: Brazil / Ethiopia', [null, null]),
+    (
+      'English Origin with ratios',
+      'Origin: Brazil 60% / Ethiopia 40%',
+      [60, 40],
+    ),
+    ('English Blend without ratios', 'Blend: Brazil / Ethiopia', [null, null]),
+    (
+      'English Blend with ratios',
+      'Blend: Brazil 60% / Ethiopia 40%',
+      [60, 40],
+    ),
+    ('Korean Origin without ratios', '원산지: 브라질 / 에티오피아', [null, null]),
+    (
+      'Korean Origin with ratios',
+      '원산지: 브라질 60% / 에티오피아 40%',
+      [60, 40],
+    ),
+    ('Korean Blend without ratios', '블렌드: 브라질 / 에티오피아', [null, null]),
+    (
+      'Korean Blend with ratios',
+      '블렌드: 브라질 60% / 에티오피아 40%',
+      [60, 40],
+    ),
+  ];
+  for (final (name, text, ratios) in labeledInlineCases) {
+    test('bounded local label admits $name', () {
+      final components = parseOcrComponents([OcrLine(text)]);
+      expect(
+        components.map((component) => component.country),
+        ['Brazil', 'Ethiopia'],
+        reason: text,
+      );
+      expect(
+        components.map((component) => component.ratioPercent),
+        ratios,
+        reason: text,
+      );
+    });
+  }
+
+  test('first country remains the sole fallback when no evidence exists', () {
+    final components = parseOcrComponents(const [
+      OcrLine('Ethiopia Guji'),
+      OcrLine('Colombia is mentioned in a story'),
+    ]);
+
+    expect(components.map((component) => component.country), ['Ethiopia']);
+  });
+
+  test('Blend title does not globally admit a descriptive country', () {
+    final components = parseOcrComponents(const [
+      OcrLine('HOUSE BLEND'),
+      OcrLine('Brazil'),
+      OcrLine('Inspired by Colombia and our neighborhood'),
+    ]);
+
+    expect(components.map((component) => component.country), ['Brazil']);
+  });
+
+  test('far footer country is not repeated-anchor evidence', () {
+    final components = parseOcrComponents(const [
+      OcrLine(
+        'Origin',
+        left: 100,
+        top: 60,
+        right: 180,
+        bottom: 90,
+      ),
+      OcrLine(
+        'Ethiopia',
+        left: 100,
+        top: 100,
+        right: 220,
+        bottom: 130,
+      ),
+      OcrLine(
+        'Colombia',
+        left: 100,
+        top: 1000,
+        right: 210,
+        bottom: 1030,
+      ),
+    ]);
+
+    expect(components.map((component) => component.country), ['Ethiopia']);
+  });
+
+  test('far address country before Origin is not repeated-anchor evidence', () {
+    final components = parseOcrComponents(const [
+      OcrLine(
+        'Colombia',
+        left: 100,
+        top: 20,
+        right: 210,
+        bottom: 50,
+      ),
+      OcrLine(
+        'Origin',
+        left: 100,
+        top: 860,
+        right: 180,
+        bottom: 890,
+      ),
+      OcrLine(
+        'Ethiopia',
+        left: 100,
+        top: 900,
+        right: 220,
+        bottom: 930,
+      ),
+    ]);
+
+    expect(components.map((component) => component.country), ['Ethiopia']);
+  });
+
+  test('large country-only title collapses into same-country Origin', () {
+    final components = parseOcrComponents(const [
+      OcrLine('Brazil', left: 20, top: 20, right: 260, bottom: 100),
+      OcrLine('Origin', left: 20, top: 150, right: 100, bottom: 180),
+      OcrLine('Brazil', left: 20, top: 190, right: 140, bottom: 220),
+    ]);
+
+    expect(components, hasLength(1));
+    expect(components.single.country, 'Brazil');
+  });
+
+  test('repeated OCR columns associate fields with their country anchor', () {
+    final components = parseOcrComponents(const [
+      OcrLine('Brazil', left: 100, top: 100, right: 180, bottom: 130),
+      OcrLine('Ethiopia', left: 300, top: 100, right: 400, bottom: 130),
+      OcrLine('Region', left: 20, top: 160, right: 80, bottom: 190),
+      OcrLine('Cerrado', left: 100, top: 160, right: 190, bottom: 190),
+      OcrLine('Guji', left: 300, top: 160, right: 360, bottom: 190),
+      OcrLine('Process', left: 20, top: 220, right: 80, bottom: 250),
+      OcrLine('Natural', left: 100, top: 220, right: 190, bottom: 250),
+      OcrLine('Washed', left: 300, top: 220, right: 380, bottom: 250),
+      OcrLine('Ratio', left: 20, top: 280, right: 70, bottom: 310),
+      OcrLine('60%', left: 100, top: 280, right: 150, bottom: 310),
+      OcrLine('40%', left: 300, top: 280, right: 350, bottom: 310),
+    ]);
+
+    expect(components, hasLength(2));
+    expect(components.map((component) => component.country), [
+      'Brazil',
+      'Ethiopia',
+    ]);
+    expect(components.map((component) => component.region), [
+      'Cerrado',
+      'Guji',
+    ]);
+    expect(components.map((component) => component.process), [
+      Process.natural,
+      Process.washed,
+    ]);
+    expect(components.map((component) => component.ratioPercent), [60, 40]);
+  });
+
+  test(
+    'unlabeled repeated columns associate region and process by geometry',
+    () {
+      final components = parseOcrComponents(const [
+        OcrLine('Brazil', left: 100, top: 100, right: 180, bottom: 130),
+        OcrLine('Ethiopia', left: 300, top: 100, right: 400, bottom: 130),
+        OcrLine('Cerrado', left: 100, top: 160, right: 190, bottom: 190),
+        OcrLine('Guji', left: 300, top: 160, right: 360, bottom: 190),
+        OcrLine('Natural', left: 100, top: 220, right: 190, bottom: 250),
+        OcrLine('Washed', left: 300, top: 220, right: 380, bottom: 250),
+      ]);
+
+      expect(components.map((component) => component.region), [
+        'Cerrado',
+        'Guji',
+      ]);
+      expect(components.map((component) => component.process), [
+        Process.natural,
+        Process.washed,
+      ]);
+    },
+  );
+
+  test('unlabeled percentages stay in their repeated country columns', () {
+    final components = parseOcrComponents(const [
+      OcrLine('Brazil', left: 100, top: 100, right: 180, bottom: 130),
+      OcrLine('Ethiopia', left: 300, top: 100, right: 400, bottom: 130),
+      OcrLine('60%', left: 100, top: 160, right: 150, bottom: 190),
+      OcrLine('40%', left: 300, top: 160, right: 350, bottom: 190),
+    ]);
+
+    expect(components.map((component) => component.ratioPercent), [60, 40]);
+  });
+
+  test('global Notes row values are not consumed as component regions', () {
+    final components = parseOcrComponents(const [
+      OcrLine('Brazil', left: 100, top: 100, right: 180, bottom: 130),
+      OcrLine('Ethiopia', left: 300, top: 100, right: 400, bottom: 130),
+      OcrLine('Notes', left: 20, top: 160, right: 80, bottom: 190),
+      OcrLine('Blueberry', left: 100, top: 160, right: 190, bottom: 190),
+      OcrLine('Jasmine', left: 300, top: 160, right: 380, bottom: 190),
+    ]);
+
+    expect(components.map((component) => component.region), [null, null]);
+  });
+
+  test('reversed OCR order preserves geometric field ownership', () {
+    final components = parseOcrComponents(const [
+      OcrLine('Ethiopia', left: 300, top: 100, right: 400, bottom: 130),
+      OcrLine('Brazil', left: 100, top: 100, right: 180, bottom: 130),
+      OcrLine('Guji', left: 300, top: 160, right: 360, bottom: 190),
+      OcrLine('Cerrado', left: 100, top: 160, right: 190, bottom: 190),
+      OcrLine('Washed', left: 300, top: 220, right: 380, bottom: 250),
+      OcrLine('Natural', left: 100, top: 220, right: 190, bottom: 250),
+      OcrLine('40%', left: 300, top: 280, right: 350, bottom: 310),
+      OcrLine('60%', left: 100, top: 280, right: 150, bottom: 310),
+    ]);
+
+    expect(components.map((component) => component.country), [
+      'Ethiopia',
+      'Brazil',
+    ]);
+    expect(components.map((component) => component.region), [
+      'Guji',
+      'Cerrado',
+    ]);
+    expect(components.map((component) => component.process), [
+      Process.washed,
+      Process.natural,
+    ]);
+    expect(components.map((component) => component.ratioPercent), [40, 60]);
+  });
+
+  test('centered geometry candidate stays unowned in either OCR order', () {
+    List<OcrComponentDraft> parse(bool reversed) {
+      final anchors = reversed
+          ? const [
+              OcrLine(
+                'Ethiopia',
+                left: 300,
+                top: 100,
+                right: 400,
+                bottom: 130,
+              ),
+              OcrLine(
+                'Brazil',
+                left: 100,
+                top: 100,
+                right: 180,
+                bottom: 130,
+              ),
+            ]
+          : const [
+              OcrLine(
+                'Brazil',
+                left: 100,
+                top: 100,
+                right: 180,
+                bottom: 130,
+              ),
+              OcrLine(
+                'Ethiopia',
+                left: 300,
+                top: 100,
+                right: 400,
+                bottom: 130,
+              ),
+            ];
+      return parseOcrComponents([
+        ...anchors,
+        const OcrLine(
+          'Natural',
+          left: 100,
+          top: 160,
+          right: 190,
+          bottom: 190,
+        ),
+        const OcrLine(
+          'Washed',
+          left: 300,
+          top: 160,
+          right: 380,
+          bottom: 190,
+        ),
+        const OcrLine(
+          'Shared',
+          left: 210,
+          top: 220,
+          right: 280,
+          bottom: 250,
+        ),
+      ]);
+    }
+
+    final forward = parse(false);
+    final reversed = parse(true);
+    Map<String, String?> regions(List<OcrComponentDraft> components) => {
+      for (final component in components)
+        component.country!: component.region,
+    };
+
+    expect(regions(forward), {'Brazil': null, 'Ethiopia': null});
+    expect(regions(reversed), regions(forward));
+  });
+
+  test('geometry-less vertical rows retain bounded sequential fallback', () {
+    final components = parseOcrComponents(const [
+      OcrLine('Brazil 60%'),
+      OcrLine('Cerrado Natural'),
+      OcrLine('Ethiopia 40%'),
+      OcrLine('Guji Washed'),
+    ]);
+
+    expect(components.map((component) => component.region), [
+      'Cerrado',
+      'Guji',
+    ]);
+    expect(components.map((component) => component.process), [
+      Process.natural,
+      Process.washed,
+    ]);
+    expect(components.map((component) => component.ratioPercent), [60, 40]);
+  });
+
+  test('field labels require a full token boundary', () {
+    final components = parseOcrComponents(const [
+      OcrLine('Brazil 60%'),
+      OcrLine('Regional Select'),
+      OcrLine('Processing Anaerobic'),
+      OcrLine('Ethiopia 40%'),
+      OcrLine('Guji Washed'),
+    ]);
+
+    expect(components.first.region, 'Regional Select');
+    expect(components.first.process, Process.anaerobic);
+  });
+
+  test('space-delimited Region Process and Ratio labels remain valid', () {
+    final components = parseOcrComponents(const [
+      OcrLine('Brazil'),
+      OcrLine('Region Cerrado'),
+      OcrLine('Process Natural'),
+      OcrLine('Ratio 60%'),
+      OcrLine('Ethiopia'),
+      OcrLine('Region Guji'),
+      OcrLine('Process Washed'),
+      OcrLine('Ratio 40%'),
+    ]);
+
+    expect(components.map((component) => component.region), [
+      'Cerrado',
+      'Guji',
+    ]);
+    expect(components.map((component) => component.process), [
+      Process.natural,
+      Process.washed,
+    ]);
+    expect(components.map((component) => component.ratioPercent), [60, 40]);
+  });
+
+  test('same-row label and value pairs stay with each component row', () {
+    final components = parseOcrComponents(const [
+      OcrLine('Brazil', left: 20, top: 100, right: 100, bottom: 130),
+      OcrLine('Region', left: 130, top: 100, right: 190, bottom: 130),
+      OcrLine('Cerrado', left: 210, top: 100, right: 290, bottom: 130),
+      OcrLine('Process', left: 310, top: 100, right: 375, bottom: 130),
+      OcrLine('Natural', left: 395, top: 100, right: 475, bottom: 130),
+      OcrLine('Ratio', left: 495, top: 100, right: 545, bottom: 130),
+      OcrLine('60%', left: 565, top: 100, right: 610, bottom: 130),
+      OcrLine('Ethiopia', left: 20, top: 180, right: 115, bottom: 210),
+      OcrLine('Region', left: 130, top: 180, right: 190, bottom: 210),
+      OcrLine('Guji', left: 210, top: 180, right: 260, bottom: 210),
+      OcrLine('Process', left: 310, top: 180, right: 375, bottom: 210),
+      OcrLine('Washed', left: 395, top: 180, right: 475, bottom: 210),
+      OcrLine('Ratio', left: 495, top: 180, right: 545, bottom: 210),
+      OcrLine('40%', left: 565, top: 180, right: 610, bottom: 210),
+    ]);
+
+    expect(components.map((component) => component.region), [
+      'Cerrado',
+      'Guji',
+    ]);
+    expect(components.map((component) => component.process), [
+      Process.natural,
+      Process.washed,
+    ]);
+    expect(components.map((component) => component.ratioPercent), [60, 40]);
+  });
+
+  test('labeled inline ratios are associated within bounded components', () {
+    final components = parseOcrComponents(const [
+      OcrLine('Brazil'),
+      OcrLine('Ratio: 60%'),
+      OcrLine('Ethiopia'),
+      OcrLine('Ratio: 40%'),
+    ]);
+
+    expect(components.map((component) => component.country), [
+      'Brazil',
+      'Ethiopia',
+    ]);
+    expect(components.map((component) => component.ratioPercent), [60, 40]);
+  });
+
+  test('bare Ratio labels take the following percentage value', () {
+    final components = parseOcrComponents(const [
+      OcrLine('Brazil'),
+      OcrLine('Ratio'),
+      OcrLine('60%'),
+      OcrLine('Ethiopia'),
+      OcrLine('Ratio'),
+      OcrLine('40%'),
+    ]);
+
+    expect(components.map((component) => component.country), [
+      'Brazil',
+      'Ethiopia',
+    ]);
+    expect(components.map((component) => component.ratioPercent), [60, 40]);
+  });
+
+  test('same country in separate component rows remains separate', () {
+    final components = parseOcrComponents(const [
+      OcrLine('Brazil', left: 20, top: 80, right: 110, bottom: 110),
+      OcrLine('Cerrado Natural', left: 20, top: 120, right: 220, bottom: 150),
+      OcrLine('Brazil', left: 20, top: 220, right: 110, bottom: 250),
+      OcrLine('Mogiana Washed', left: 20, top: 260, right: 210, bottom: 290),
+    ]);
+
+    expect(components, hasLength(2));
+    expect(components.map((component) => component.country), [
+      'Brazil',
+      'Brazil',
+    ]);
+    expect(components.map((component) => component.region), [
+      'Cerrado',
+      'Mogiana',
+    ]);
+    expect(components.map((component) => component.process), [
+      Process.natural,
+      Process.washed,
+    ]);
   });
 
   test('structured country replaces a duplicate country in the title', () {

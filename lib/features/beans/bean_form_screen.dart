@@ -27,12 +27,16 @@ class _ComponentDraft {
   _ComponentDraft({
     this.process = Process.washed,
     this.processProvidedOrEdited = false,
+    this.processFromOcr = false,
+    this.ratioFromOcr = false,
   });
 
   final country = TextEditingController();
   final region = TextEditingController();
   Process process;
   bool processProvidedOrEdited;
+  bool processFromOcr;
+  bool ratioFromOcr;
   final ratio = TextEditingController();
   void dispose() { country.dispose(); region.dispose(); ratio.dispose(); }
 }
@@ -47,6 +51,7 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
   DateTime? _roastDate;
   final _components = [_ComponentDraft()];
   bool _saving = false;
+  bool _typeFromOcr = false;
   final _usedChips = <String>{};
 
   @override
@@ -79,6 +84,7 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
     final d = widget.draft;
     if (e == null) {
       _type = widget.initialType ?? d?.inferredType ?? BeanType.singleOrigin;
+      _typeFromOcr = d?.inferredType != null && _type == d!.inferredType;
     }
     if (e == null && d != null) {
       if (d.name != null) _name.text = d.name!;
@@ -91,6 +97,8 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
         final row = _ComponentDraft(
           process: component.process ?? Process.other,
           processProvidedOrEdited: component.process != null,
+          processFromOcr: component.process != null,
+          ratioFromOcr: component.ratioPercent != null,
         );
         row.country.text = component.country ?? '';
         row.region.text = component.region ?? '';
@@ -183,6 +191,7 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
     if (next == BeanType.blend) {
       setState(() {
         _type = next;
+        _typeFromOcr = false;
         while (_components.length < 2) {
           _components.add(_ComponentDraft());
         }
@@ -219,6 +228,7 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
     }
     setState(() {
       _type = BeanType.singleOrigin;
+      _typeFromOcr = false;
       for (final row in _components.skip(1)) {
         row.dispose();
       }
@@ -308,6 +318,8 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
           selected: {_type},
           onSelectionChanged: (s) => _changeType(s.first),
         ),
+        if (_typeFromOcr)
+          const Text('OCR 자동', key: Key('ocr-auto-type')),
         const SizedBox(height: 14),
         Text('원산지 구성', style: TextStyle(fontWeight: FontWeight.w700, color: c.espresso)),
         if (_type == BeanType.blend &&
@@ -430,12 +442,19 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
           const SizedBox(width: 10),
           Expanded(
             child: DropdownButtonFormField<Process>(
+              key: Key('field-process-$i'),
               initialValue: comp.process,
-              decoration: const InputDecoration(labelText: '가공'),
+              decoration: InputDecoration(
+                labelText: '가공',
+                helper: comp.processFromOcr
+                    ? Text('OCR 자동', key: Key('ocr-auto-process-$i'))
+                    : null,
+              ),
               items: [for (final p in Process.values) DropdownMenuItem(value: p, child: Text(p.label))],
               onChanged: (v) => setState(() {
                 comp.process = v ?? Process.washed;
                 comp.processProvidedOrEdited = true;
+                comp.processFromOcr = false;
               }),
             ),
           ),
@@ -445,7 +464,17 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
                 key: Key('field-ratio-$i'),
                 controller: comp.ratio,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: '%'))),
+                onChanged: (_) => setState(() => comp.ratioFromOcr = false),
+                decoration: InputDecoration(
+                  labelText: '%',
+                  helper: comp.ratioFromOcr
+                      ? Text(
+                          'OCR 자동',
+                          key: Key('ocr-auto-ratio-$i'),
+                          style: const TextStyle(fontSize: 10),
+                        )
+                      : null,
+                ))),
           ],
         ]),
       ]),

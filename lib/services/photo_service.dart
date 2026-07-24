@@ -15,14 +15,20 @@ abstract class PhotoService {
 }
 
 typedef DocumentsDirectory = Future<Directory> Function();
+typedef EncodedImageWriter = Future<void> Function(String path, List<int> bytes);
 
 class ImagePickerPhotoService implements PhotoService {
-  ImagePickerPhotoService({DocumentsDirectory? documentsDirectory})
+  ImagePickerPhotoService({
+    DocumentsDirectory? documentsDirectory,
+    EncodedImageWriter? writeEncodedImage,
+  })
     : _documentsDirectory =
-          documentsDirectory ?? getApplicationDocumentsDirectory;
+          documentsDirectory ?? getApplicationDocumentsDirectory,
+      _writeEncodedImage = writeEncodedImage ?? _writeEncodedImageToFile;
 
   final ImagePicker _picker = ImagePicker();
   final DocumentsDirectory _documentsDirectory;
+  final EncodedImageWriter _writeEncodedImage;
 
   @override
   Future<String?> pick({required bool fromCamera}) async {
@@ -38,20 +44,41 @@ class ImagePickerPhotoService implements PhotoService {
     final photos = Directory('${dir.path}/photos');
     if (!await photos.exists()) await photos.create(recursive: true);
     final stamp = DateTime.now().microsecondsSinceEpoch;
-    final decoded = await img.decodeImageFile(tempPath);
-    if (decoded != null) {
-      final dest = '${photos.path}/$stamp.jpg';
+    final jpegDest = '${photos.path}/$stamp.jpg';
+    try {
+      final decoded = await img.decodeImageFile(tempPath);
+      if (decoded == null) return _copyOriginal(tempPath, photos, stamp);
       final oriented = img.bakeOrientation(decoded);
-      await File(dest).writeAsBytes(img.encodeJpg(oriented, quality: 85));
-      return dest;
+      await _writeEncodedImage(
+          jpegDest, img.encodeJpg(oriented, quality: 85));
+      return jpegDest;
+    } catch (_) {
+      final partial = File(jpegDest);
+      try {
+        if (await partial.exists()) await partial.delete();
+      } catch (_) {
+        // The original-copy fallback below remains the recovery path.
+      }
+      return _copyOriginal(tempPath, photos, stamp);
     }
+  }
+
+  Future<String> _copyOriginal(
+      String tempPath, Directory photos, int stamp) async {
     final basename = tempPath.split(RegExp(r'[/\\]')).last;
     final dot = basename.lastIndexOf('.');
     final ext = dot > 0 && dot < basename.length - 1
         ? basename.substring(dot + 1)
         : 'img';
-    final dest = '${photos.path}/$stamp.$ext';
+    var dest = '${photos.path}/$stamp.$ext';
+    if (await File(dest).exists()) {
+      dest = '${photos.path}/${stamp}_original.$ext';
+    }
     await File(tempPath).copy(dest);
     return dest;
   }
+
+  static Future<void> _writeEncodedImageToFile(
+          String path, List<int> bytes) =>
+      File(path).writeAsBytes(bytes);
 }

@@ -9,6 +9,33 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('shows a zero-component blend detail without origin rows',
+      (tester) async {
+    final bean = Bean(
+      id: 8, name: '비공개 블렌드', roaster: '프릳츠', type: BeanType.blend,
+      roastLevel: null, roastDate: null, cupNotes: const [],
+      photoPath: null, scaScore: null, weightGrams: null, price: null,
+      shop: null, memo: null, createdAt: DateTime(2026));
+    final detail =
+        BeanDetail(bean: bean, components: const [], tastings: const []);
+
+    await tester.pumpWidget(ProviderScope(
+      overrides: [
+        beanDetailProvider(8).overrideWith((ref) => Stream.value(detail)),
+      ],
+      child: MaterialApp(
+        theme: AppTheme.light,
+        home: const BeanDetailScreen(beanId: 8),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('비공개 블렌드'), findsOneWidget);
+    expect(find.textContaining('블렌드'), findsWidgets);
+    expect(find.text('원산지'), findsNothing);
+    expect(find.textContaining('아직 시음 기록이 없어요'), findsOneWidget);
+  });
+
   testWidgets('shows profile spec and empty tasting state', (tester) async {
     final bean = Bean(
       id: 7, name: '예가체프 코체레', roaster: '프릳츠', type: BeanType.singleOrigin,

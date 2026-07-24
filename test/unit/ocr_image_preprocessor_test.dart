@@ -130,4 +130,36 @@ void main() {
       [62, 128, 192],
     );
   });
+
+  test('enhance removes a partial output when writing fails', () async {
+    final root = await Directory.systemTemp.createTemp(
+      'beanprofile-enhance-failure-',
+    );
+    addTearDown(() => root.delete(recursive: true));
+    final source = File('${root.path}/source.png');
+    await source.writeAsBytes(img.encodePng(img.Image(width: 8, height: 8)));
+    final service = DartOcrImagePreprocessor(
+      temporaryDirectory: () async => root,
+      writeEnhancedImage: (path, bytes) async {
+        await File(path).writeAsBytes(bytes.take(4).toList());
+        throw const FileSystemException('disk full');
+      },
+    );
+
+    await expectLater(
+      service.enhance(source.path),
+      throwsA(isA<FileSystemException>()),
+    );
+
+    final outputs = await root
+        .list()
+        .where(
+          (entry) =>
+              entry.path.endsWith('.png') &&
+              entry.path.contains('beanprofile_ocr_'),
+        )
+        .toList();
+    expect(outputs, isEmpty);
+    expect(await source.exists(), isTrue);
+  });
 }

@@ -8,8 +8,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-Bean _bean(String name) => Bean(
-      id: 1, name: name, roaster: '프릳츠', type: BeanType.singleOrigin,
+Bean _bean(String name, {BeanType type = BeanType.singleOrigin}) => Bean(
+      id: 1, name: name, roaster: '프릳츠', type: type,
       roastLevel: null, roastDate: null, cupNotes: const ['블루베리'],
       photoPath: null, scaScore: null, weightGrams: null, price: null,
       shop: null, memo: null, createdAt: DateTime(2026));
@@ -29,6 +29,23 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('예가체프 코체레'), findsOneWidget);
     expect(find.text('블루베리'), findsOneWidget);
+  });
+
+  testWidgets('renders a zero-component blend without an origin label',
+      (tester) async {
+    await tester.pumpWidget(_host([
+      BeanSummary(
+        bean: _bean('비공개 블렌드', type: BeanType.blend),
+        originLabel: null,
+        avgRating: null,
+        tastingCount: 0,
+      ),
+    ]));
+    await tester.pumpAndSettle();
+
+    expect(find.text('비공개 블렌드'), findsOneWidget);
+    expect(find.text('BLEND'), findsOneWidget);
+    expect(find.text('프릳츠'), findsOneWidget);
   });
 
   testWidgets('shows empty state', (tester) async {

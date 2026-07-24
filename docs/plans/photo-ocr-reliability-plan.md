@@ -485,17 +485,17 @@ const countryKeywords = <String, String>{
 };
 
 final ratioPattern = RegExp(r'\b(100|[1-9]?\d)\s*%');
-final componentContext = RegExp(
-  r'blend|블렌드|origin|원산지|component|구성',
+final bareLocalComponentLabel = RegExp(
+  r'^(origin|원산지|생산지|component|구성)(\s*\d+)?\s*[:：]?$',
   caseSensitive: false,
 );
 ```
 
 - Sort keyword matching by key length descending so `Costa Rica` wins before shorter overlaps.
-- Always admit the first country mention to preserve single-origin behavior.
-- Admit later mentions only when they have a ratio, the joined card has component context, they share a line with another country, or their left coordinate matches another country row within `2 * max(line.height, 20)`.
+- Evaluate bounded evidence for every country mention before admitting any anchor. If at least one mention has structured/local evidence, admit only evidenced anchors; use the first textual country as the single-origin fallback only when no mention has evidence anywhere.
+- Valid anchor evidence is an inline or locally labeled ratio, a separator/ratio-only multi-country line, a genuinely adjacent `Origin/Component` label region, or a repeated row/column coordinate structure made from country-like anchor lines. Descriptive multi-country prose, a `Blend` title, or an `Origin` label elsewhere on the card never admits an address/description country.
 - Deduplicate the same country from the same line and coordinate, but keep the same country on a different row/inline segment.
-- Segment ordered lines from each admitted country anchor until the next admitted anchor. Parse the anchor ratio, a region token that is not a known label/country/process, and the first process keyword in the segment.
+- Associate explicit `Region/Process/Ratio` label values with each anchor by same-row/same-column geometry first, including OCR that emits all country headers before the value columns. In a repeated table, assign bounded unlabeled values by anchor-axis proximity in process → percentage → remaining region order. Use the bounded segment until the next anchor only when geometry is absent or ambiguous. Support `Ratio: 60%`, bare `Ratio` followed by `60%`, and inline country ratios.
 - For a one-component result, overwrite its region/process with the existing global geometry parser when that produces a non-null value. This preserves M3.3.
 - Move `countryKeywords` and process keyword lookup into the component parser and import them from `ocr_parser.dart`; do not duplicate keyword tables.
 

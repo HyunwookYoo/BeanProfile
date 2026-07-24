@@ -1,0 +1,85 @@
+<title>블렌드 OCR 실기기 테스트 카드 — 설계</title>
+<style>
+*{box-sizing:border-box}
+:root{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+  --font-sans:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Consolas,"Malgun Gothic",monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}}
+:root[data-theme="light"]{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+}
+:root[data-theme="dark"]{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-sans);line-height:1.7;-webkit-font-smoothing:antialiased}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.doc{max-width:880px;margin:0 auto;padding:44px 24px 96px}
+.crumb{font-family:var(--font-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:16px}
+h1{font-size:clamp(26px,4vw,38px);font-weight:800;letter-spacing:-.025em;line-height:1.2;margin:.1em 0 .5em;text-wrap:balance}
+h2{font-size:22px;font-weight:700;margin:2em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line);letter-spacing:-.01em;text-wrap:balance}
+h3{font-size:16.5px;font-weight:700;color:var(--accent-ink);margin:1.7em 0 .5em}
+h4{font-size:14px;font-weight:700;margin:1.3em 0 .4em}
+p{margin:.7em 0}
+a{color:var(--accent);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+strong{font-weight:700;color:var(--fg)}
+hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+code.ic{font-family:var(--font-mono);font-size:.85em;background:var(--ic-bg);color:var(--ic-fg);padding:1.5px 6px;border-radius:6px}
+pre.code{position:relative;background:var(--code-bg);color:var(--code-fg);border-radius:12px;padding:16px 18px;margin:1em 0;overflow-x:auto;border:1px solid rgba(0,0,0,.28)}
+pre.code code{font-family:var(--font-mono);font-size:12.75px;line-height:1.6;white-space:pre;color:inherit;background:none;padding:0}
+pre.code[data-lang]::before{content:attr(data-lang);position:absolute;top:9px;right:13px;font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(236,227,211,.42)}
+.tablewrap{overflow-x:auto;margin:1.1em 0}
+table{border-collapse:collapse;width:100%;font-size:13.75px}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--th);font-weight:700}
+tbody tr:nth-child(even){background:var(--surface)}
+blockquote{margin:1.1em 0;padding:11px 16px;border-left:3px solid var(--accent);background:var(--surface);border-radius:0 10px 10px 0;color:var(--muted)}
+blockquote strong{color:var(--fg)}
+ul,ol{margin:.7em 0;padding-left:1.4em}
+li{margin:.32em 0}
+ul.tasklist{list-style:none;padding-left:.15em}
+ul.tasklist li.task{position:relative;padding-left:30px;margin:.5em 0}
+ul.tasklist li.task::before{content:"";position:absolute;left:0;top:.18em;width:17px;height:17px;border:2px solid var(--accent);border-radius:5px;background:transparent}
+ul.tasklist li.task.done::before{content:"\2713";background:var(--accent);color:#fff;font-size:12px;font-weight:800;text-align:center;line-height:15px}
+</style>
+<article class="doc"><div class="crumb">BeanProfile · docs/superpowers/specs</div>
+<h1>블렌드 OCR 실기기 테스트 카드 — 설계</h1>
+<blockquote>상태: 사용자 승인 완료   산출물: <code class="ic">docs/mockups/ocr-blend-test-cards.html</code></blockquote>
+<h2>1. 목적</h2>
+<p>BeanProfile 앱의 사진 OCR을 실기기에서 검증할 수 있도록, 다른 화면에 띄운 뒤 휴대폰 카메라로 촬영하는 블렌드 커피 정보 카드 HTML을 만든다.</p>
+<p>이 산출물은 앱 UI나 신규 기능이 아니다. Flutter 코드, OCR 파서, 데이터 모델은 변경하지 않는다.</p>
+<h2>2. 범위</h2>
+<p>하나의 독립 HTML에 다음 두 테스트 카드를 제공한다.</p>
+<ol><li><strong>B — 실제형 2열 카드</strong></li><li>상용 커피 카드에 가까운 시각적 위계</li><li>두 구성 원두를 좌우 열로 명확히 구분</li><li>제품·로스터리·로스팅·컵노트는 공통 영역에 배치</li><li><strong>C — 고밀도 스트레스 카드</strong></li><li>더 작은 글자와 촘촘한 정보 밀도</li><li>라벨과 값이 반복되는 표 구조</li><li>장식 요소와 보조 문구를 포함하되, 정답 데이터는 B와 동일</li></ol>
+<p>각 카드는 밝은 배경과 어두운 저대비 배경을 전환할 수 있다. 카드만 크게 표시하는 전체화면 기능도 제공한다.</p>
+<h2>3. 공통 정답 데이터</h2>
+<p>두 카드와 모든 대비 상태는 같은 정보를 표시한다. 이를 통해 레이아웃과 대비만 바뀌었을 때 OCR 결과를 비교할 수 있다.</p>
+<div class="tablewrap"><table><thead><tr><th>필드</th><th>값</th></tr></thead><tbody><tr><td>제품명</td><td>DAYBREAK HOUSE BLEND</td></tr><tr><td>로스터리</td><td>BEANPROFILE LAB</td></tr><tr><td>유형</td><td>BLEND</td></tr><tr><td>구성 1 국가</td><td>BRAZIL</td></tr><tr><td>구성 1 지역</td><td>CERRADO</td></tr><tr><td>구성 1 가공</td><td>NATURAL</td></tr><tr><td>구성 1 비율</td><td>60%</td></tr><tr><td>구성 2 국가</td><td>ETHIOPIA</td></tr><tr><td>구성 2 지역</td><td>GUJI</td></tr><tr><td>구성 2 가공</td><td>WASHED</td></tr><tr><td>구성 2 비율</td><td>40%</td></tr><tr><td>로스팅 단계</td><td>MEDIUM</td></tr><tr><td>로스팅일</td><td>2026.07.24</td></tr><tr><td>컵노트</td><td>COCOA, BERRY, JASMINE</td></tr></tbody></table></div>
+<p>라벨은 한국어를 주로 사용하고, 국가·지역·가공·고유명은 영문 대문자로 표시한다. 제품명 또는 유형 영역에는 독립된 <code class="ic">BLEND</code> 단어가 있어 유형 확정 규칙을 검증할 수 있어야 한다.</p>
+<h2>4. 화면 구성</h2>
+<h3>상단 제어 영역</h3>
+<ul><li>카드 선택: <code class="ic">B 실제형</code> / <code class="ic">C 스트레스형</code></li><li>대비 선택: <code class="ic">밝은 배경</code> / <code class="ic">어두운 저대비</code></li><li><code class="ic">카드만 전체화면</code> 버튼</li><li>현재 카드와 대비 상태 표시</li></ul>
+<p>제어 영역은 촬영 대상 카드 바깥에 둔다. 전체화면에서는 카드만 표시하고, 화면 탭 또는 <code class="ic">Esc</code>로 돌아올 수 있게 한다.</p>
+<h3>B — 실제형 2열 카드</h3>
+<ul><li>상단: 로스터리, 제품명, <code class="ic">BLEND</code></li><li>중앙: 구성 1과 구성 2를 같은 폭의 두 열로 배치</li><li>각 열: 국가와 비율을 가장 크게, 지역과 가공을 그 아래 배치</li><li>하단: 로스팅 단계·날짜와 컵노트</li><li>구성 간 경계를 충분히 주어 좌표 기반 라벨-값 매칭의 기준 카드로 사용</li></ul>
+<h3>C — 고밀도 스트레스 카드</h3>
+<ul><li>상단: 작은 로스터리 표기와 큰 제품명</li><li>중앙: 구성 행을 반복 표 형태로 배치</li><li>국가·지역·가공·비율 라벨과 값을 서로 다른 열에 배치</li><li>보조 문구와 얇은 구분선을 추가해 실제 포장지의 정보 밀도를 모사</li><li>필수 데이터의 글자 크기는 촬영 가능한 범위로 유지하며, 의도적인 회전·왜곡은 넣지 않는다</li></ul>
+<h2>5. 대비 상태</h2>
+<h3>밝은 배경</h3>
+<ul><li>따뜻한 아이보리 카드와 짙은 에스프레소 글자</li><li>기준 OCR 결과를 얻는 정상 대비 상태</li></ul>
+<h3>어두운 저대비</h3>
+<ul><li>짙은 차콜 카드와 가까운 명도의 회색 글자</li><li>기존 <code class="ic">assets/test/ocr_dark_blend_en.png</code>와 유사하게 OCR 전처리 필요성을 검증</li><li>모든 글자를 완전히 숨기지는 않고, 육안으로는 읽을 수 있지만 카메라 노출에 따라 누락될 수 있는 수준으로 설정</li></ul>
+<h2>6. 반응형과 사용성</h2>
+<ul><li>카드 비율은 기존 테스트 픽스처와 같은 <code class="ic">3:4</code>를 유지한다.</li><li>데스크톱에서는 카드가 화면 높이에 맞춰 최대한 크게 표시된다.</li><li>좁은 화면에서는 제어 영역이 줄바꿈되고 카드가 가로폭에 맞게 축소된다.</li><li>외부 폰트, 이미지, CDN을 사용하지 않는 단일 파일로 만든다.</li><li>버튼은 마우스와 터치 모두 사용할 수 있어야 한다.</li></ul>
+<h2>7. 검증</h2>
+<ul><li>HTML 문법과 로컬 로딩을 확인한다.</li><li>데스크톱 및 모바일 크기에서 카드가 잘리지 않는지 렌더링한다.</li><li>B/C, 밝음/어두움의 네 조합이 동일한 정답 데이터를 표시하는지 확인한다.</li><li>전체화면 진입과 복귀를 확인한다.</li><li>기존 앱 코드와 테스트 자산이 변경되지 않았는지 Git diff로 확인한다.</li></ul>
+<h2>8. 비목표</h2>
+<ul><li>Flutter 앱의 입력 폼이나 화면 변경</li><li>OCR 파서·전처리 알고리즘 수정</li><li>새로운 PNG 픽스처 생성</li><li>실제 상용 브랜드의 디자인 복제</li><li>자동 촬영, 카메라 제어 또는 OCR 결과 수집</li></ul>
+</article>

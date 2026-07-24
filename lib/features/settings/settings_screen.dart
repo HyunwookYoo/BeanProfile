@@ -5,7 +5,7 @@ import '../../providers.dart';
 import '../../services/backup_service.dart';
 import '../../theme.dart';
 
-const kAppVersion = 'v0.5.0';
+const kAppVersion = 'v0.6.0';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});

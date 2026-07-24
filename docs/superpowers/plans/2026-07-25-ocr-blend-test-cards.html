@@ -1,0 +1,297 @@
+<title>Blend OCR Test Cards Implementation Plan</title>
+<style>
+*{box-sizing:border-box}
+:root{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+  --font-sans:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Consolas,"Malgun Gothic",monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}}
+:root[data-theme="light"]{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+}
+:root[data-theme="dark"]{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-sans);line-height:1.7;-webkit-font-smoothing:antialiased}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.doc{max-width:880px;margin:0 auto;padding:44px 24px 96px}
+.crumb{font-family:var(--font-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:16px}
+h1{font-size:clamp(26px,4vw,38px);font-weight:800;letter-spacing:-.025em;line-height:1.2;margin:.1em 0 .5em;text-wrap:balance}
+h2{font-size:22px;font-weight:700;margin:2em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line);letter-spacing:-.01em;text-wrap:balance}
+h3{font-size:16.5px;font-weight:700;color:var(--accent-ink);margin:1.7em 0 .5em}
+h4{font-size:14px;font-weight:700;margin:1.3em 0 .4em}
+p{margin:.7em 0}
+a{color:var(--accent);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+strong{font-weight:700;color:var(--fg)}
+hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+code.ic{font-family:var(--font-mono);font-size:.85em;background:var(--ic-bg);color:var(--ic-fg);padding:1.5px 6px;border-radius:6px}
+pre.code{position:relative;background:var(--code-bg);color:var(--code-fg);border-radius:12px;padding:16px 18px;margin:1em 0;overflow-x:auto;border:1px solid rgba(0,0,0,.28)}
+pre.code code{font-family:var(--font-mono);font-size:12.75px;line-height:1.6;white-space:pre;color:inherit;background:none;padding:0}
+pre.code[data-lang]::before{content:attr(data-lang);position:absolute;top:9px;right:13px;font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(236,227,211,.42)}
+.tablewrap{overflow-x:auto;margin:1.1em 0}
+table{border-collapse:collapse;width:100%;font-size:13.75px}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--th);font-weight:700}
+tbody tr:nth-child(even){background:var(--surface)}
+blockquote{margin:1.1em 0;padding:11px 16px;border-left:3px solid var(--accent);background:var(--surface);border-radius:0 10px 10px 0;color:var(--muted)}
+blockquote strong{color:var(--fg)}
+ul,ol{margin:.7em 0;padding-left:1.4em}
+li{margin:.32em 0}
+ul.tasklist{list-style:none;padding-left:.15em}
+ul.tasklist li.task{position:relative;padding-left:30px;margin:.5em 0}
+ul.tasklist li.task::before{content:"";position:absolute;left:0;top:.18em;width:17px;height:17px;border:2px solid var(--accent);border-radius:5px;background:transparent}
+ul.tasklist li.task.done::before{content:"\2713";background:var(--accent);color:#fff;font-size:12px;font-weight:800;text-align:center;line-height:15px}
+</style>
+<article class="doc"><div class="crumb">BeanProfile · docs/superpowers/plans</div>
+<h1>Blend OCR Test Cards Implementation Plan</h1>
+<blockquote><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code class="ic">- [ ]</code>) syntax for tracking.</blockquote>
+<p><strong>Goal:</strong> Build one self-contained HTML file that shows both the B realistic two-column blend card and the C high-density stress card for on-device camera OCR testing.</p>
+<p><strong>Architecture:</strong> A single semantic coffee-card DOM contains the shared ground-truth values. CSS switches its layout between B and C and its palette between light and dark-low-contrast, so all four test states keep identical data. Small vanilla-JavaScript handlers control card mode, contrast, URL state, and card-only fullscreen without adding dependencies or changing Flutter code.</p>
+<p><strong>Tech Stack:</strong> HTML5, CSS, vanilla JavaScript, Microsoft Edge headless rendering for verification</p>
+<h2>Global Constraints</h2>
+<ul><li>Create only <code class="ic">docs/mockups/ocr-blend-test-cards.html</code>; do not modify Flutter, OCR parser, database, or test fixture files.</li><li>Keep the card at a <code class="ic">3:4</code> aspect ratio.</li><li>Use no external fonts, images, JavaScript, CDN, or network resource.</li><li>Provide <code class="ic">B 실제형</code> and <code class="ic">C 스트레스형</code>.</li><li>Provide <code class="ic">밝은 배경</code> and <code class="ic">어두운 저대비</code> for both layouts.</li><li>Provide a card-only fullscreen action usable by mouse and touch.</li><li>Use exactly the approved ground-truth data from <code class="ic">docs/superpowers/specs/2026-07-25-ocr-blend-test-cards-design.md</code>.</li></ul>
+<hr>
+<h2>File Structure</h2>
+<ul><li>Create: <code class="ic">docs/mockups/ocr-blend-test-cards.html</code></li><li>Owns the control panel, shared test-card markup, all B/C and contrast styling, fullscreen behavior, usage guidance, and ground-truth reference.</li><li>Read only: <code class="ic">docs/superpowers/specs/2026-07-25-ocr-blend-test-cards-design.md</code></li><li>Source of approved layout, data, and non-goals.</li><li>Read only: <code class="ic">assets/test/ocr_blend_en.png</code>, <code class="ic">assets/test/ocr_dark_blend_en.png</code></li><li>Existing contrast baseline; neither file changes.</li></ul>
+<h3>Task 1: Build and verify the standalone blend test-card HTML</h3>
+<p><strong>Files:</strong></p>
+<ul><li>Create: <code class="ic">docs/mockups/ocr-blend-test-cards.html</code></li><li>Reference: <code class="ic">docs/superpowers/specs/2026-07-25-ocr-blend-test-cards-design.md</code></li></ul>
+<p><strong>Interfaces:</strong></p>
+<ul><li>Consumes: URL query parameters <code class="ic">card=b|c</code> and <code class="ic">contrast=light|dark</code></li><li>Produces: <code class="ic">setCardMode(mode)</code>, <code class="ic">setContrast(mode)</code>, <code class="ic">toggleCardFullscreen()</code>, and <code class="ic">applyState()</code> browser functions</li><li>Produces: one <code class="ic">#coffee-card</code> element whose <code class="ic">data-card</code> and <code class="ic">data-contrast</code> attributes fully determine the visible capture target</li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 1: Confirm the implementation target is absent and the repository scope is clean</strong></li></ul>
+<p>Run:</p>
+<pre class="code" data-lang="powershell"><code>Test-Path docs/mockups/ocr-blend-test-cards.html
+git -c safe.directory=C:/BeanProfile status --short</code></pre>
+<p>Expected:</p>
+<ul><li><code class="ic">Test-Path</code> prints <code class="ic">False</code>.</li><li>Only the implementation-plan files and pre-existing user-owned untracked files appear; no Flutter file is modified.</li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 2: Create the shared semantic card structure</strong></li></ul>
+<p>Create <code class="ic">docs/mockups/ocr-blend-test-cards.html</code> as a complete document beginning with:</p>
+<pre class="code" data-lang="html"><code>&lt;!doctype html&gt;
+&lt;html lang="ko"&gt;
+&lt;head&gt;
+  &lt;meta charset="utf-8"&gt;
+  &lt;meta name="viewport" content="width=device-width, initial-scale=1"&gt;
+  &lt;title&gt;BeanProfile — 블렌드 OCR 테스트 카드&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;main class="tester"&gt;
+    &lt;section class="controls" aria-label="테스트 카드 설정"&gt;
+      &lt;div class="segmented" aria-label="카드 레이아웃"&gt;
+        &lt;button type="button" data-card-button="b"&gt;B 실제형&lt;/button&gt;
+        &lt;button type="button" data-card-button="c"&gt;C 스트레스형&lt;/button&gt;
+      &lt;/div&gt;
+      &lt;div class="segmented" aria-label="카드 대비"&gt;
+        &lt;button type="button" data-contrast-button="light"&gt;밝은 배경&lt;/button&gt;
+        &lt;button type="button" data-contrast-button="dark"&gt;어두운 저대비&lt;/button&gt;
+      &lt;/div&gt;
+      &lt;button type="button" id="fullscreen-button"&gt;카드만 전체화면&lt;/button&gt;
+    &lt;/section&gt;
+
+    &lt;section class="capture-stage"&gt;
+      &lt;article id="coffee-card" data-card="b" data-contrast="light"&gt;
+        &lt;header class="card-header"&gt;
+          &lt;p class="roaster"&gt;BEANPROFILE LAB&lt;/p&gt;
+          &lt;p class="type"&gt;BLEND&lt;/p&gt;
+          &lt;h1&gt;DAYBREAK HOUSE BLEND&lt;/h1&gt;
+        &lt;/header&gt;
+
+        &lt;section class="components" aria-label="블렌드 구성"&gt;
+          &lt;article class="component component-one"&gt;
+            &lt;p class="component-number"&gt;COMPONENT 01&lt;/p&gt;
+            &lt;h2&gt;BRAZIL &lt;strong&gt;60%&lt;/strong&gt;&lt;/h2&gt;
+            &lt;dl&gt;
+              &lt;div&gt;&lt;dt&gt;지역&lt;/dt&gt;&lt;dd&gt;CERRADO&lt;/dd&gt;&lt;/div&gt;
+              &lt;div&gt;&lt;dt&gt;가공&lt;/dt&gt;&lt;dd&gt;NATURAL&lt;/dd&gt;&lt;/div&gt;
+            &lt;/dl&gt;
+          &lt;/article&gt;
+          &lt;article class="component component-two"&gt;
+            &lt;p class="component-number"&gt;COMPONENT 02&lt;/p&gt;
+            &lt;h2&gt;ETHIOPIA &lt;strong&gt;40%&lt;/strong&gt;&lt;/h2&gt;
+            &lt;dl&gt;
+              &lt;div&gt;&lt;dt&gt;지역&lt;/dt&gt;&lt;dd&gt;GUJI&lt;/dd&gt;&lt;/div&gt;
+              &lt;div&gt;&lt;dt&gt;가공&lt;/dt&gt;&lt;dd&gt;WASHED&lt;/dd&gt;&lt;/div&gt;
+            &lt;/dl&gt;
+          &lt;/article&gt;
+        &lt;/section&gt;
+
+        &lt;footer class="card-footer"&gt;
+          &lt;dl class="roast-data"&gt;
+            &lt;div&gt;&lt;dt&gt;로스팅&lt;/dt&gt;&lt;dd&gt;MEDIUM&lt;/dd&gt;&lt;/div&gt;
+            &lt;div&gt;&lt;dt&gt;로스팅일&lt;/dt&gt;&lt;dd&gt;2026.07.24&lt;/dd&gt;&lt;/div&gt;
+          &lt;/dl&gt;
+          &lt;div class="notes"&gt;
+            &lt;p&gt;컵노트&lt;/p&gt;
+            &lt;strong&gt;COCOA, BERRY, JASMINE&lt;/strong&gt;
+          &lt;/div&gt;
+        &lt;/footer&gt;
+      &lt;/article&gt;
+    &lt;/section&gt;
+  &lt;/main&gt;
+&lt;/body&gt;
+&lt;/html&gt;</code></pre>
+<p>Add a ground-truth reference below the capture stage. It must be outside <code class="ic">#coffee-card</code>, so it never enters a camera frame in card-only fullscreen.</p>
+<ul class="tasklist"><li class="task"><strong>Step 3: Style the common shell and B realistic layout</strong></li></ul>
+<p>Use local system fonts only:</p>
+<pre class="code" data-lang="css"><code>:root {
+  color-scheme: light dark;
+  --page: #171513;
+  --panel: #24211e;
+  --accent: #b67b2e;
+}
+
+#coffee-card {
+  aspect-ratio: 3 / 4;
+  width: min(78vw, 66vh, 720px);
+  overflow: hidden;
+  background: #f5f2e8;
+  color: #19140f;
+}
+
+#coffee-card[data-card="b"] .components {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}</code></pre>
+<p>The B state must:</p>
+<ul><li>emphasize <code class="ic">DAYBREAK HOUSE BLEND</code>;</li><li>show <code class="ic">BRAZIL 60%</code> and <code class="ic">ETHIOPIA 40%</code> as equal-weight columns;</li><li>keep <code class="ic">REGION/PROCESS</code> data aligned within each component;</li><li>place roast data and cup notes in a clearly separated footer;</li><li>remain readable without decorative imagery.</li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 4: Add the C high-density stress layout</strong></li></ul>
+<p>Switch only CSS based on <code class="ic">data-card="c"</code>:</p>
+<pre class="code" data-lang="css"><code>#coffee-card[data-card="c"] {
+  display: grid;
+  grid-template-columns: 0.34fr 1fr;
+  grid-template-areas:
+    "rail header"
+    "rail components"
+    "rail footer";
+}
+
+#coffee-card[data-card="c"] .components {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+#coffee-card[data-card="c"] .component dl &gt; div {
+  display: grid;
+  grid-template-columns: 0.42fr 1fr;
+}</code></pre>
+<p>The C state must:</p>
+<ul><li>use smaller type and tighter row spacing than B;</li><li>repeat labels in a dense table-like structure;</li><li>include thin rules and non-essential microcopy in a side rail;</li><li>preserve horizontal text and undistorted glyphs so the test targets layout density rather than camera perspective;</li><li>display the same approved values as B.</li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 5: Add normal and dark-low-contrast palettes</strong></li></ul>
+<p>Use attribute-driven palette tokens:</p>
+<pre class="code" data-lang="css"><code>#coffee-card[data-contrast="light"] {
+  --card-bg: #f5f2e8;
+  --card-ink: #19140f;
+  --card-muted: #756858;
+  --card-rule: #d8cfbf;
+}
+
+#coffee-card[data-contrast="dark"] {
+  --card-bg: #26262a;
+  --card-ink: #3a3a3e;
+  --card-muted: #35353a;
+  --card-rule: #303035;
+}
+
+#coffee-card {
+  background: var(--card-bg);
+  color: var(--card-ink);
+}</code></pre>
+<p>The dark state must remain faintly readable to the eye and intentionally resemble the luminance range of <code class="ic">assets/test/ocr_dark_blend_en.png</code>.</p>
+<ul class="tasklist"><li class="task"><strong>Step 6: Add deterministic controls, URL state, and fullscreen</strong></li></ul>
+<p>Implement the approved public functions:</p>
+<pre class="code" data-lang="js"><code>const card = document.querySelector('#coffee-card');
+
+function applyState() {
+  const params = new URLSearchParams(location.search);
+  const cardMode = params.get('card') === 'c' ? 'c' : 'b';
+  const contrast = params.get('contrast') === 'dark' ? 'dark' : 'light';
+  card.dataset.card = cardMode;
+  card.dataset.contrast = contrast;
+  document.querySelectorAll('[data-card-button]').forEach((button) =&gt; {
+    button.setAttribute('aria-pressed', String(button.dataset.cardButton === cardMode));
+  });
+  document.querySelectorAll('[data-contrast-button]').forEach((button) =&gt; {
+    button.setAttribute('aria-pressed', String(button.dataset.contrastButton === contrast));
+  });
+}
+
+function setCardMode(mode) {
+  const params = new URLSearchParams(location.search);
+  params.set('card', mode === 'c' ? 'c' : 'b');
+  history.replaceState(null, '', `?${params}`);
+  applyState();
+}
+
+function setContrast(mode) {
+  const params = new URLSearchParams(location.search);
+  params.set('contrast', mode === 'dark' ? 'dark' : 'light');
+  history.replaceState(null, '', `?${params}`);
+  applyState();
+}
+
+async function toggleCardFullscreen() {
+  if (document.fullscreenElement) {
+    await document.exitFullscreen();
+  } else {
+    await card.requestFullscreen();
+  }
+}</code></pre>
+<p>Wire every button with <code class="ic">addEventListener</code>, call <code class="ic">applyState()</code> once, and add a <code class="ic">fullscreenchange</code> listener that updates the fullscreen button label.</p>
+<ul class="tasklist"><li class="task"><strong>Step 7: Run deterministic structural checks</strong></li></ul>
+<p>Run:</p>
+<pre class="code" data-lang="powershell"><code>$mockup = Get-Content -Raw docs/mockups/ocr-blend-test-cards.html
+$required = @(
+  'id="coffee-card"',
+  'data-card="b"',
+  'data-contrast="light"',
+  'DAYBREAK HOUSE BLEND',
+  'BRAZIL',
+  '60%',
+  'ETHIOPIA',
+  '40%',
+  'CERRADO',
+  'NATURAL',
+  'GUJI',
+  'WASHED',
+  'MEDIUM',
+  '2026.07.24',
+  'COCOA, BERRY, JASMINE',
+  'function setCardMode',
+  'function setContrast',
+  'function toggleCardFullscreen'
+)
+foreach ($needle in $required) {
+  if (-not $mockup.Contains($needle)) { throw "Missing required marker: $needle" }
+}
+if ($mockup -match '(src|href)=\"https?://') {
+  throw 'External resource found'
+}
+'Structural checks passed'</code></pre>
+<p>Expected: <code class="ic">Structural checks passed</code>.</p>
+<ul class="tasklist"><li class="task"><strong>Step 8: Render every test state with headless Edge</strong></li></ul>
+<p>Create screenshots outside the repository:</p>
+<pre class="code" data-lang="powershell"><code>$edge = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
+$base = 'file:///C:/BeanProfile/docs/mockups/ocr-blend-test-cards.html'
+&amp; $edge --headless=new --disable-gpu --hide-scrollbars --window-size=1440,1100 --screenshot=C:\tmp\beanprofile-b-light.png "$base?card=b&amp;contrast=light"
+&amp; $edge --headless=new --disable-gpu --hide-scrollbars --window-size=1440,1100 --screenshot=C:\tmp\beanprofile-b-dark.png "$base?card=b&amp;contrast=dark"
+&amp; $edge --headless=new --disable-gpu --hide-scrollbars --window-size=1440,1100 --screenshot=C:\tmp\beanprofile-c-light.png "$base?card=c&amp;contrast=light"
+&amp; $edge --headless=new --disable-gpu --hide-scrollbars --window-size=1440,1100 --screenshot=C:\tmp\beanprofile-c-dark.png "$base?card=c&amp;contrast=dark"
+&amp; $edge --headless=new --disable-gpu --hide-scrollbars --window-size=390,844 --screenshot=C:\tmp\beanprofile-mobile.png "$base?card=b&amp;contrast=light"</code></pre>
+<p>Expected: five non-empty PNG files under <code class="ic">C:\tmp</code>.</p>
+<p>Inspect every screenshot and verify:</p>
+<ul><li>no text or card edge is clipped;</li><li>B is visibly two-column and C is visibly denser;</li><li>all four layout/contrast combinations show identical ground-truth values;</li><li>mobile controls wrap and the <code class="ic">3:4</code> card fits the viewport;</li><li>dark text is intentionally low contrast but not visually absent.</li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 9: Verify repository scope and commit</strong></li></ul>
+<p>Run:</p>
+<pre class="code" data-lang="powershell"><code>git -c safe.directory=C:/BeanProfile diff --check
+git -c safe.directory=C:/BeanProfile status --short</code></pre>
+<p>Expected: only <code class="ic">docs/mockups/ocr-blend-test-cards.html</code> is new for this implementation task, plus pre-existing user-owned untracked files.</p>
+<p>Commit:</p>
+<pre class="code" data-lang="powershell"><code>git -c safe.directory=C:/BeanProfile add -- docs/mockups/ocr-blend-test-cards.html
+git -c safe.directory=C:/BeanProfile commit -m "docs(ocr): add blend test cards"</code></pre>
+</article>

@@ -95,11 +95,15 @@ bool isKnownOcrLabel(String text) {
 }
 
 /// 토큰의 바레-라벨 줄을 찾아 공간적으로 값을 매칭.
-String? _spatialValue(List<OcrLine> lines, Set<String> tokens) {
+String? _spatialValue(
+  List<OcrLine> lines,
+  Set<String> tokens, {
+  bool Function(String value)? acceptsValue,
+}) {
   for (final label in lines) {
     final t = _norm(label.text);
     if (!tokens.contains(t)) continue;
-    final v = _valueFor(lines, label);
+    final v = _valueFor(lines, label, acceptsValue: acceptsValue);
     if (v != null && v.isNotEmpty) return v;
   }
   return null;
@@ -108,11 +112,23 @@ String? _spatialValue(List<OcrLine> lines, Set<String> tokens) {
 /// 라벨 줄의 값: ① 같은 행·오른쪽 → 없으면 ② 바로 아래(최근접). 두 탐색 모두 다른 라벨
 /// 줄은 값 후보에서 제외하고, ②는 추가로 라벨과 후보 사이에 다른 라벨이 끼어 있으면
 /// 차단해 인접 라벨을 값으로 오채움하지 않는다.
-String? _valueFor(List<OcrLine> lines, OcrLine label) {
+String? _valueFor(
+  List<OcrLine> lines,
+  OcrLine label, {
+  bool Function(String value)? acceptsValue,
+}) {
+  bool isUsable(OcrLine value) {
+    final text = value.text.trim();
+    return !identical(value, label) &&
+        text.isNotEmpty &&
+        !_isLabel(text) &&
+        (acceptsValue?.call(text) ?? true);
+  }
+
   final h = label.height <= 0 ? 1.0 : label.height;
   OcrLine? best;
   for (final v in lines) {
-    if (identical(v, label) || v.text.trim().isEmpty || _isLabel(v.text)) continue;
+    if (!isUsable(v)) continue;
     final aligned = (v.centerY - label.centerY).abs() <= 0.6 * h;
     if (aligned && v.left >= label.right - 0.5 * h) {
       if (best == null || v.left < best.left) best = v;
@@ -120,7 +136,7 @@ String? _valueFor(List<OcrLine> lines, OcrLine label) {
   }
   if (best != null) return best.text.trim();
   for (final v in lines) {
-    if (identical(v, label) || v.text.trim().isEmpty || _isLabel(v.text)) continue;
+    if (!isUsable(v)) continue;
     final below = v.top >= label.bottom - 0.5 * h;
     final xOverlap = v.left <= label.right && v.right >= label.left;
     final sameCol = (v.left - label.left).abs() <= 1.5 * h;
@@ -167,6 +183,19 @@ List<String> _splitNotes(String s) => s
     .where((e) => e.isNotEmpty)
     .toList();
 
+bool _isCupNoteValue(String value) =>
+    _dateIn(value) == null && !ratioPattern.hasMatch(value);
+
+List<String> _uniqueDelimitedCupNotes(List<String> texts) {
+  final candidates = <List<String>>[];
+  for (final text in texts) {
+    if (isKnownOcrLabel(text) || !_isCupNoteValue(text)) continue;
+    final notes = _splitNotes(text);
+    if (notes.length >= 2) candidates.add(notes);
+  }
+  return candidates.length == 1 ? candidates.single : const [];
+}
+
 OcrDraft parseOcr(List<OcrLine> lines) {
   final texts = lines.map((l) => l.text.trim()).where((t) => t.isNotEmpty).toList();
   final joined = texts.join('\n');
@@ -174,7 +203,11 @@ OcrDraft parseOcr(List<OcrLine> lines) {
 
   // 4.1 좌표 라벨→값
   String? region = _spatialValue(lines, _regionTokens);
-  final cupSpatial = _spatialValue(lines, _cupTokens);
+  final cupSpatial = _spatialValue(
+    lines,
+    _cupTokens,
+    acceptsValue: _isCupNoteValue,
+  );
   var cupNotes = cupSpatial == null ? const <String>[] : _splitNotes(cupSpatial);
 
   // 4.2 타이포 제목/이브로우
@@ -192,6 +225,10 @@ OcrDraft parseOcr(List<OcrLine> lines) {
   roaster ??= _nearbyBrandAboveName(lines, name);
   region ??= _firstLabel(texts, _regionLabel);
   if (cupNotes.isEmpty) cupNotes = _matchCupNotes(texts);
+  if (cupNotes.isEmpty &&
+      lines.any((line) => _cupTokens.contains(_norm(line.text)))) {
+    cupNotes = _uniqueDelimitedCupNotes(texts);
+  }
 
   var components = parseOcrComponents(lines);
   if (components.length == 1) {

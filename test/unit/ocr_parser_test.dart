@@ -158,6 +158,28 @@ void main() {
       ]);
       expect(d.cupNotes, ['딸기', '복숭아', '레드와인']);
     });
+    test('컵노트 후보에서 날짜를 제외하고 유일한 노트 칩을 사용', () {
+      final d = parseOcr(const [
+        OcrLine('컵노트', left: 713, top: 3419, right: 900, bottom: 3457),
+        OcrLine(
+          'COCOA, BERRY, JASMINE',
+          left: 1541,
+          top: 3543,
+          right: 2401,
+          bottom: 3618,
+        ),
+        OcrLine(
+          '2026.07.24',
+          left: 713,
+          top: 3589,
+          right: 1033,
+          bottom: 3643,
+        ),
+        OcrLine('로스팅일', left: 318, top: 3602, right: 515, bottom: 3646),
+      ]);
+
+      expect(d.cupNotes, ['COCOA', 'BERRY', 'JASMINE']);
+    });
     test('값 없으면 region null', () {
       final d = parseOcr(const [OcrLine('지역', left: 10, top: 100, right: 60, bottom: 130)]);
       expect(d.components, isEmpty);

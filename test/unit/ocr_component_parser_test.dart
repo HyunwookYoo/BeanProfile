@@ -290,6 +290,39 @@ void main() {
     ]);
   });
 
+  test('single unmatched ratio fills the only component with no ratio', () {
+    final components = parseOcrComponents(const [
+      OcrLine('ORIGIN 01 · 구성 1', left: 100, top: 100, right: 300, bottom: 125),
+      OcrLine('ORIGIN 02 · 구성 2', left: 600, top: 100, right: 800, bottom: 125),
+      OcrLine('BRAZIL', left: 100, top: 160, right: 260, bottom: 210),
+      OcrLine('ETHIOPIA', left: 600, top: 160, right: 800, bottom: 210),
+      OcrLine('60%', left: 410, top: 220, right: 490, bottom: 255),
+      OcrLine('40%', left: 600, top: 220, right: 680, bottom: 255),
+      OcrLine('NATURAL', left: 100, top: 300, right: 250, bottom: 330),
+      OcrLine('WASHED', left: 410, top: 300, right: 490, bottom: 330),
+    ]);
+
+    expect(components.map((component) => component.ratioPercent), [60, 40]);
+  });
+
+  test('single unmatched process fills the only component with no process', () {
+    final components = parseOcrComponents(const [
+      OcrLine('ORIGIN 01 · 구성 1', left: 100, top: 100, right: 300, bottom: 125),
+      OcrLine('ORIGIN 02 · 구성 2', left: 600, top: 100, right: 800, bottom: 125),
+      OcrLine('BRAZIL', left: 100, top: 160, right: 260, bottom: 210),
+      OcrLine('ETHIOPIA', left: 600, top: 160, right: 800, bottom: 210),
+      OcrLine('60%', left: 410, top: 220, right: 490, bottom: 255),
+      OcrLine('40%', left: 600, top: 220, right: 680, bottom: 255),
+      OcrLine('NATURAL', left: 100, top: 300, right: 250, bottom: 330),
+      OcrLine('WASHED', left: 410, top: 300, right: 490, bottom: 330),
+    ]);
+
+    expect(components.map((component) => component.process), [
+      Process.natural,
+      Process.washed,
+    ]);
+  });
+
   test('first country remains the sole fallback when no evidence exists', () {
     final components = parseOcrComponents(const [
       OcrLine('Ethiopia Guji'),

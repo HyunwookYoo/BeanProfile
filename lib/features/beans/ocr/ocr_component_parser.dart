@@ -171,9 +171,91 @@ List<OcrComponentDraft> parseOcrComponents(List<OcrLine> lines) {
         ]
       : [mentions.first];
 
-  return [
+  final components = [
     for (var i = 0; i < admitted.length; i++) _componentFor(lines, admitted, i),
   ];
+  return _fillSingleUnmatchedFields(lines, components);
+}
+
+List<OcrComponentDraft> _fillSingleUnmatchedFields(
+  List<OcrLine> lines,
+  List<OcrComponentDraft> components,
+) {
+  if (components.length < 2) return components;
+
+  final missingRatio = [
+    for (var i = 0; i < components.length; i++)
+      if (components[i].ratioPercent == null) i,
+  ];
+  int? ratioIndex;
+  int? ratio;
+  if (missingRatio.length == 1) {
+    final remaining = [
+      for (final line in lines)
+        for (final match in ratioPattern.allMatches(line.text))
+          int.parse(match.group(1)!),
+    ];
+    for (final component in components) {
+      final assigned = component.ratioPercent;
+      if (assigned != null) remaining.remove(assigned);
+    }
+    final assignedTotal = components.fold(
+      0,
+      (total, component) => total + (component.ratioPercent ?? 0),
+    );
+    if (remaining.length == 1 && assignedTotal + remaining.single == 100) {
+      ratioIndex = missingRatio.single;
+      ratio = remaining.single;
+    }
+  }
+
+  final missingProcess = [
+    for (var i = 0; i < components.length; i++)
+      if (components[i].process == null) i,
+  ];
+  int? processIndex;
+  Process? process;
+  if (missingProcess.length == 1) {
+    final remaining = [
+      for (final line in lines)
+        if (_standaloneProcess(line.text) case final value?) value,
+    ];
+    for (final component in components) {
+      final assigned = component.process;
+      if (assigned != null) remaining.remove(assigned);
+    }
+    if (remaining.length == 1) {
+      processIndex = missingProcess.single;
+      process = remaining.single;
+    }
+  }
+
+  if (ratioIndex == null && processIndex == null) return components;
+  return [
+    for (var i = 0; i < components.length; i++)
+      OcrComponentDraft(
+        country: components[i].country,
+        region: components[i].region,
+        process: components[i].process ?? (i == processIndex ? process : null),
+        ratioPercent:
+            components[i].ratioPercent ?? (i == ratioIndex ? ratio : null),
+      ),
+  ];
+}
+
+Process? _standaloneProcess(String text) {
+  final process = firstProcessMatch(text);
+  if (process == null) return null;
+
+  var remainder = text.trim().replaceFirst(_processLabelPrefix, '');
+  for (final keyword in processKeywords.keys) {
+    remainder = remainder.replaceAll(
+      RegExp(RegExp.escape(keyword), caseSensitive: false),
+      ' ',
+    );
+  }
+  remainder = remainder.replaceAll(RegExp(r'[\s:/|·,;：\-–—]+'), '');
+  return remainder.isEmpty ? process : null;
 }
 
 bool _hasComponentEvidence(

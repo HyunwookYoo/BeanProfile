@@ -194,6 +194,17 @@ void main() {
       expect(d.name, '콜롬비아 핑크버번 내추럴');
       expect(d.roaster, isNull);
     });
+    test('제목 바로 위 유일한 브랜드는 가로 좌표가 벌어져도 로스터리로 채움', () {
+      final d = parseOcr(const [
+        OcrLine('BEANPROFILE LAB', left: 900, top: 10, right: 1100, bottom: 30),
+        OcrLine('BLEND', left: 700, top: 10, right: 800, bottom: 30),
+        OcrLine('DAYBREAK HOUSE', left: 100, top: 50, right: 500, bottom: 120),
+        OcrLine('BRAZIL', left: 100, top: 180, right: 220, bottom: 220),
+      ]);
+
+      expect(d.name, 'DAYBREAK HOUSE');
+      expect(d.roaster, 'BEANPROFILE LAB');
+    });
     test('가드: 균일 높이면 name/roaster null', () {
       final d = parseOcr(const [
         OcrLine('원산지', left: 10, top: 10, right: 70, bottom: 30),

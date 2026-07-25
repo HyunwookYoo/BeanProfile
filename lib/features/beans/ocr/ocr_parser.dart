@@ -41,6 +41,16 @@ final RegExp _roasterLabel = RegExp(
   caseSensitive: false,
 );
 
+final RegExp _beanTypeOnly = RegExp(
+  r'^(?:blend|블렌드|single[\s-]*origin|싱글\s*오리진)$',
+  caseSensitive: false,
+);
+
+final RegExp _genericCardHeader = RegExp(
+  r'^(?:coffee\s*(?:info|card)|원두\s*정보)$',
+  caseSensitive: false,
+);
+
 const Set<String> _regionTokens = {'지역', 'region'};
 const Set<String> _cupTokens = {
   '컵노트', '컵 노트', 'notes', 'cup notes', 'cup note', 'tasting notes', '향미',
@@ -170,6 +180,7 @@ OcrDraft parseOcr(List<OcrLine> lines) {
   // 4.3 콜론/키워드 폴백
   name ??= _firstLabel(texts, _nameLabel);
   roaster ??= _firstLabel(texts, _roasterLabel);
+  roaster ??= _nearbyBrandAboveName(lines, name);
   region ??= _firstLabel(texts, _regionLabel);
   if (cupNotes.isEmpty) cupNotes = _matchCupNotes(texts);
 
@@ -200,6 +211,40 @@ OcrDraft parseOcr(List<OcrLine> lines) {
     typeDecision: type.decision,
     typeReasons: type.reasons,
   );
+}
+
+String? _nearbyBrandAboveName(List<OcrLine> lines, String? name) {
+  if (name == null || name.trim().isEmpty) return null;
+  final normalizedName = _norm(name);
+  final nameLines = lines.where(
+    (line) => _norm(line.text) == normalizedName && line.height > 0,
+  );
+  if (nameLines.isEmpty) return null;
+  final title = nameLines.reduce(
+    (first, second) => first.height >= second.height ? first : second,
+  );
+
+  final candidates = <String>[];
+  for (final line in lines) {
+    final text = line.text.trim();
+    if (text.isEmpty ||
+        identical(line, title) ||
+        line.height <= 0 ||
+        line.height >= title.height ||
+        line.bottom > title.top + 0.3 * title.height ||
+        title.top - line.bottom > 3 * title.height ||
+        isKnownOcrLabel(text) ||
+        _beanTypeOnly.hasMatch(text) ||
+        _genericCardHeader.hasMatch(text) ||
+        countryKeywords.containsKey(_norm(text)) ||
+        firstProcessMatch(text) != null ||
+        ratioPattern.hasMatch(text) ||
+        _dateIn(text) != null) {
+      continue;
+    }
+    candidates.add(text);
+  }
+  return candidates.length == 1 ? candidates.single : null;
 }
 
 /// 문자열 하위호환: 좌표 없는 합성 라인으로 감싸 parseOcr에 위임.

@@ -61,7 +61,10 @@ const processKeywords = <String, Process>{
 
 final ratioPattern = RegExp(r'\b(100|[1-9]?\d)\s*%');
 final _bareLocalComponentLabel = RegExp(
-  r'^(?:origin|원산지|생산지|component|구성)(?:\s*\d+)?\s*[:：]?$',
+  r'^(?:origin|원산지|생산지|component|구성)(?:\s*\d+)?'
+  r'(?:\s*[·.\-–—]\s*'
+  r'(?:origin|원산지|생산지|component|구성)(?:\s*\d+)?)?'
+  r'\s*[:：]?$',
   caseSensitive: false,
 );
 final _inlineLocalComponentGroupLabel = RegExp(
@@ -518,6 +521,13 @@ OcrComponentDraft _componentFor(
   final mention = mentions[index];
   final segment = _segmentTexts(lines, mentions, index);
   final labeledProcess = _labeledProcess(segment);
+  final hasLocalSection = _hasLocalComponentLabel(mention, lines);
+  final sequentialRegion = _firstRegion(
+    segment,
+    labeledProcess?.valueIndexes ?? const {},
+  );
+  final sequentialProcess =
+      labeledProcess?.process ?? firstProcessMatch(segment.join('\n'));
   final spatialRegion = _spatialFieldValue(
     lines,
     mentions,
@@ -537,29 +547,25 @@ OcrComponentDraft _componentFor(
     _ComponentField.ratio,
   );
   final unlabeled = _unlabeledSpatialFields(lines, mentions, index);
+  final useSequentialFields = hasLocalSection || !unlabeled.hasLayout;
+  final useSequentialRegion =
+      hasLocalSection || (!unlabeled.hasLayout && mentions.length > 1);
+  final sequentialRatio = hasLocalSection
+      ? _leadingRatio(segment) ?? _labeledRatio(segment)
+      : _labeledRatio(segment);
   return OcrComponentDraft(
     country: mention.country,
     region: spatialRegion != null
         ? _cleanRegion(spatialRegion)
-        : unlabeled.region ??
-              (unlabeled.hasLayout || mentions.length == 1
-                  ? null
-                  : _firstRegion(
-                      segment,
-                      labeledProcess?.valueIndexes ?? const {},
-                    )),
+        : unlabeled.region ?? (useSequentialRegion ? sequentialRegion : null),
     process: spatialProcess == null
-        ? unlabeled.process ??
-              (unlabeled.hasLayout
-                  ? null
-                  : labeledProcess?.process ??
-                        firstProcessMatch(segment.join('\n')))
+        ? unlabeled.process ?? (useSequentialFields ? sequentialProcess : null)
         : _labeledProcessValue(spatialProcess),
     ratioPercent:
         mention.ratio ??
         (spatialRatio == null
             ? unlabeled.ratioPercent ??
-                  (unlabeled.hasLayout ? null : _labeledRatio(segment))
+                  (useSequentialFields ? sequentialRatio : null)
             : _ratioFrom(spatialRatio)),
   );
 }
@@ -931,6 +937,15 @@ bool _isFieldValue(String text, _ComponentField field) {
 int? _ratioFrom(String text) {
   final match = ratioPattern.firstMatch(text);
   return match == null ? null : int.parse(match.group(1)!);
+}
+
+int? _leadingRatio(List<String> segment) {
+  for (final text in segment) {
+    final value = text.trim();
+    if (value.isEmpty) continue;
+    return _ratioFrom(value);
+  }
+  return null;
 }
 
 int? _labeledRatio(List<String> segment) {

@@ -151,6 +151,60 @@ void main() {
     });
   }
 
+  test('bilingual numbered labels admit geometry-less component sections', () {
+    final components = parseOcrComponents(const [
+      OcrLine('HOUSE BLEND'),
+      OcrLine('ORIGIN 01 · 구성 1'),
+      OcrLine('BRAZIL'),
+      OcrLine('60%'),
+      OcrLine('지역'),
+      OcrLine('CERRADO'),
+      OcrLine('가공'),
+      OcrLine('NATURAL'),
+      OcrLine('ORIGIN 02 · 구성 2'),
+      OcrLine('ETHIOPIA'),
+      OcrLine('40%'),
+      OcrLine('지역'),
+      OcrLine('GUJI'),
+      OcrLine('가공'),
+      OcrLine('WASHED'),
+    ]);
+
+    expect(components.map((component) => component.country), [
+      'Brazil',
+      'Ethiopia',
+    ]);
+  });
+
+  test('explicit component sections recover fields without value geometry', () {
+    final components = parseOcrComponents(const [
+      OcrLine('ORIGIN 01 · 구성 1'),
+      OcrLine('BRAZIL', left: 100, top: 100, right: 180, bottom: 130),
+      OcrLine('60%'),
+      OcrLine('지역'),
+      OcrLine('CERRADO'),
+      OcrLine('가공'),
+      OcrLine('NATURAL'),
+      OcrLine('ORIGIN 02 · 구성 2'),
+      OcrLine('ETHIOPIA', left: 300, top: 100, right: 400, bottom: 130),
+      OcrLine('40%'),
+      OcrLine('지역'),
+      OcrLine('GUJI'),
+      OcrLine('가공'),
+      OcrLine('WASHED'),
+    ]);
+
+    expect(components.map((component) => component.region), [
+      'CERRADO',
+      'GUJI',
+    ]);
+    expect(components.map((component) => component.process), [
+      Process.natural,
+      Process.washed,
+    ]);
+    expect(components.map((component) => component.ratioPercent), [60, 40]);
+  });
+
   test('first country remains the sole fallback when no evidence exists', () {
     final components = parseOcrComponents(const [
       OcrLine('Ethiopia Guji'),

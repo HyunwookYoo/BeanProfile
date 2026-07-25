@@ -67,6 +67,13 @@ final _bareLocalComponentLabel = RegExp(
   r'\s*[:：]?$',
   caseSensitive: false,
 );
+final _numberedComponentSectionLabel = RegExp(
+  r'^(?:origin|원산지|생산지|component|구성)\s*\d+'
+  r'(?:\s*[·.\-–—]\s*'
+  r'(?:origin|원산지|생산지|component|구성)\s*\d+)?'
+  r'\s*[:：]?$',
+  caseSensitive: false,
+);
 final _inlineLocalComponentGroupLabel = RegExp(
   r'^(?:origin|원산지|생산지|component|구성|blend|블렌드)'
   r'(?:\s*\d+)?\s*[:：]\s*',
@@ -461,7 +468,7 @@ bool _hasParallelComponentValues(
   final offsets = <List<double>>[<double>[], <double>[]];
   for (final line in lines) {
     if (!_isTopologyValue(line, lines, a, b)) continue;
-    final owner = _ownerForLine(line, [a, b]);
+    final owner = _ownerForLine(line, [a, b], lines);
     if (owner == null) continue;
     final anchor = owner == 0 ? a : b;
     final offset = line.centerY - anchor.line.centerY;
@@ -605,7 +612,7 @@ _unlabeledSpatialFields(
   final candidates = <OcrLine>[
     for (final line in lines)
       if (_isUnlabeledTableCandidate(line, lines, mentions, layout) &&
-          _ownerForLine(line, mentions) == ownerIndex)
+          _ownerForLine(line, mentions, lines) == ownerIndex)
         line,
   ];
 
@@ -722,10 +729,11 @@ bool _isUnlabeledTableCandidate(
 
 bool _isClaimedByFieldLabel(OcrLine candidate, List<OcrLine> lines) {
   for (final label in lines) {
+    final text = label.text.trim();
     if (identical(label, candidate) ||
         !_hasGeometry(label) ||
-        (!_isAnyFieldLabel(label.text) &&
-            !_nonRegionLabel.hasMatch(label.text.trim()))) {
+        _bareLocalComponentLabel.hasMatch(text) ||
+        (!_isAnyFieldLabel(text) && !_nonRegionLabel.hasMatch(text))) {
       continue;
     }
     if (_sameVisualRow(label, candidate) && candidate.left >= label.right) {
@@ -800,7 +808,7 @@ String? _spatialFieldValue(
     final inlineValue = label.text.trim().substring(match.end).trim();
     if (inlineValue.isNotEmpty &&
         _isFieldValue(inlineValue, field) &&
-        _ownerForLine(label, mentions) == ownerIndex) {
+        _ownerForLine(label, mentions, lines) == ownerIndex) {
       return inlineValue;
     }
     final rowLabels = lines.where(
@@ -825,7 +833,7 @@ String? _spatialFieldValue(
           !_isFieldValue(candidate.text, field)) {
         continue;
       }
-      if (_ownerForLine(candidate, mentions) == ownerIndex) {
+      if (_ownerForLine(candidate, mentions, lines) == ownerIndex) {
         return candidate.text.trim();
       }
     }
@@ -850,7 +858,7 @@ String? _spatialFieldValue(
           !_isFieldValue(candidate.text, field)) {
         continue;
       }
-      if (_ownerForLine(candidate, mentions) == ownerIndex) {
+      if (_ownerForLine(candidate, mentions, lines) == ownerIndex) {
         return candidate.text.trim();
       }
     }
@@ -871,16 +879,23 @@ bool _sameVisualColumn(OcrLine a, OcrLine b) {
       tolerance;
 }
 
-int? _ownerForLine(OcrLine value, List<_CountryMention> mentions) {
-  final geometric = <(int, _CountryMention)>[
-    for (var i = 0; i < mentions.length; i++)
-      if (_hasGeometry(mentions[i].line)) (i, mentions[i]),
-  ];
+int? _ownerForLine(
+  OcrLine value,
+  List<_CountryMention> mentions, [
+  List<OcrLine>? lines,
+]) {
+  final explicit = lines == null
+      ? null
+      : _numberedSectionAnchors(lines, mentions);
+  final geometric =
+      explicit ??
+      <(int, OcrLine)>[
+        for (var i = 0; i < mentions.length; i++)
+          if (_hasGeometry(mentions[i].line)) (i, mentions[i].line),
+      ];
   if (_hasGeometry(value) && geometric.isNotEmpty) {
-    final xs = geometric.map(
-      (entry) => (entry.$2.line.left + entry.$2.line.right) / 2,
-    );
-    final ys = geometric.map((entry) => entry.$2.line.centerY);
+    final xs = geometric.map((entry) => (entry.$2.left + entry.$2.right) / 2);
+    final ys = geometric.map((entry) => entry.$2.centerY);
     final xSpread = xs.reduce((a, b) => a < b ? a : b);
     final xMax = xs.reduce((a, b) => a > b ? a : b);
     final ySpread = ys.reduce((a, b) => a < b ? a : b);
@@ -894,8 +909,8 @@ int? _ownerForLine(OcrLine value, List<_CountryMention> mentions) {
     var secondDistance = double.infinity;
     for (final entry in geometric) {
       final anchorAxis = horizontal
-          ? (entry.$2.line.left + entry.$2.line.right) / 2
-          : entry.$2.line.centerY;
+          ? (entry.$2.left + entry.$2.right) / 2
+          : entry.$2.centerY;
       final distance = (valueAxis - anchorAxis).abs();
       if (distance < bestDistance) {
         secondDistance = bestDistance;
@@ -911,6 +926,49 @@ int? _ownerForLine(OcrLine value, List<_CountryMention> mentions) {
     return best;
   }
   return null;
+}
+
+List<(int, OcrLine)>? _numberedSectionAnchors(
+  List<OcrLine> lines,
+  List<_CountryMention> mentions,
+) {
+  final headers = <OcrLine>[
+    for (final line in lines)
+      if (_hasGeometry(line) &&
+          _numberedComponentSectionLabel.hasMatch(line.text.trim()))
+        line,
+  ];
+  final countries = <(int, OcrLine)>[
+    for (var i = 0; i < mentions.length; i++)
+      if (_hasGeometry(mentions[i].line)) (i, mentions[i].line),
+  ];
+  if (headers.length < 2 || countries.length < 2) return null;
+
+  final xs = headers.map((line) => (line.left + line.right) / 2);
+  final ys = headers.map((line) => line.centerY);
+  final horizontal = _axisRange(xs) > _axisRange(ys);
+  double axis(OcrLine line) =>
+      horizontal ? (line.left + line.right) / 2 : line.centerY;
+  headers.sort((a, b) => axis(a).compareTo(axis(b)));
+  countries.sort((a, b) => axis(a.$2).compareTo(axis(b.$2)));
+
+  final count = headers.length < countries.length
+      ? headers.length
+      : countries.length;
+  return [for (var i = 0; i < count; i++) (countries[i].$1, headers[i])];
+}
+
+double _axisRange(Iterable<double> values) {
+  final iterator = values.iterator;
+  if (!iterator.moveNext()) return 0;
+  var min = iterator.current;
+  var max = iterator.current;
+  while (iterator.moveNext()) {
+    final value = iterator.current;
+    if (value < min) min = value;
+    if (value > max) max = value;
+  }
+  return max - min;
 }
 
 bool _isAnyFieldLabel(String text) => _ComponentField.values.any(

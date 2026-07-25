@@ -205,6 +205,91 @@ void main() {
     expect(components.map((component) => component.ratioPercent), [60, 40]);
   });
 
+  test('explicit component columns ignore row-major OCR serialization', () {
+    final components = parseOcrComponents(const [
+      OcrLine(
+        'ORIGIN 01 · 구성 1',
+        left: 100,
+        top: 100,
+        right: 300,
+        bottom: 125,
+      ),
+      OcrLine(
+        'ORIGIN 02 · 구성 2',
+        left: 600,
+        top: 100,
+        right: 800,
+        bottom: 125,
+      ),
+      OcrLine('BRAZIL', left: 100, top: 160, right: 260, bottom: 210),
+      OcrLine('ETHIOPIA', left: 600, top: 160, right: 800, bottom: 210),
+      OcrLine('60%', left: 100, top: 220, right: 180, bottom: 255),
+      OcrLine('40%', left: 600, top: 220, right: 680, bottom: 255),
+      OcrLine('지역', left: 100, top: 500, right: 160, bottom: 530),
+      OcrLine('지역', left: 600, top: 500, right: 660, bottom: 530),
+      OcrLine('CERRADO', left: 260, top: 500, right: 410, bottom: 530),
+      OcrLine('GUJI', left: 760, top: 500, right: 840, bottom: 530),
+      OcrLine('가공', left: 100, top: 600, right: 160, bottom: 630),
+      OcrLine('가공', left: 600, top: 600, right: 660, bottom: 630),
+      OcrLine('NATURAL', left: 260, top: 600, right: 410, bottom: 630),
+      OcrLine('WASHED', left: 760, top: 600, right: 900, bottom: 630),
+    ]);
+
+    expect(components.map((component) => component.country), [
+      'Brazil',
+      'Ethiopia',
+    ]);
+    expect(components.map((component) => component.region), [
+      'CERRADO',
+      'GUJI',
+    ]);
+    expect(components.map((component) => component.process), [
+      Process.natural,
+      Process.washed,
+    ]);
+    expect(components.map((component) => component.ratioPercent), [60, 40]);
+  });
+
+  test('numbered section columns override shifted country bounding boxes', () {
+    final components = parseOcrComponents(const [
+      OcrLine(
+        'ORIGIN 01 · 구성 1',
+        left: 100,
+        top: 100,
+        right: 300,
+        bottom: 125,
+      ),
+      OcrLine(
+        'ORIGIN 02 · 구성 2',
+        left: 600,
+        top: 100,
+        right: 800,
+        bottom: 125,
+      ),
+      OcrLine('BRAZIL', left: 100, top: 160, right: 180, bottom: 210),
+      OcrLine('ETHIOPIA', left: 400, top: 160, right: 520, bottom: 210),
+      OcrLine('60%', left: 100, top: 220, right: 180, bottom: 255),
+      OcrLine('40%', left: 600, top: 220, right: 680, bottom: 255),
+      OcrLine('지역', left: 100, top: 500, right: 160, bottom: 530),
+      OcrLine('지역', left: 600, top: 500, right: 660, bottom: 530),
+      OcrLine('CERRADO', left: 300, top: 500, right: 380, bottom: 530),
+      OcrLine('GUJI', left: 760, top: 500, right: 840, bottom: 530),
+      OcrLine('가공', left: 100, top: 600, right: 160, bottom: 630),
+      OcrLine('가공', left: 600, top: 600, right: 660, bottom: 630),
+      OcrLine('NATURAL', left: 300, top: 600, right: 380, bottom: 630),
+      OcrLine('WASHED', left: 760, top: 600, right: 840, bottom: 630),
+    ]);
+
+    expect(components.map((component) => component.process), [
+      Process.natural,
+      Process.washed,
+    ]);
+    expect(components.map((component) => component.region), [
+      'CERRADO',
+      'GUJI',
+    ]);
+  });
+
   test('first country remains the sole fallback when no evidence exists', () {
     final components = parseOcrComponents(const [
       OcrLine('Ethiopia Guji'),

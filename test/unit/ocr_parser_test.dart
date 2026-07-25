@@ -205,6 +205,29 @@ void main() {
       expect(d.name, 'DAYBREAK HOUSE');
       expect(d.roaster, 'BEANPROFILE LAB');
     });
+    test('유일한 브랜드 표식 줄은 좌표 연결이 없어도 로스터리로 채움', () {
+      final d = parseOcr(const [
+        OcrLine('BEANPROFILE LAB'),
+        OcrLine('Name: DAYBREAK HOUSE'),
+        OcrLine('BLEND'),
+        OcrLine('Brazil 60%'),
+        OcrLine('Ethiopia 40%'),
+      ]);
+
+      expect(d.name, 'DAYBREAK HOUSE');
+      expect(d.roaster, 'BEANPROFILE LAB');
+    });
+    test('제품 유형 줄이 제목과 겹쳐도 로스터리로 사용하지 않음', () {
+      final d = parseOcr(const [
+        OcrLine('BLEND', left: 100, top: 10, right: 250, bottom: 30),
+        OcrLine('BEANPROFILE LAB', left: 900, top: 10, right: 1100, bottom: 30),
+        OcrLine('DAYBREAK HOUSE', left: 100, top: 50, right: 500, bottom: 120),
+        OcrLine('BRAZIL', left: 100, top: 180, right: 220, bottom: 220),
+      ]);
+
+      expect(d.name, 'DAYBREAK HOUSE');
+      expect(d.roaster, 'BEANPROFILE LAB');
+    });
     test('가드: 균일 높이면 name/roaster null', () {
       final d = parseOcr(const [
         OcrLine('원산지', left: 10, top: 10, right: 70, bottom: 30),

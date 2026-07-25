@@ -209,23 +209,27 @@ List<OcrComponentDraft> _fillSingleUnmatchedFields(
     }
   }
 
-  final missingProcess = [
+  final unresolvedProcess = [
     for (var i = 0; i < components.length; i++)
-      if (components[i].process == null) i,
+      if (components[i].process == null ||
+          components[i].process == Process.other)
+        i,
   ];
   int? processIndex;
   Process? process;
-  if (missingProcess.length == 1) {
+  if (unresolvedProcess.length == 1) {
     final remaining = [
       for (final line in lines)
         if (_standaloneProcess(line.text) case final value?) value,
     ];
     for (final component in components) {
       final assigned = component.process;
-      if (assigned != null) remaining.remove(assigned);
+      if (assigned != null && assigned != Process.other) {
+        remaining.remove(assigned);
+      }
     }
     if (remaining.length == 1) {
-      processIndex = missingProcess.single;
+      processIndex = unresolvedProcess.single;
       process = remaining.single;
     }
   }
@@ -236,7 +240,7 @@ List<OcrComponentDraft> _fillSingleUnmatchedFields(
       OcrComponentDraft(
         country: components[i].country,
         region: components[i].region,
-        process: components[i].process ?? (i == processIndex ? process : null),
+        process: i == processIndex ? process : components[i].process,
         ratioPercent:
             components[i].ratioPercent ?? (i == ratioIndex ? ratio : null),
       ),

@@ -51,6 +51,11 @@ final RegExp _genericCardHeader = RegExp(
   caseSensitive: false,
 );
 
+final RegExp _brandMarker = RegExp(
+  r'(?:\b(?:lab|roasters?|roastery)\b|로스터스|로스터리|랩)\s*$',
+  caseSensitive: false,
+);
+
 const Set<String> _regionTokens = {'지역', 'region'};
 const Set<String> _cupTokens = {
   '컵노트', '컵 노트', 'notes', 'cup notes', 'cup note', 'tasting notes', '향미',
@@ -176,10 +181,14 @@ OcrDraft parseOcr(List<OcrLine> lines) {
   final te = _titleEyebrow(lines);
   String? name = te.$1;
   String? roaster = te.$2;
+  if (roaster != null && _beanTypeOnly.hasMatch(roaster.trim())) {
+    roaster = null;
+  }
 
   // 4.3 콜론/키워드 폴백
   name ??= _firstLabel(texts, _nameLabel);
   roaster ??= _firstLabel(texts, _roasterLabel);
+  roaster ??= _uniqueBrandMarker(texts, name);
   roaster ??= _nearbyBrandAboveName(lines, name);
   region ??= _firstLabel(texts, _regionLabel);
   if (cupNotes.isEmpty) cupNotes = _matchCupNotes(texts);
@@ -211,6 +220,30 @@ OcrDraft parseOcr(List<OcrLine> lines) {
     typeDecision: type.decision,
     typeReasons: type.reasons,
   );
+}
+
+String? _uniqueBrandMarker(List<String> texts, String? name) {
+  final normalizedName = name == null ? null : _norm(name);
+  final candidates = <String>[];
+  for (final value in texts) {
+    final text = value.trim();
+    if (text.isEmpty ||
+        _norm(text) == normalizedName ||
+        !_brandMarker.hasMatch(text) ||
+        isKnownOcrLabel(text) ||
+        _beanTypeOnly.hasMatch(text) ||
+        _genericCardHeader.hasMatch(text) ||
+        countryKeywords.containsKey(_norm(text)) ||
+        firstProcessMatch(text) != null ||
+        ratioPattern.hasMatch(text) ||
+        _dateIn(text) != null) {
+      continue;
+    }
+    if (!candidates.any((candidate) => _norm(candidate) == _norm(text))) {
+      candidates.add(text);
+    }
+  }
+  return candidates.length == 1 ? candidates.single : null;
 }
 
 String? _nearbyBrandAboveName(List<OcrLine> lines, String? name) {

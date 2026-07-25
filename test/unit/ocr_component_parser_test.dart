@@ -323,6 +323,22 @@ void main() {
     ]);
   });
 
+  test('single known process replaces the only unresolved other process', () {
+    final components = parseOcrComponents(const [
+      OcrLine('BLEND'),
+      OcrLine('Brazil 60%'),
+      OcrLine('Process: Natural'),
+      OcrLine('Ethiopia 40%'),
+      OcrLine('Process: Experimental'),
+      OcrLine('Washed'),
+    ]);
+
+    expect(components.map((component) => component.process), [
+      Process.natural,
+      Process.washed,
+    ]);
+  });
+
   test('first country remains the sole fallback when no evidence exists', () {
     final components = parseOcrComponents(const [
       OcrLine('Ethiopia Guji'),

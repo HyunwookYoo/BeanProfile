@@ -667,8 +667,6 @@ enum _ComponentField { region, process, ratio }
 
 class _RepeatedLayout {
   final bool horizontal;
-  final double minLeft;
-  final double maxRight;
   final double minTop;
   final double maxBottom;
   final double maxHeight;
@@ -676,8 +674,6 @@ class _RepeatedLayout {
 
   const _RepeatedLayout({
     required this.horizontal,
-    required this.minLeft,
-    required this.maxRight,
     required this.minTop,
     required this.maxBottom,
     required this.maxHeight,
@@ -743,12 +739,6 @@ _RepeatedLayout? _repeatedLayout(List<_CountryMention> mentions) {
   final maxY = ys.reduce((a, b) => a > b ? a : b);
   return _RepeatedLayout(
     horizontal: maxX - minX > maxY - minY,
-    minLeft: geometric
-        .map((mention) => mention.line.left)
-        .reduce((a, b) => a < b ? a : b),
-    maxRight: geometric
-        .map((mention) => mention.line.right)
-        .reduce((a, b) => a > b ? a : b),
     minTop: geometric
         .map((mention) => mention.line.top)
         .reduce((a, b) => a < b ? a : b),
@@ -808,9 +798,7 @@ bool _isUnlabeledTableCandidate(
     return nearest <= tolerance;
   }
   return line.top >= layout.minTop - layout.maxHeight &&
-      line.bottom <= layout.maxBottom + 4 * layout.maxHeight &&
-      line.left >= layout.minLeft - 2 * layout.maxHeight &&
-      line.right <= layout.maxRight + 8 * layout.maxHeight;
+      line.bottom <= layout.maxBottom + 4 * layout.maxHeight;
 }
 
 bool _isClaimedByFieldLabel(OcrLine candidate, List<OcrLine> lines) {

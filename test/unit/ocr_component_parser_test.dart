@@ -479,6 +479,27 @@ void main() {
     },
   );
 
+  test('vertical component rows recover a distant metadata column', () {
+    final components = parseOcrComponents(const [
+      OcrLine('BRAZIL 60%', left: 600, top: 600, right: 860, bottom: 680),
+      OcrLine('지역', left: 1400, top: 520, right: 1480, bottom: 560),
+      OcrLine('CERRADO', left: 1600, top: 520, right: 1800, bottom: 570),
+      OcrLine('NATURAL', left: 1600, top: 720, right: 1800, bottom: 770),
+      OcrLine('ETHIOPIA 40%', left: 600, top: 1080, right: 900, bottom: 1160),
+      OcrLine('GUJI', left: 1600, top: 980, right: 1720, bottom: 1030),
+      OcrLine('WASHED', left: 1600, top: 1190, right: 1780, bottom: 1240),
+    ]);
+
+    expect(components.map((component) => component.region), [
+      'CERRADO',
+      'GUJI',
+    ]);
+    expect(components.map((component) => component.process), [
+      Process.natural,
+      Process.washed,
+    ]);
+  });
+
   test('unlabeled percentages stay in their repeated country columns', () {
     final components = parseOcrComponents(const [
       OcrLine('Brazil', left: 100, top: 100, right: 180, bottom: 130),

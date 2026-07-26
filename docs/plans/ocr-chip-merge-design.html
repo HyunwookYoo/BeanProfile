@@ -1,0 +1,129 @@
+<title>☕ BeanProfile — OCR 칩 드래그 병합 설계</title>
+<style>
+*{box-sizing:border-box}
+:root{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+  --font-sans:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Consolas,"Malgun Gothic",monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}}
+:root[data-theme="light"]{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+}
+:root[data-theme="dark"]{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-sans);line-height:1.7;-webkit-font-smoothing:antialiased}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.doc{max-width:880px;margin:0 auto;padding:44px 24px 96px}
+.crumb{font-family:var(--font-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:16px}
+h1{font-size:clamp(26px,4vw,38px);font-weight:800;letter-spacing:-.025em;line-height:1.2;margin:.1em 0 .5em;text-wrap:balance}
+h2{font-size:22px;font-weight:700;margin:2em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line);letter-spacing:-.01em;text-wrap:balance}
+h3{font-size:16.5px;font-weight:700;color:var(--accent-ink);margin:1.7em 0 .5em}
+h4{font-size:14px;font-weight:700;margin:1.3em 0 .4em}
+p{margin:.7em 0}
+a{color:var(--accent);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+strong{font-weight:700;color:var(--fg)}
+hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+code.ic{font-family:var(--font-mono);font-size:.85em;background:var(--ic-bg);color:var(--ic-fg);padding:1.5px 6px;border-radius:6px}
+pre.code{position:relative;background:var(--code-bg);color:var(--code-fg);border-radius:12px;padding:16px 18px;margin:1em 0;overflow-x:auto;border:1px solid rgba(0,0,0,.28)}
+pre.code code{font-family:var(--font-mono);font-size:12.75px;line-height:1.6;white-space:pre;color:inherit;background:none;padding:0}
+pre.code[data-lang]::before{content:attr(data-lang);position:absolute;top:9px;right:13px;font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(236,227,211,.42)}
+.tablewrap{overflow-x:auto;margin:1.1em 0}
+table{border-collapse:collapse;width:100%;font-size:13.75px}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--th);font-weight:700}
+tbody tr:nth-child(even){background:var(--surface)}
+blockquote{margin:1.1em 0;padding:11px 16px;border-left:3px solid var(--accent);background:var(--surface);border-radius:0 10px 10px 0;color:var(--muted)}
+blockquote strong{color:var(--fg)}
+ul,ol{margin:.7em 0;padding-left:1.4em}
+li{margin:.32em 0}
+ul.tasklist{list-style:none;padding-left:.15em}
+ul.tasklist li.task{position:relative;padding-left:30px;margin:.5em 0}
+ul.tasklist li.task::before{content:"";position:absolute;left:0;top:.18em;width:17px;height:17px;border:2px solid var(--accent);border-radius:5px;background:transparent}
+ul.tasklist li.task.done::before{content:"\2713";background:var(--accent);color:#fff;font-size:12px;font-weight:800;text-align:center;line-height:15px}
+</style>
+<article class="doc"><div class="crumb">BeanProfile · docs/plans</div>
+<h1>☕ BeanProfile — OCR 칩 드래그 병합 설계</h1>
+<div class="tablewrap"><table><thead><tr><th>항목</th><th>내용</th></tr></thead><tbody><tr><td>작성일</td><td>2026-07-26</td></tr><tr><td>상태</td><td>설계 승인(브레인스토밍) → 구현 계획 대기</td></tr><tr><td>선행</td><td>M3.1 칩 배정 UX <code class="ic">v0.3.1</code> · M3.3 좌표 파서 <code class="ic">v0.3.3</code> · 사진 OCR 신뢰성 <code class="ic">v0.6.x</code></td></tr><tr><td>상위 문서</td><td><a href="milestone-3.1-ux-design.md"><code class="ic">milestone-3.1-ux-design.md</code></a> · <a href="photo-ocr-reliability-design.md"><code class="ic">photo-ocr-reliability-design.md</code></a></td></tr><tr><td>영향 범위</td><td><code class="ic">bean_form_screen</code> · <code class="ic">OcrChipsPanel</code> (파서·데이터 모델 불변)</td></tr></tbody></table></div>
+<hr>
+<h2>1. 문제</h2>
+<p>칩은 OCR이 필드에 자동 배정하지 못한 나머지 텍스트 줄이다(<code class="ic">OcrDraft.chips</code>, <code class="ic">List&lt;String&gt;</code>). 칩을 탭하면 "어디에 넣을까요?" 시트가 열리고, 6개 대상 중 <strong>컵노트만 추가(append)</strong>, 나머지 5개는 <strong>교체</strong>다.</p>
+<p>실사용에서 두 가지가 섞여 나타난다.</p>
+<ol><li><strong>한 값이 여러 칩으로 쪼개진다.</strong> ML Kit은 카드를 줄·열 단위로 끊어 읽으므로 지역 <code class="ic">에티오피아 구지 샤키소</code>가 칩 3개로 나온다. 교체 배정이라 하나씩 넣으면 <strong>앞의 값이 덮어써져</strong> 조립할 방법이 없다.</li><li><strong>여러 조각을 한 칸에 모으고 싶다.</strong> 컵노트는 append라 되지만, 제품명·지역처럼 교체인 칸은 두 번째 칩을 넣는 순간 첫 번째가 사라진다.</li></ol>
+<p>두 경우 모두 <strong>칩을 배정하기 전에 합칠 수단</strong>이 없다는 하나의 결핍에서 나온다.</p>
+<h2>2. 확정 결정 (브레인스토밍 2026-07-26)</h2>
+<div class="tablewrap"><table><thead><tr><th>#</th><th>결정</th><th>선택</th></tr></thead><tbody><tr><td>Q1</td><td>해결할 문제</td><td>위 1·2 <strong>혼재</strong> — 쪼개진 값 조립 + 조각 누적을 한 수단으로</td></tr><tr><td>Q2</td><td>구분자</td><td><strong>배정 대상이 결정</strong> — 칩은 조각 목록을 유지하다가, 컵노트엔 <code class="ic">, </code>로 나머지 칸엔 공백으로 붙는다</td></tr><tr><td>Q3</td><td>병합 순서</td><td><strong>드래그 방향이 결정</strong> — 떨군 자리의 칩이 앞, 끌어온 칩이 뒤</td></tr><tr><td>Q4</td><td>되돌리기</td><td><strong>병합 칩의 ✕ 버튼</strong> — 언제든 분해. Undo 스낵바는 두지 않는다</td></tr><tr><td>Q5</td><td>상호작용</td><td><strong><code class="ic">LongPressDraggable</code> + <code class="ic">DragTarget</code></strong> (다중선택 버튼 · 시트 '뒤에 붙이기'는 기각)</td></tr></tbody></table></div>
+<h3>M3.1 Q3(드래그드롭 미지원)과의 관계</h3>
+<p>M3.1은 드래그드롭을 기각했다. 그 판단은 <strong>칩 → 폼 필드</strong> 드래그를 대상으로 했고, 근거는 "칩은 폼 하단·대상 칸은 상단 → 드래그 중 자동스크롤을 직접 구현해야 하고 터치 정확도·테스트가 취약하다"였다.</p>
+<p><strong>칩 → 칩</strong>은 같은 패널 안에서 일어나 그 근거가 성립하지 않는다. 거리가 짧고 스크롤이 끼어들지 않으며 드롭 대상이 항상 화면에 있다. M3.1의 기각은 <strong>칩 → 필드에 한해 그대로 유효</strong>하며(§6 스코프 밖), 이번 설계는 그 결정을 뒤집지 않는다.</p>
+<h2>3. 설계</h2>
+<h3>3.1 데이터 모델 — 칩이 "문자열"에서 "조각 목록"이 된다</h3>
+<p>구분자를 배정 시점에 정하려면 칩이 자기 조각들을 기억해야 한다. 순수 파일 하나를 새로 만든다(M4 <code class="ic">computeTasteProfile</code>, M5 <code class="ic">backup_codec</code>과 같은 결 — Flutter 의존 없는 순수 로직 + 단위 테스트).</p>
+<pre class="code" data-lang="dart"><code>// lib/features/beans/ocr/ocr_chip.dart
+class OcrChip {
+  const OcrChip(this.parts, {this.used = false});
+  final List&lt;String&gt; parts;            // ['에티오피아', '구지'] — 최소 1개
+  final bool used;
+
+  bool get isMerged =&gt; parts.length &gt; 1;
+  String get label =&gt; parts.join(' · ');            // 칩에 보이는 글자
+  String text({required bool comma}) =&gt;             // 칸에 들어갈 값
+      parts.join(comma ? ', ' : ' ');
+}
+
+List&lt;OcrChip&gt; mergeChips(List&lt;OcrChip&gt; chips, {required int target, required int source});
+List&lt;OcrChip&gt; splitChip(List&lt;OcrChip&gt; chips, int index);</code></pre>
+<ul><li><strong><code class="ic">mergeChips</code></strong> — 떨군 칩(<code class="ic">target</code>)의 <code class="ic">parts</code>가 <code class="ic">target.parts + source.parts</code>가 되고, 끌어온 칩은 목록에서 사라진다. 드래그 방향이 곧 순서다(Q3).</li></ul>
+<p>  병합 칩은 <code class="ic">target</code>이 있던 <strong>순서상 위치</strong>에 남는다. 끌어온 칩이 앞쪽에 있었다면(<code class="ic">source &lt; target</code>) 그것이 빠지면서 인덱스는 하나 당겨진다 — 눈에 보이는 자리는 그대로다.</p>
+<ul><li><strong><code class="ic">splitChip</code></strong> — 병합 칩 <strong>자리에</strong> 조각들이 순서대로 펼쳐진다. 원래 위치 복원이 아니다.</li></ul>
+<p>  <code class="ic">[샤키소][구지 · 에티오피아][무세공]</code> → <code class="ic">[샤키소][구지][에티오피아][무세공]</code></p>
+<ul><li>병합 칩에 또 떨구면 조각이 3개가 되고, 병합 칩끼리도 합쳐진다 — 리스트 이어붙이기라 별도 처리가 없다.</li><li>자기 자신에 떨구기·배정된 칩 관여는 <strong>UI에서 걸러</strong>(§3.2) 순수 함수까지 오지 않는다. 단일 칩 분해도 마찬가지다 — ✕는 병합 칩에만 붙는다. 두 곳에서 막지 않는다.</li></ul>
+<p>폼은 <code class="ic">List&lt;OcrChip&gt;</code> 하나만 상태로 들고, 기존 <code class="ic">_usedChips</code> Set은 사라진다.</p>
+<h3>3.2 상호작용</h3>
+<p>각 칩은 <strong>끌 수 있으면서 동시에 받을 수 있는</strong> 위젯이 된다. 폼 본문이 <code class="ic">ListView</code>(세로 스크롤)라 즉시 시작하는 <code class="ic">Draggable</code>은 스크롤 제스처와 경합한다 → <code class="ic">LongPressDraggable</code>을 쓴다. 오조작 방지는 덤이다.</p>
+<div class="tablewrap"><table><thead><tr><th>상태</th><th>위젯</th><th>동작</th></tr></thead><tbody><tr><td>일반 칩</td><td><code class="ic">ActionChip</code> (기존과 동일)</td><td>탭 = 배정 시트 · 길게 눌러 끌기</td></tr><tr><td>병합 칩</td><td><code class="ic">InputChip</code> + ✕</td><td>탭 = 배정 시트 · ✕ = 분해 · 길게 눌러 끌기</td></tr><tr><td>배정된 칩</td><td>흐림(<code class="ic">oat</code>)</td><td>탭·드래그·드롭 <strong>전부 불가</strong></td></tr></tbody></table></div>
+<ul><li>끌리는 동안 원래 자리는 흐려지고(<code class="ic">childWhenDragging</code>), 손가락엔 떠 있는 칩이 붙는다(<code class="ic">feedback</code>).</li><li>드롭 대상 위에 오면 <strong>그 칩만 테두리 강조</strong>. 자기 자신·배정된 칩 위에서는 강조가 뜨지 않는다(<code class="ic">onWillAcceptWithDetails</code>에서 거름).</li><li>콜백은 문자열이 아니라 <strong>인덱스</strong>로 주고받는다: <code class="ic">onTap(int)</code> · <code class="ic">onMerge(int target, int source)</code> · <code class="ic">onSplit(int)</code>.</li><li>힌트 문구: <code class="ic">인식된 텍스트 — 탭하면 어디에 넣을지 물어봐요 · 길게 눌러 다른 칩에 끌면 합쳐져요</code></li></ul>
+<h3>3.3 배정 시트 연동</h3>
+<p>시트 구성(6개 대상·현재 값 부제)은 그대로다. 값을 만드는 한 줄만 바뀐다.</p>
+<pre class="code" data-lang="dart"><code>final (_, ctrl, append) = targets[picked];
+final value = chip.text(comma: append);</code></pre>
+<p>기존 <code class="ic">append</code> 플래그(컵노트만 <code class="ic">true</code>)가 <strong>쉼표 여부와 정확히 일치</strong>한다 — 컵노트는 원래 여러 값을 <code class="ic">, </code>로 모으는 칸이고 나머지 5개는 한 값을 담는 칸이다. 플래그를 새로 만들지 않고 <code class="ic">append</code> 하나를 그대로 쓴다.</p>
+<ul><li>시트 제목은 <strong>실제 들어갈 값</strong>을 쓴다: <code class="ic">'에티오피아 구지' 어디에 넣을까요?</code></li></ul>
+<p>  칩의 <code class="ic">·</code>는 "합쳐진 칩"이라는 표시일 뿐이라 제목에는 나오지 않는다.</p>
+<ul><li>배정이 끝나면 그 칩만 <code class="ic">used: true</code>로 교체한다. 목록에서 지우지 않는다 — 지금처럼 흐려진 채 남아 무엇을 썼는지 보인다.</li></ul>
+<h2>4. 파일 영향</h2>
+<p><strong>신규</strong></p>
+<ul><li><code class="ic">lib/features/beans/ocr/ocr_chip.dart</code> — <code class="ic">OcrChip</code> + <code class="ic">mergeChips</code> + <code class="ic">splitChip</code></li><li><code class="ic">test/unit/ocr_chip_test.dart</code></li></ul>
+<p><strong>수정</strong></p>
+<ul><li><code class="ic">lib/features/beans/widgets/ocr_chips_panel.dart</code> — 드래그·드롭·✕·인덱스 콜백으로 재작성</li><li><code class="ic">lib/features/beans/bean_form_screen.dart</code> — <code class="ic">_usedChips</code> Set → <code class="ic">List&lt;OcrChip&gt;</code> 상태, <code class="ic">_openAssignSheet(int)</code>, 병합·분해 핸들러</li><li><code class="ic">test/widget/ocr_form_test.dart</code> — 병합 시나리오 추가</li></ul>
+<p><strong>불변</strong></p>
+<ul><li>OCR 파이프라인·파서 — <code class="ic">OcrDraft.chips</code>는 계속 <code class="ic">List&lt;String&gt;</code> 입력이다</li><li>데이터 모델·저장소·providers·배정 대상 6개</li></ul>
+<h2>5. 테스트 전략 (<code class="ic">docs/testing.md</code> 3계층)</h2>
+<h3>단위 — <code class="ic">test/unit/ocr_chip_test.dart</code></h3>
+<ul><li><code class="ic">mergeChips</code>: 떨군 자리가 앞·끌어온 게 뒤 · 목록 길이가 하나 준다</li><li><strong>방향 판별</strong>: <code class="ic">merge(target: 0, source: 1)</code>과 <code class="ic">merge(target: 1, source: 0)</code>이 <strong>서로 다른 순서</strong>를 내놓는지 — 순서 규칙이 실제로 구현됐는지 가르는 테스트</li><li>3개 이상 연쇄 병합 · 병합 칩끼리 병합</li><li><code class="ic">splitChip</code>: 병합 칩 자리에 순서대로 펼쳐진다</li><li><code class="ic">text(comma:)</code>: <code class="ic">'에티오피아 구지'</code> vs <code class="ic">'자몽, 초콜릿'</code></li></ul>
+<h3>위젯 — <code class="ic">test/widget/ocr_form_test.dart</code></h3>
+<p>기존 테스트처럼 <code class="ic">t.view.physicalSize</code>를 키워 칩 패널을 화면에 올린 뒤:</p>
+<pre class="code" data-lang="dart"><code>Future&lt;void&gt; dragChip(WidgetTester t, String from, String onto) async {
+  final g = await t.startGesture(t.getCenter(find.byKey(Key('chip-$from'))));
+  await t.pump(kLongPressTimeout + const Duration(milliseconds: 100));
+  await g.moveTo(t.getCenter(find.byKey(Key('chip-$onto'))));
+  await t.pump();
+  await g.up();
+  await t.pumpAndSettle();
+}</code></pre>
+<ul><li>드래그 → <code class="ic">chip-에티오피아 · 구지</code> 렌더 · 원래 칩 2개는 사라진다</li><li>병합 칩 → 지역 배정 → <code class="ic">field-region-0</code>이 <code class="ic">'에티오피아 구지'</code></li><li>병합 칩 → 컵노트에 추가 → <code class="ic">'자몽, 초콜릿'</code></li><li>✕ 탭 → 조각 칩 2개로 복귀</li><li>배정된(흐린) 칩은 드래그해도 병합되지 않는다</li></ul>
+<h3>비회귀</h3>
+<p>기존 단일 칩 테스트(<code class="ic">Key('chip-Yirgacheffe')</code>, <code class="ic">t.widget&lt;ActionChip&gt;(...)</code>)는 <strong>그대로 통과한다</strong>. Key를 라벨 기반으로 유지하고 일반 칩은 계속 <code class="ic">ActionChip</code>이기 때문이다.</p>
+<p>라벨 중복은 구조적으로 불가능하다 — 초기 칩은 <code class="ic">ocr_candidate.dart</code>에서 중복 제거되고, 병합은 둘을 하나로 줄이며, 분해는 원래 조각으로만 되돌린다. 따라서 같은 라벨의 칩이 둘 생길 수 없다.</p>
+<h2>6. 스코프 밖</h2>
+<ul><li><strong>칩 → 폼 필드</strong> 직접 드래그 (M3.1 Q3 기각 유지 — 자동스크롤 문제 그대로)</li><li>파서가 좌표를 보고 <strong>자동으로</strong> 병합을 제안하는 것</li><li>블렌드 2번째+ 구성 필드 배정 (M3.1과 동일하게 첫 구성만)</li><li>병합 상태 저장 — 폼을 벗어나면 사라진다(지금 칩과 동일)</li><li>병합 직후 Undo 스낵바 (✕로 대체)</li></ul>
+<h2>7. 완료 기준 (DoD)</h2>
+<ul><li><code class="ic">flutter analyze</code> 0 · <code class="ic">flutter test</code> 전체 green</li><li>단위 테스트가 <strong>드래그 방향에 따라 순서가 달라짐</strong>을 판별한다</li><li>기기에서: 드래그 병합 → 지역·컵노트 배정 → ✕ 분해가 모두 동작한다</li><li>태스크별 SDD 리뷰 + opus 전체-브랜치 리뷰 통과</li></ul>
+</article>

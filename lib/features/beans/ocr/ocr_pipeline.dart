@@ -67,23 +67,17 @@ class DefaultOcrPipeline implements OcrPipeline {
       }
     }
 
-    final best = enhanced == null
-        ? original
-        : compareOcrCandidates(original, enhanced) >= 0
-        ? original
-        : enhanced;
-    final other = identical(best, original) ? enhanced : original;
-    final draft = other == null ? best.draft : mergeOcrCandidates(best, other);
+    final selection = selectOcrCandidates(original, enhanced);
     final finalCandidate = OcrCandidate(
-      lines: best.lines,
-      draft: draft,
-      knownLabelCount: best.knownLabelCount,
-      fromEnhanced: best.fromEnhanced,
+      lines: selection.selected.lines,
+      draft: selection.draft,
+      knownLabelCount: selection.selected.knownLabelCount,
+      fromEnhanced: selection.selected.fromEnhanced,
     );
     return OcrPipelineResult(
-      draft: draft,
+      draft: selection.draft,
       quality: quality,
-      usedEnhanced: best.fromEnhanced,
+      usedEnhanced: selection.usedEnhanced,
       shouldWarnQuality: quality.hasIssues && isWeakOcr(finalCandidate),
     );
   }

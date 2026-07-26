@@ -266,6 +266,55 @@ void main() {
     },
   );
 
+  test('selection chooses the stronger candidate and merges the other', () {
+    final original = candidate(
+      draft: const OcrDraft(
+        name: 'House Blend',
+        components: [
+          OcrComponentDraft(country: 'Brazil', ratioPercent: 60),
+          OcrComponentDraft(country: 'Ethiopia', ratioPercent: 40),
+        ],
+      ),
+      fromEnhanced: false,
+    );
+    final enhanced = candidate(
+      draft: const OcrDraft(
+        name: 'House Blend',
+        components: [
+          OcrComponentDraft(country: 'Brazil', process: Process.natural),
+          OcrComponentDraft(
+            country: 'Ethiopia',
+            region: 'Guji',
+            process: Process.washed,
+          ),
+        ],
+      ),
+    );
+
+    final result = selectOcrCandidates(original, enhanced);
+
+    expect(result.selected, same(enhanced));
+    expect(result.other, same(original));
+    expect(result.usedEnhanced, isTrue);
+    expect(result.draft.components[0].ratioPercent, 60);
+    expect(result.draft.components[1].ratioPercent, 40);
+    expect(result.draft.components[1].region, 'Guji');
+  });
+
+  test('selection keeps original when enhanced is unavailable', () {
+    final original = candidate(
+      draft: const OcrDraft(name: 'Original'),
+      fromEnhanced: false,
+    );
+
+    final result = selectOcrCandidates(original, null);
+
+    expect(result.selected, same(original));
+    expect(result.other, isNull);
+    expect(result.draft, same(original.draft));
+    expect(result.usedEnhanced, isFalse);
+  });
+
   test('candidate builder parses lines and counts known labels', () {
     const lines = [
       OcrLine('Name: House Blend'),

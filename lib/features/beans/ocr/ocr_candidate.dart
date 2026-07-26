@@ -46,6 +46,20 @@ class OcrCandidate {
   }
 }
 
+class OcrCandidateSelection {
+  final OcrCandidate selected;
+  final OcrCandidate? other;
+  final OcrDraft draft;
+
+  const OcrCandidateSelection({
+    required this.selected,
+    required this.other,
+    required this.draft,
+  });
+
+  bool get usedEnhanced => selected.fromEnhanced;
+}
+
 OcrCandidate buildOcrCandidate(List<OcrLine> lines, bool fromEnhanced) =>
     OcrCandidate(
       lines: lines,
@@ -86,6 +100,28 @@ int compareOcrCandidates(OcrCandidate first, OcrCandidate second) {
 
   if (first.fromEnhanced == second.fromEnhanced) return 0;
   return first.fromEnhanced ? -1 : 1;
+}
+
+OcrCandidateSelection selectOcrCandidates(
+  OcrCandidate original,
+  OcrCandidate? enhanced,
+) {
+  final selected =
+      enhanced == null || compareOcrCandidates(original, enhanced) >= 0
+      ? original
+      : enhanced;
+  final other = enhanced == null
+      ? null
+      : identical(selected, original)
+      ? enhanced
+      : original;
+  return OcrCandidateSelection(
+    selected: selected,
+    other: other,
+    draft: other == null
+        ? selected.draft
+        : mergeOcrCandidates(selected, other),
+  );
 }
 
 OcrDraft mergeOcrCandidates(OcrCandidate primary, OcrCandidate secondary) {

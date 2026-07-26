@@ -1,0 +1,456 @@
+<title>BeanProfile — 디개싱 일수 목업</title>
+<style>
+  :root{
+    --bg:#E7E1D6; --fg:#2B2019; --muted:#7A6F62; --line:#D6CEC0;
+    --surface:#F3EFE8; --accent:#A66A24;
+    --shadow:0 18px 40px -18px rgba(60,42,24,.45), 0 4px 12px -6px rgba(60,42,24,.25);
+    --espresso:#2B2019; --oat:#ECE6DB; --cup:#FCFBF8;
+    --crema:#B67B2E; --crema-ink:#8A5A18; --cherry:#9E3B2D;
+    --app-muted:#8C8172; --app-line:#E4DED2;
+    --pill-bg:#F1E6D2; --pill-line:#E4D2AD;
+    --font-sans:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --font-mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Consolas,"Malgun Gothic",monospace;
+  }
+  @media (prefers-color-scheme:dark){:root{
+    --bg:#1B1510; --fg:#EDE5D8; --muted:#9C9081; --line:#332A21; --surface:#241D16; --accent:#D89A46;
+    --shadow:0 20px 46px -18px rgba(0,0,0,.7), 0 4px 14px -6px rgba(0,0,0,.5);
+  }}
+  :root[data-theme="light"]{--bg:#E7E1D6;--fg:#2B2019;--muted:#7A6F62;--line:#D6CEC0;--surface:#F3EFE8;--accent:#A66A24;
+    --shadow:0 18px 40px -18px rgba(60,42,24,.45), 0 4px 12px -6px rgba(60,42,24,.25)}
+  :root[data-theme="dark"]{--bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--surface:#241D16;--accent:#D89A46;
+    --shadow:0 20px 46px -18px rgba(0,0,0,.7), 0 4px 14px -6px rgba(0,0,0,.5)}
+
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-sans);line-height:1.5;-webkit-font-smoothing:antialiased}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+  .board{max-width:1180px;margin:0 auto;padding:40px 24px 72px}
+  .eyebrow{font-family:var(--font-mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin:0 0 10px;font-weight:700}
+  h1.title{font-size:clamp(24px,4vw,38px);font-weight:800;letter-spacing:-.025em;margin:0;text-wrap:balance}
+  .sub{color:var(--muted);max-width:70ch;margin:12px 0 0;font-size:15px}
+  h2.sect{font-size:19px;font-weight:800;letter-spacing:-.02em;margin:46px 0 0;padding-top:22px;border-top:1px solid var(--line)}
+  h2.sect + p{color:var(--muted);font-size:14px;margin:8px 0 0;max-width:70ch}
+
+  .rule{display:flex;flex-wrap:wrap;gap:8px 18px;margin:22px 0 4px;padding:14px 16px;background:var(--surface);border:1px solid var(--line);border-radius:14px}
+  .rule span{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
+  .rule b{font-weight:700;color:var(--fg)}
+  .rule code{font-family:var(--font-mono);font-size:11.5px;background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:1px 5px}
+
+  .screens{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:26px 20px;margin-top:26px;justify-items:center}
+  .screen-card{width:100%;max-width:360px;display:flex;flex-direction:column;align-items:center}
+  .screen-head{width:100%;display:flex;align-items:baseline;gap:10px;margin:0 4px 12px}
+  .screen-idx{font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--accent);flex:none}
+  .screen-name{font-weight:700;font-size:16px}
+  .screen-cap{width:100%;margin:14px 4px 0;color:var(--muted);font-size:12.5px}
+  .screen-cap ul{margin:6px 0 0;padding-left:16px}
+  .screen-cap li{margin:3px 0}
+  .screen-cap .k{color:var(--fg);font-weight:600}
+
+  .phone{width:320px;height:664px;border-radius:40px;background:#0d0a07;padding:9px;box-shadow:var(--shadow);flex:none;position:relative}
+  .screen{position:relative;width:100%;height:100%;border-radius:32px;overflow:hidden;background:var(--oat);color:var(--espresso);display:flex;flex-direction:column;font-size:14px}
+  .statusbar{height:34px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 20px;font-family:var(--font-mono);font-size:12px;font-weight:600}
+  .statusbar .dots{display:flex;gap:4px}
+  .statusbar .dots i{width:6px;height:6px;border-radius:50%;background:var(--espresso);opacity:.55}
+  .appbar{flex:none;display:flex;align-items:center;gap:10px;padding:6px 16px 12px}
+  .appbar h1{font-size:18px;font-weight:800;letter-spacing:-.02em;margin:0;flex:1}
+  .appbar .act{width:30px;height:30px;display:flex;align-items:center;justify-content:center;color:var(--espresso);flex:none}
+  .body{flex:1;overflow:hidden;padding:0 16px}
+  svg{display:block}
+  .ico{width:18px;height:18px;stroke:currentColor;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round}
+  .ico.sm{width:14px;height:14px}
+  .savebar{flex:none;padding:8px 16px 14px}
+  .savebtn{height:48px;border-radius:12px;background:var(--espresso);color:var(--oat);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px}
+
+  /* form rows */
+  .frow{display:flex;align-items:center;gap:10px;min-height:38px}
+  .flabel{font-size:13.5px;color:var(--espresso);flex:none;width:52px}
+  .fval{font-family:var(--font-mono);font-size:13px;font-variant-numeric:tabular-nums;color:var(--espresso);font-weight:600}
+  .fbtn{margin-left:auto;font-size:13px;font-weight:700;color:var(--crema-ink);flex:none}
+  .fsrc{font-size:11.5px;color:var(--app-muted)}
+  .fdiv{height:1px;background:var(--app-line);margin:6px 0}
+
+  /* degassing input variants */
+  .numfield{display:inline-flex;align-items:baseline;gap:5px;border-bottom:1.6px solid var(--crema);padding:2px 8px 3px;min-width:62px;justify-content:center}
+  .numfield .n{font-family:var(--font-mono);font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--espresso)}
+  .numfield .n.ph{color:var(--app-muted);font-weight:400}
+  .numfield .u{font-size:12px;color:var(--app-muted)}
+  .stepper{display:inline-flex;align-items:center;gap:2px;border:1px solid var(--app-line);background:var(--cup);border-radius:11px;padding:3px}
+  .stepper .sb{width:30px;height:28px;border-radius:8px;background:var(--oat);display:flex;align-items:center;justify-content:center;color:var(--crema-ink)}
+  .stepper .sv{min-width:52px;text-align:center;font-family:var(--font-mono);font-size:13.5px;font-weight:700;font-variant-numeric:tabular-nums}
+
+  /* pills + badges */
+  .pill{display:inline-flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:11px;font-weight:700;font-variant-numeric:tabular-nums;
+        color:var(--crema-ink);background:var(--pill-bg);border:1px solid var(--pill-line);border-radius:20px;padding:2px 9px;flex:none}
+  .pill.warn{color:var(--cherry);background:#F3DAD4;border-color:#E6C1B8}
+  .pill.ghost{color:var(--app-muted);background:transparent;border-color:var(--app-line)}
+
+  /* intensity + stars */
+  .ints{display:flex;align-items:center;gap:10px;min-height:30px}
+  .ints .il{font-size:12.5px;color:var(--app-muted);width:34px;flex:none}
+  .ints .id{display:flex;gap:7px}
+  .ints .id i{width:11px;height:11px;border-radius:50%;border:1.5px solid var(--app-line);background:var(--cup);display:block}
+  .ints .id i.on{background:var(--crema);border-color:var(--crema)}
+  .stars{font-size:13px;color:var(--crema);letter-spacing:1px;flex:none}
+  .stars .off{color:var(--app-line)}
+  .grouplabel{font-weight:700;font-size:13.5px;color:var(--espresso);margin:12px 0 2px}
+  .comment{border:1px solid var(--app-line);background:var(--cup);border-radius:11px;padding:9px 11px;font-size:12px;color:var(--app-muted);height:58px;margin-top:10px}
+
+  /* tasting cards on detail screen */
+  .tcard{background:var(--cup);border:1px solid var(--app-line);border-radius:12px;padding:11px 12px;margin-bottom:8px}
+  .tcard .th{display:flex;align-items:center;gap:7px;margin-bottom:5px}
+  .tcard .td{font-family:var(--font-mono);font-size:11px;color:var(--app-muted);font-variant-numeric:tabular-nums}
+  .tcard .tm{display:flex;align-items:center;gap:8px}
+  .tcard .tint{flex:1;font-family:var(--font-mono);font-size:11px;color:var(--espresso);font-variant-numeric:tabular-nums}
+  .tcard .tc{font-size:11.5px;color:var(--espresso);margin-top:5px}
+  .sectitle{font-weight:700;font-size:13.5px;margin:2px 0 9px}
+  .specrow{display:flex;align-items:center;gap:8px;background:var(--cup);border:1px solid var(--app-line);border-radius:12px;padding:8px 12px;margin-bottom:6px}
+  .specrow .sk{width:56px;font-size:11.5px;color:var(--app-muted);flex:none}
+  .specrow .sv{font-family:var(--font-mono);font-size:11.5px;color:var(--espresso);font-variant-numeric:tabular-nums}
+
+  .hint{display:flex;gap:8px;align-items:flex-start;background:var(--cup);border:1px solid var(--app-line);border-radius:11px;padding:9px 11px;margin-top:10px}
+  .hint .ht{font-size:11.5px;color:var(--app-muted);line-height:1.55}
+  .hint .hi{color:var(--crema-ink);flex:none;margin-top:1px}
+
+  /* decision table */
+  .tablewrap{overflow-x:auto;margin-top:20px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+  table{border-collapse:collapse;width:100%;min-width:660px;font-size:13.5px}
+  th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+  tbody tr:last-child td{border-bottom:0}
+  th{font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);font-weight:700}
+  td.q{font-weight:700;white-space:nowrap}
+  td code{font-family:var(--font-mono);font-size:12px;background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:1px 5px}
+  td .tag{display:inline-block;font-family:var(--font-mono);font-size:10.5px;font-weight:700;letter-spacing:.06em;border-radius:5px;padding:2px 7px}
+  td .tag.open{color:var(--cherry);background:#F3DAD4;border:1px solid #E6C1B8}
+  td .tag.set{color:var(--crema-ink);background:var(--pill-bg);border:1px solid var(--pill-line)}
+</style>
+
+<div class="board">
+  <p class="eyebrow">Design Mockup</p>
+  <h1 class="title">디개싱 일수 — 시음 기록에 로스팅 후 며칠인지 남기기</h1>
+  <p class="sub">
+    로스팅 날짜가 있으면 <b>시음일 − 로스팅일</b>을 자동으로 보여주고, 없으면 그 자리에서 일수를 직접 입력합니다.
+    기준은 오늘이 아니라 <b>시음일</b>이라, 지난 기록을 나중에 열어봐도 숫자가 흔들리지 않습니다.
+  </p>
+
+  <div class="rule">
+    <span><b>자동</b> <code>roastDate</code> 있음 → 계산값 (읽기 전용)</span>
+    <span><b>수동</b> <code>roastDate</code> 없음 → <code>tasting.degassingDays</code> 입력</span>
+    <span><b>미표시</b> 둘 다 없음</span>
+  </div>
+
+  <h2 class="sect">1. 시음 폼 — 어디에 넣나</h2>
+  <p>시음일 바로 아래, 강도 위. 둘 다 “이 시음이 언제였나”를 말하는 줄이라 붙여 두고, 그 아래를 구분선으로 끊습니다.</p>
+
+  <div class="screens">
+
+    <div class="screen-card">
+      <div class="screen-head"><span class="screen-idx">1A</span><span class="screen-name">자동 계산</span></div>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i></span></div>
+        <div class="appbar">
+          <span class="act"><svg class="ico" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></span>
+          <h1>시음 기록</h1>
+        </div>
+        <div class="body">
+          <div class="frow">
+            <span class="flabel">시음일</span>
+            <span class="fval">2026-07-27</span>
+            <span class="fbtn">날짜 선택</span>
+          </div>
+          <div class="frow">
+            <span class="flabel">디개싱</span>
+            <span class="fval">8일</span>
+            <span class="fsrc">로스팅 2026-07-19</span>
+          </div>
+          <div class="fdiv"></div>
+          <div class="grouplabel">강도</div>
+          <div class="ints"><span class="il">산미</span><span class="id"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></span></div>
+          <div class="ints"><span class="il">단맛</span><span class="id"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></span></div>
+          <div class="ints"><span class="il">바디</span><span class="id"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></span></div>
+          <div class="ints"><span class="il">쓴맛</span><span class="id"><i class="on"></i><i class="on"></i><i></i><i></i><i></i></span></div>
+          <div class="grouplabel">종합 만족도</div>
+          <div class="stars">★★★★<span class="off">★</span></div>
+          <div class="comment">코멘트</div>
+        </div>
+        <div class="savebar"><div class="savebtn">저장</div></div>
+      </div></div>
+      <div class="screen-cap">
+        <ul>
+          <li><span class="k">읽기 전용.</span> 시음일을 바꾸면 숫자도 따라 바뀝니다.</li>
+          <li>출처(<span class="k">로스팅 2026-07-19</span>)를 옆에 적어, 어디서 나온 숫자인지 감춰두지 않습니다.</li>
+          <li>탭할 게 없으니 입력 위젯이 아닌 텍스트로 둡니다.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="screen-card">
+      <div class="screen-head"><span class="screen-idx">1B</span><span class="screen-name">수동 — 숫자 필드</span></div>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i></span></div>
+        <div class="appbar">
+          <span class="act"><svg class="ico" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></span>
+          <h1>시음 기록</h1>
+        </div>
+        <div class="body">
+          <div class="frow">
+            <span class="flabel">시음일</span>
+            <span class="fval">2026-07-27</span>
+            <span class="fbtn">날짜 선택</span>
+          </div>
+          <div class="frow">
+            <span class="flabel">디개싱</span>
+            <span class="numfield"><span class="n">8</span><span class="u">일</span></span>
+            <span class="fsrc">로스팅 날짜 없음</span>
+          </div>
+          <div class="fdiv"></div>
+          <div class="grouplabel">강도</div>
+          <div class="ints"><span class="il">산미</span><span class="id"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></span></div>
+          <div class="ints"><span class="il">단맛</span><span class="id"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></span></div>
+          <div class="ints"><span class="il">바디</span><span class="id"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></span></div>
+          <div class="ints"><span class="il">쓴맛</span><span class="id"><i class="on"></i><i class="on"></i><i></i><i></i><i></i></span></div>
+          <div class="grouplabel">종합 만족도</div>
+          <div class="stars">★★★★<span class="off">★</span></div>
+          <div class="comment">코멘트</div>
+        </div>
+        <div class="savebar"><div class="savebtn">저장</div></div>
+      </div></div>
+      <div class="screen-cap">
+        <ul>
+          <li>숫자 키보드가 뜨고, <span class="k">숫자만 · 세 자리까지</span> 받습니다.</li>
+          <li>비워두면 저장은 되고 표시만 생략됩니다 — 필수 항목이 아닙니다.</li>
+          <li>30일을 넣기 쉽지만, 키보드가 올라와 폼을 가립니다.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="screen-card">
+      <div class="screen-head"><span class="screen-idx">1C</span><span class="screen-name">수동 — 스테퍼 (대안)</span></div>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i></span></div>
+        <div class="appbar">
+          <span class="act"><svg class="ico" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></span>
+          <h1>시음 기록</h1>
+        </div>
+        <div class="body">
+          <div class="frow">
+            <span class="flabel">시음일</span>
+            <span class="fval">2026-07-27</span>
+            <span class="fbtn">날짜 선택</span>
+          </div>
+          <div class="frow">
+            <span class="flabel">디개싱</span>
+            <span class="stepper">
+              <span class="sb"><svg class="ico sm" viewBox="0 0 24 24"><path d="M5 12h14"/></svg></span>
+              <span class="sv">8일</span>
+              <span class="sb"><svg class="ico sm" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span>
+            </span>
+            <span class="fsrc">로스팅<br>날짜 없음</span>
+          </div>
+          <div class="fdiv"></div>
+          <div class="grouplabel">강도</div>
+          <div class="ints"><span class="il">산미</span><span class="id"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></span></div>
+          <div class="ints"><span class="il">단맛</span><span class="id"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i></span></div>
+          <div class="ints"><span class="il">바디</span><span class="id"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></span></div>
+          <div class="ints"><span class="il">쓴맛</span><span class="id"><i class="on"></i><i class="on"></i><i></i><i></i><i></i></span></div>
+          <div class="grouplabel">종합 만족도</div>
+          <div class="stars">★★★★<span class="off">★</span></div>
+          <div class="comment">코멘트</div>
+        </div>
+        <div class="savebar"><div class="savebtn">저장</div></div>
+      </div></div>
+      <div class="screen-cap">
+        <ul>
+          <li>키보드가 안 뜨고, 강도 선택기와 같은 “탭으로 고르는” 결입니다.</li>
+          <li>대신 <span class="k">30일이면 탭 30번</span>. 오래 눌러 빠르게 넘기는 동작을 따로 만들어야 합니다.</li>
+          <li>가로 폭을 많이 먹어 “로스팅 날짜 없음”이 두 줄로 접힙니다.</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+
+  <h2 class="sect">2. 원두 상세 — 남은 기록에서 어떻게 보이나</h2>
+  <p>시음 카드의 날짜 옆에 알약 하나. 시음 기록 목록을 훑을 때 “며칠째에 마셨더니 이 맛”이 한눈에 이어집니다.</p>
+
+  <div class="screens">
+
+    <div class="screen-card">
+      <div class="screen-head"><span class="screen-idx">2A</span><span class="screen-name">시음 카드 배지</span></div>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i></span></div>
+        <div class="appbar">
+          <span class="act"><svg class="ico" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></span>
+          <h1>원두 상세</h1>
+          <span class="act"><svg class="ico" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg></span>
+        </div>
+        <div class="body">
+          <div class="specrow"><span class="sk">로스팅</span><span class="sv">2026-07-19 · 중배전</span></div>
+          <div class="specrow"><span class="sk">원산지</span><span class="sv">에티오피아 · 구지 · 워시드</span></div>
+          <div class="fdiv" style="margin:14px 0 12px"></div>
+          <div class="sectitle">시음 기록 3</div>
+
+          <div class="tcard">
+            <div class="th"><span class="td">2026-07-27</span><span class="pill">디개싱 8일</span></div>
+            <div class="tm">
+              <span class="tint">산미 3 · 단맛 4 · 바디 3 · 쓴맛 2</span>
+              <span class="stars">★★★★<span class="off">★</span></span>
+            </div>
+            <div class="tc">단맛이 확 올라옴. 지금이 제일 좋다</div>
+          </div>
+
+          <div class="tcard">
+            <div class="th"><span class="td">2026-07-23</span><span class="pill">디개싱 4일</span></div>
+            <div class="tm">
+              <span class="tint">산미 4 · 단맛 2 · 바디 2 · 쓴맛 2</span>
+              <span class="stars">★★★<span class="off">★★</span></span>
+            </div>
+            <div class="tc">아직 가스가 많다. 신맛만 튐</div>
+          </div>
+
+          <div class="tcard">
+            <div class="th"><span class="td">2026-07-20</span><span class="pill">디개싱 1일</span></div>
+            <div class="tm">
+              <span class="tint">산미 4 · 단맛 2 · 바디 2 · 쓴맛 3</span>
+              <span class="stars">★★<span class="off">★★★</span></span>
+            </div>
+          </div>
+        </div>
+        <div class="savebar"><div class="savebtn" style="background:var(--crema);color:#fff">＋ 시음 추가</div></div>
+      </div></div>
+      <div class="screen-cap">
+        <ul>
+          <li>알약은 <span class="k">날짜 옆</span>. 강도 줄은 손대지 않아 기존 배치가 그대로입니다.</li>
+          <li>같은 원두를 1일 · 4일 · 8일에 마신 기록이 위아래로 붙어 곡선이 읽힙니다.</li>
+          <li>값이 없는 시음은 알약 없이 날짜만 — 줄이 밀리지 않습니다.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="screen-card">
+      <div class="screen-head"><span class="screen-idx">2B</span><span class="screen-name">경계값 처리</span></div>
+      <div class="phone"><div class="screen">
+        <div class="statusbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i></span></div>
+        <div class="appbar">
+          <span class="act"><svg class="ico" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></span>
+          <h1>원두 상세</h1>
+        </div>
+        <div class="body">
+          <div class="sectitle">시음 기록 4</div>
+
+          <div class="tcard">
+            <div class="th"><span class="td">2026-07-19</span><span class="pill">당일</span></div>
+            <div class="tm">
+              <span class="tint">산미 4 · 단맛 2 · 바디 2 · 쓴맛 3</span>
+              <span class="stars">★★<span class="off">★★★</span></span>
+            </div>
+            <div class="tc">0일 → “0일” 대신 <b>당일</b></div>
+          </div>
+
+          <div class="tcard">
+            <div class="th"><span class="td">2026-07-25</span></div>
+            <div class="tm">
+              <span class="tint">산미 3 · 단맛 3 · 바디 3 · 쓴맛 3</span>
+              <span class="stars">★★★<span class="off">★★</span></span>
+            </div>
+            <div class="tc">로스팅 날짜도 입력값도 없음 → 알약 자체가 없음</div>
+          </div>
+
+          <div class="tcard">
+            <div class="th"><span class="td">2026-07-15</span><span class="pill warn">날짜 확인</span></div>
+            <div class="tm">
+              <span class="tint">산미 3 · 단맛 3 · 바디 2 · 쓴맛 3</span>
+              <span class="stars">★★★<span class="off">★★</span></span>
+            </div>
+            <div class="tc">시음일이 로스팅일보다 앞섬 → 음수. 숨기지 않고 <b>짚어줌</b></div>
+          </div>
+
+          <div class="tcard">
+            <div class="th"><span class="td">2026-06-02</span><span class="pill">디개싱 128일</span></div>
+            <div class="tm">
+              <span class="tint">산미 2 · 단맛 2 · 바디 3 · 쓴맛 4</span>
+              <span class="stars">★<span class="off">★★★★</span></span>
+            </div>
+            <div class="tc">큰 값도 그대로 — 오래 묵힌 것도 사실이니까</div>
+          </div>
+
+          <div class="hint">
+            <span class="hi"><svg class="ico sm" viewBox="0 0 24 24"><path d="M12 8v5M12 16h.01M12 3a9 9 0 100 18 9 9 0 000-18z"/></svg></span>
+            <span class="ht"><b>음수를 어떻게 볼 것인가</b>가 유일하게 갈리는 지점입니다.
+            조용히 숨기면 화면은 깨끗하지만 잘못 찍은 날짜를 영영 못 찾습니다.</span>
+          </div>
+        </div>
+      </div></div>
+      <div class="screen-cap">
+        <ul>
+          <li><span class="k">0일 → “당일”</span> · 값 없음 → 알약 생략 · 음수 → 빨간 “날짜 확인”.</li>
+          <li>상한선은 두지 않습니다. 128일도 사용자가 실제로 그렇게 마신 기록입니다.</li>
+          <li>입력칸은 <span class="k">숫자만 · 세 자리</span>까지 — 그 위의 상한 규칙은 두지 않습니다.</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+
+  <h2 class="sect">3. 결정 요약</h2>
+  <p>브레인스토밍(2026-07-27)에서 확정된 항목 전부. 설계 문서는 <code>docs/plans/degassing-days-design.md</code>.</p>
+
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr><th>항목</th><th>상태</th><th>내용</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="q">기준일</td>
+          <td><span class="tag set">확정</span></td>
+          <td>오늘이 아니라 <b>시음일</b>. 지난 기록을 편집해도 숫자가 안 변합니다.</td>
+        </tr>
+        <tr>
+          <td class="q">저장</td>
+          <td><span class="tag set">확정</span></td>
+          <td><code>Tastings.degassingDays</code> (nullable int) 신규. <code>roastDate</code>가 있으면 컬럼은 무시하고 계산값을 씁니다.</td>
+        </tr>
+        <tr>
+          <td class="q">폼 위치</td>
+          <td><span class="tag set">확정</span></td>
+          <td>시음일 줄 바로 아래, 강도 위. 그 아래 구분선.</td>
+        </tr>
+        <tr>
+          <td class="q">입력 위젯</td>
+          <td><span class="tag set">확정</span></td>
+          <td><b>1B 숫자 필드.</b> 스테퍼는 30일에 탭 30번이라 길게-눌러-가속을 따로 만들어야 합니다.</td>
+        </tr>
+        <tr>
+          <td class="q">시음 카드</td>
+          <td><span class="tag set">확정</span></td>
+          <td><b>2A 날짜 옆 알약.</b> 1일 → 4일 → 8일이 위아래로 붙어야 “언제가 제일 맛있었나”가 읽힙니다.</td>
+        </tr>
+        <tr>
+          <td class="q">음수</td>
+          <td><span class="tag set">확정</span></td>
+          <td><b>2B 빨간 “날짜 확인”.</b> 조용히 숨기면 “값 없음”과 구별이 안 돼 잘못 찍은 날짜를 못 찾습니다.</td>
+        </tr>
+        <tr>
+          <td class="q">표기</td>
+          <td><span class="tag set">확정</span></td>
+          <td><code>디개싱 8일</code>. “8일차”는 07-19→07-27이 8일차인지 9일차인지 사람마다 달라집니다.</td>
+        </tr>
+        <tr>
+          <td class="q">입력 제약</td>
+          <td><span class="tag set">확정</span></td>
+          <td>숫자만 · 세 자리. 그 위의 상한 규칙(365 등)은 두지 않습니다 — 999는 이상할 뿐 아무것도 깨뜨리지 않습니다.</td>
+        </tr>
+        <tr>
+          <td class="q">백업 버전</td>
+          <td><span class="tag set">확정</span></td>
+          <td><code>_schemaVersion</code>은 <b>1 유지</b>. 올리면 기존 백업 파일이 “지원하지 않는 형식”으로 거부됩니다.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 class="sect">4. 안 하는 것</h2>
+  <p>
+    원두 리스트·상세 스펙 줄의 <b>오늘 기준 실시간 카운터</b>(“지금 12일째”)는 이번 범위 밖입니다 — 기준일 논의에서 시음일 쪽을 골랐고,
+    두 가지 기준의 숫자가 한 화면에 같이 뜨면 헷갈립니다. 취향 탭의 <b>디개싱 구간별 선호 분석</b>도 데이터가 먼저 쌓여야 의미가 있어 이번엔 넣지 않습니다.
+  </p>
+</div>

@@ -183,8 +183,15 @@ List<String> _splitNotes(String s) => s
     .where((e) => e.isNotEmpty)
     .toList();
 
-bool _isCupNoteValue(String value) =>
-    _dateIn(value) == null && !ratioPattern.hasMatch(value);
+bool _isCupNoteValue(String value) {
+  final normalized = _norm(value);
+  return _dateIn(value) == null &&
+      !ratioPattern.hasMatch(value) &&
+      !_roastKeywords.containsKey(normalized) &&
+      !processKeywords.containsKey(normalized) &&
+      !countryKeywords.containsKey(normalized) &&
+      !_beanTypeOnly.hasMatch(normalized);
+}
 
 List<String> _uniqueDelimitedCupNotes(List<String> texts) {
   final candidates = <List<String>>[];

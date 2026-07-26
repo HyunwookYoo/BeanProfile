@@ -180,6 +180,26 @@ void main() {
 
       expect(d.cupNotes, ['COCOA', 'BERRY', 'JASMINE']);
     });
+    test('컵노트 후보에서 구조화 필드 값을 제외하고 유일한 노트 칩을 사용', () {
+      final d = parseOcr(const [
+        OcrLine('컵노트', left: 713, top: 3419, right: 900, bottom: 3457),
+        OcrLine('MEDIUM', left: 713, top: 3480, right: 1033, bottom: 3520),
+        OcrLine('WASHED', left: 713, top: 3530, right: 1033, bottom: 3570),
+        OcrLine('BRAZIL', left: 713, top: 3580, right: 1033, bottom: 3620),
+        OcrLine('BLEND', left: 713, top: 3630, right: 1033, bottom: 3670),
+        OcrLine('2026.07.24', left: 713, top: 3680, right: 1033, bottom: 3720),
+        OcrLine('60%', left: 713, top: 3730, right: 1033, bottom: 3770),
+        OcrLine(
+          'COCOA, BERRY, JASMINE',
+          left: 1541,
+          top: 3543,
+          right: 2401,
+          bottom: 3618,
+        ),
+      ]);
+
+      expect(d.cupNotes, ['COCOA', 'BERRY', 'JASMINE']);
+    });
     test('값 없으면 region null', () {
       final d = parseOcr(const [OcrLine('지역', left: 10, top: 100, right: 60, bottom: 130)]);
       expect(d.components, isEmpty);

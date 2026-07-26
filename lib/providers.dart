@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'data/bean_repository.dart';
 import 'data/database.dart';
@@ -45,6 +46,11 @@ final ocrPipelineProvider = Provider<OcrPipeline>(
     qualityAnalyzer: ref.watch(imageQualityAnalyzerProvider),
     preprocessor: ref.watch(ocrImagePreprocessorProvider),
   ),
+);
+final ocrDiagnosticsEnabledProvider = Provider<bool>(
+  (ref) =>
+      kDebugMode ||
+      const bool.fromEnvironment('ENABLE_OCR_DIAGNOSTICS'),
 );
 final ocrDiagnosticsServiceProvider = Provider<OcrDiagnosticsService>(
   (ref) => DefaultOcrDiagnosticsService(

@@ -76,6 +76,10 @@ ul.tasklist li.task.done::before{content:"\2713";background:var(--accent);color:
 <p>태그 <code class="ic">v1.2.3</code> → <code class="ic">--build-name=1.2.3</code>, <code class="ic">--build-number=&lt;github.run_number&gt;</code>.</p>
 <p>빌드 번호는 <strong>반드시 단조 증가</strong>해야 한다. TestFlight는 중복 번호를 거부하고, Android <code class="ic">versionCode</code>도 역행할 수 없다. <code class="ic">run_number</code>는 워크플로 실행마다 증가하므로 조건을 만족한다.</p>
 <blockquote>⚠️ <strong>함정:</strong> 실패한 워크플로를 <strong>re-run 하면 <code class="ic">run_number</code>가 유지</strong>된다 → TestFlight가 중복으로 거부한다. 실패했으면 re-run 하지 말고 <strong>태그를 올려서</strong>(<code class="ic">v0.0.2</code>) 다시 밀 것.</blockquote>
+<h3>OCR 개발자 진단 빌드</h3>
+<p><code class="ic">OCR 진단 복사</code>는 일반 release 빌드에서 숨긴다. 로컬 debug 빌드에서는 자동으로 표시되고, iPhone에서 다시 필요할 때만 GitHub Actions의 <strong>release → Run workflow</strong>를 수동 실행한다.</p>
+<ol><li>실행할 브랜치를 선택한다.</li><li><code class="ic">build_name</code>에 현재 앱 버전(예: <code class="ic">0.6.11</code>)을 입력한다.</li><li>완료 후 실행 결과의 Artifacts에서 <code class="ic">beanprofile-diagnostic-*</code>를 내려받는다.</li><li>압축 안의 미서명 IPA를 AltStore로 설치한다.</li></ol>
+<p>수동 실행은 <code class="ic">ENABLE_OCR_DIAGNOSTICS=true</code>를 전달하며 Artifact를 7일 보관한다. 일반 <code class="ic">v*</code> 태그 실행은 같은 플래그를 <code class="ic">false</code>로 고정하고 기존 GitHub Release만 만든다. 진단 IPA를 일반 릴리스 자산으로 게시하지 않는다.</p>
 <hr>
 <h2>3. 1회성 셋업 — Android (~10분)</h2>
 <blockquote>이 문서의 셸 명령은 <strong>Git Bash</strong>(Git for Windows 동봉) 기준이다. <code class="ic">keytool</code>은 JDK, <code class="ic">base64</code>/<code class="ic">openssl</code>은 Git Bash에 들어 있다. PowerShell에는 <code class="ic">base64</code>가 없으므로 Git Bash에서 실행할 것.</blockquote>

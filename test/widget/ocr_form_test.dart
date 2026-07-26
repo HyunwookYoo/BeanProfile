@@ -11,7 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../helpers.dart';
 
 void main() {
-  testWidgets('diagnostic button only appears for a photo OCR form', (t) async {
+  testWidgets('diagnostic button requires an enabled photo OCR form', (t) async {
     final db = testDatabase();
     addTearDown(db.close);
     t.view.physicalSize = const Size(2400, 4000);
@@ -25,13 +25,34 @@ void main() {
           photoTempPath: '/tmp/pick.jpg',
         ),
         db: db,
+        diagnosticsEnabled: false,
+      ),
+    );
+    await t.pump();
+
+    expect(find.byKey(const Key('copy-ocr-diagnostics')), findsNothing);
+
+    await t.pumpWidget(
+      wrapApp(
+        const BeanFormScreen(
+          draft: OcrDraft(chips: ['Brazil']),
+          photoTempPath: '/tmp/pick.jpg',
+        ),
+        db: db,
+        diagnosticsEnabled: true,
       ),
     );
     await t.pump();
 
     expect(find.byKey(const Key('copy-ocr-diagnostics')), findsOneWidget);
 
-    await t.pumpWidget(wrapApp(const BeanFormScreen(), db: db));
+    await t.pumpWidget(
+      wrapApp(
+        const BeanFormScreen(),
+        db: db,
+        diagnosticsEnabled: true,
+      ),
+    );
     await t.pump();
 
     expect(find.byKey(const Key('copy-ocr-diagnostics')), findsNothing);

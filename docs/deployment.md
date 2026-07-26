@@ -53,6 +53,21 @@ git tag v0.0.1 && git push origin v0.0.1
 > ⚠️ **함정:** 실패한 워크플로를 **re-run 하면 `run_number`가 유지**된다 → TestFlight가 중복으로 거부한다.
 > 실패했으면 re-run 하지 말고 **태그를 올려서**(`v0.0.2`) 다시 밀 것.
 
+### OCR 개발자 진단 빌드
+
+`OCR 진단 복사`는 일반 release 빌드에서 숨긴다. 로컬 debug 빌드에서는 자동으로
+표시되고, iPhone에서 다시 필요할 때만 GitHub Actions의 **release → Run workflow**를
+수동 실행한다.
+
+1. 실행할 브랜치를 선택한다.
+2. `build_name`에 현재 앱 버전(예: `0.6.11`)을 입력한다.
+3. 완료 후 실행 결과의 Artifacts에서 `beanprofile-diagnostic-*`를 내려받는다.
+4. 압축 안의 미서명 IPA를 AltStore로 설치한다.
+
+수동 실행은 `ENABLE_OCR_DIAGNOSTICS=true`를 전달하며 Artifact를 7일 보관한다.
+일반 `v*` 태그 실행은 같은 플래그를 `false`로 고정하고 기존 GitHub Release만 만든다.
+진단 IPA를 일반 릴리스 자산으로 게시하지 않는다.
+
 ---
 
 ## 3. 1회성 셋업 — Android (~10분)

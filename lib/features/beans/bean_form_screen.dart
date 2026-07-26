@@ -316,6 +316,7 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final diagnosticsEnabled = ref.watch(ocrDiagnosticsEnabledProvider);
     return Scaffold(
       appBar: AppBar(title: Text(widget.existing == null ? '원두 추가' : '원두 편집')),
       body: GestureDetector(
@@ -404,7 +405,9 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
             )
           else if (widget.draft!.chips.isNotEmpty)
             OcrChipsPanel(chips: widget.draft!.chips, used: _usedChips, onTap: _openAssignSheet),
-          if (_auto && widget.photoTempPath != null) ...[
+          if (diagnosticsEnabled &&
+              _auto &&
+              widget.photoTempPath != null) ...[
             const SizedBox(height: 10),
             OutlinedButton.icon(
               key: const Key('copy-ocr-diagnostics'),

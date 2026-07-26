@@ -28,10 +28,13 @@ Widget wrapApp(Widget child,
         OcrService? ocr,
         OcrPipeline? pipeline,
         OcrDiagnosticsService? diagnostics,
+        bool? diagnosticsEnabled,
         PhotoService? photo,
         BackupService? backup}) =>
     ProviderScope(
       overrides: [
+        if (diagnosticsEnabled != null)
+          ocrDiagnosticsEnabledProvider.overrideWithValue(diagnosticsEnabled),
         if (diagnostics != null)
           ocrDiagnosticsServiceProvider.overrideWithValue(diagnostics),
         if (db != null) databaseProvider.overrideWithValue(db),

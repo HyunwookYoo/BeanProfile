@@ -913,71 +913,124 @@ String? _spatialFieldValue(
   int ownerIndex,
   _ComponentField field,
 ) {
-  final labelPattern = _fieldLabel(field);
-  for (var labelIndex = 0; labelIndex < lines.length; labelIndex++) {
-    final label = lines[labelIndex];
-    final match = labelPattern.firstMatch(label.text.trim());
-    if (match == null) continue;
-    if (!_hasGeometry(label)) continue;
-    final inlineValue = label.text.trim().substring(match.end).trim();
-    if (inlineValue.isNotEmpty &&
-        _isFieldValue(inlineValue, field) &&
-        _ownerForLine(label, mentions, lines) == ownerIndex) {
-      return inlineValue;
-    }
-    final rowLabels = lines.where(
-      (other) =>
-          !identical(other, label) &&
-          _hasGeometry(other) &&
-          _sameVisualRow(label, other) &&
-          _isAnyFieldLabel(other.text),
-    );
-    var rightBoundary = double.infinity;
-    for (final other in rowLabels) {
-      if (other.left >= label.right && other.left < rightBoundary) {
-        rightBoundary = other.left;
-      }
-    }
-    for (final candidate in lines) {
-      if (identical(candidate, label) ||
-          !_hasGeometry(candidate) ||
-          !_sameVisualRow(label, candidate) ||
-          candidate.left < label.right ||
-          candidate.left >= rightBoundary ||
-          !_isFieldValue(candidate.text, field)) {
-        continue;
-      }
-      if (_ownerForLine(candidate, mentions, lines) == ownerIndex) {
-        return candidate.text.trim();
-      }
-    }
+  final ordered = _orderedRepeatedFieldValue(
+    lines,
+    mentions,
+    ownerIndex,
+    field,
+  );
+  if (ordered != null) return ordered;
 
-    var bottomBoundary = double.infinity;
-    for (final other in lines) {
-      if (identical(other, label) ||
-          !_hasGeometry(other) ||
-          !_isAnyFieldLabel(other.text) ||
-          other.top < label.bottom ||
-          !_sameVisualColumn(label, other)) {
-        continue;
-      }
-      if (other.top < bottomBoundary) bottomBoundary = other.top;
-    }
-    for (final candidate in lines) {
-      if (identical(candidate, label) ||
-          !_hasGeometry(candidate) ||
-          candidate.top < label.bottom ||
-          candidate.top >= bottomBoundary ||
-          !_sameVisualColumn(label, candidate) ||
-          !_isFieldValue(candidate.text, field)) {
-        continue;
-      }
-      if (_ownerForLine(candidate, mentions, lines) == ownerIndex) {
-        return candidate.text.trim();
+  final labelPattern = _fieldLabel(field);
+  for (final label in lines) {
+    if (labelPattern.firstMatch(label.text.trim()) == null) continue;
+    for (final value in _fieldValuesForLabel(lines, label, field)) {
+      if (_ownerForLine(value.ownerLine, mentions, lines) == ownerIndex) {
+        return value.text;
       }
     }
   }
   return null;
+}
+
+String? _orderedRepeatedFieldValue(
+  List<OcrLine> lines,
+  List<_CountryMention> mentions,
+  int ownerIndex,
+  _ComponentField field,
+) {
+  final layout = _repeatedLayout(mentions);
+  if (layout == null ||
+      mentions.any((mention) => !_hasGeometry(mention.line))) {
+    return null;
+  }
+
+  final entries = <({OcrLine label, OcrLine ownerLine, String text})>[];
+  final valueLines = <OcrLine>{};
+  final labelPattern = _fieldLabel(field);
+  for (final label in lines) {
+    if (labelPattern.firstMatch(label.text.trim()) == null) continue;
+    final values = _fieldValuesForLabel(lines, label, field);
+    if (values.length != 1) return null;
+    final value = values.single;
+    if (!valueLines.add(value.ownerLine)) return null;
+    entries.add((label: label, ownerLine: value.ownerLine, text: value.text));
+  }
+  if (entries.length != mentions.length) return null;
+
+  double axis(OcrLine line) =>
+      layout.horizontal ? (line.left + line.right) / 2 : line.centerY;
+  final orderedOwners = [
+    for (var i = 0; i < mentions.length; i++)
+      (index: i, line: mentions[i].line),
+  ]..sort((a, b) => axis(a.line).compareTo(axis(b.line)));
+  entries.sort((a, b) => axis(a.label).compareTo(axis(b.label)));
+
+  final position = orderedOwners.indexWhere(
+    (entry) => entry.index == ownerIndex,
+  );
+  return position < 0 ? null : entries[position].text;
+}
+
+List<({OcrLine ownerLine, String text})> _fieldValuesForLabel(
+  List<OcrLine> lines,
+  OcrLine label,
+  _ComponentField field,
+) {
+  if (!_hasGeometry(label)) return const [];
+  final match = _fieldLabel(field).firstMatch(label.text.trim());
+  if (match == null) return const [];
+  final inlineValue = label.text.trim().substring(match.end).trim();
+  if (inlineValue.isNotEmpty && _isFieldValue(inlineValue, field)) {
+    return [(ownerLine: label, text: inlineValue)];
+  }
+
+  final rowLabels = lines.where(
+    (other) =>
+        !identical(other, label) &&
+        _hasGeometry(other) &&
+        _sameVisualRow(label, other) &&
+        _isAnyFieldLabel(other.text),
+  );
+  var rightBoundary = double.infinity;
+  for (final other in rowLabels) {
+    if (other.left >= label.right && other.left < rightBoundary) {
+      rightBoundary = other.left;
+    }
+  }
+  final rowValues = [
+    for (final candidate in lines)
+      if (!identical(candidate, label) &&
+          _hasGeometry(candidate) &&
+          _sameVisualRow(label, candidate) &&
+          candidate.left >= label.right &&
+          candidate.left < rightBoundary &&
+          _isFieldValue(candidate.text, field))
+        (ownerLine: candidate, text: candidate.text.trim()),
+  ];
+  if (rowValues.isNotEmpty) return rowValues;
+
+  var bottomBoundary = double.infinity;
+  for (final other in lines) {
+    if (identical(other, label) ||
+        !_hasGeometry(other) ||
+        !_isAnyFieldLabel(other.text) ||
+        other.top < label.bottom ||
+        !_sameVisualColumn(label, other)) {
+      continue;
+    }
+    if (other.top < bottomBoundary) bottomBoundary = other.top;
+  }
+  return [
+    for (final candidate in lines)
+      if (!identical(candidate, label) &&
+          _hasGeometry(candidate) &&
+          candidate.top >= label.bottom &&
+          candidate.top < bottomBoundary &&
+          _sameVisualColumn(label, candidate) &&
+          _isFieldValue(candidate.text, field))
+        (ownerLine: candidate, text: candidate.text.trim()),
+  ];
 }
 
 bool _sameVisualRow(OcrLine a, OcrLine b) {

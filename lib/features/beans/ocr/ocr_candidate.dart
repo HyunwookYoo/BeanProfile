@@ -89,10 +89,7 @@ int compareOcrCandidates(OcrCandidate first, OcrCandidate second) {
 }
 
 OcrDraft mergeOcrCandidates(OcrCandidate primary, OcrCandidate secondary) {
-  final components =
-      secondary.countryComponentCount > primary.countryComponentCount
-      ? secondary.draft.components
-      : primary.draft.components;
+  final components = _mergeComponents(primary, secondary);
   final type = inferBeanType([
     ...primary.lines,
     ...secondary.lines,
@@ -119,3 +116,49 @@ OcrDraft mergeOcrCandidates(OcrCandidate primary, OcrCandidate secondary) {
 
 String? _preferNonEmpty(String? primary, String? secondary) =>
     primary == null || primary.trim().isEmpty ? secondary : primary;
+
+List<OcrComponentDraft> _mergeComponents(
+  OcrCandidate primary,
+  OcrCandidate secondary,
+) {
+  final useSecondary =
+      secondary.countryComponentCount > primary.countryComponentCount;
+  final base = useSecondary
+      ? secondary.draft.components
+      : primary.draft.components;
+  final fallback = useSecondary
+      ? primary.draft.components
+      : secondary.draft.components;
+  final usedFallbackIndexes = <int>{};
+  final merged = <OcrComponentDraft>[];
+
+  for (final component in base) {
+    final country = component.country;
+    int? matchIndex;
+    if (country != null) {
+      for (var i = 0; i < fallback.length; i++) {
+        if (!usedFallbackIndexes.contains(i) &&
+            fallback[i].country == country) {
+          matchIndex = i;
+          break;
+        }
+      }
+    }
+    if (matchIndex == null) {
+      merged.add(component);
+      continue;
+    }
+
+    usedFallbackIndexes.add(matchIndex);
+    final other = fallback[matchIndex];
+    merged.add(
+      OcrComponentDraft(
+        country: _preferNonEmpty(component.country, other.country),
+        region: _preferNonEmpty(component.region, other.region),
+        process: component.process ?? other.process,
+        ratioPercent: component.ratioPercent ?? other.ratioPercent,
+      ),
+    );
+  }
+  return merged;
+}

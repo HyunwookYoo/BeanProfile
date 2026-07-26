@@ -1,3 +1,4 @@
+import 'package:beanprofile/data/enums.dart';
 import 'package:beanprofile/features/beans/ocr/ocr_candidate.dart';
 import 'package:beanprofile/features/beans/ocr/ocr_draft.dart';
 import 'package:beanprofile/features/beans/ocr/ocr_pipeline.dart';
@@ -63,6 +64,57 @@ void main() {
       expect(preprocessor.enhanceCalls, 1);
       expect(preprocessor.deleted, ['/tmp/enhanced.png']);
       expect(result.usedEnhanced, isTrue);
+    },
+  );
+
+  test(
+    'low contrast merges complementary fields for matching components',
+    () async {
+      final pipeline = DefaultOcrPipeline(
+        ocr: QueueOcrService([
+          [
+            const OcrLine('Name: House Blend', confidence: .9),
+            const OcrLine('Roaster: BeanProfile Lab', confidence: .9),
+            const OcrLine('Roast date: 2026.07.24', confidence: .9),
+            const OcrLine('MEDIUM', confidence: .9),
+            const OcrLine('Brazil 60%', confidence: .9),
+            const OcrLine('Cerrado', confidence: .9),
+            const OcrLine('Ethiopia 40%', confidence: .9),
+          ],
+          [
+            const OcrLine('Name: House Blend', confidence: .9),
+            const OcrLine('Brazil 60%', confidence: .9),
+            const OcrLine('Natural', confidence: .9),
+            const OcrLine('Ethiopia 40%', confidence: .9),
+            const OcrLine('Guji', confidence: .9),
+            const OcrLine('Washed', confidence: .9),
+          ],
+        ]),
+        qualityAnalyzer: FakeQualityAnalyzer(
+          const ImageQualityReport({ImageQualityIssue.lowContrast}),
+        ),
+        preprocessor: FakePreprocessor('/tmp/enhanced.png'),
+      );
+
+      final result = await pipeline.analyze('/tmp/original.jpg');
+
+      expect(result.usedEnhanced, isFalse);
+      expect(result.draft.components, [
+        isA<OcrComponentDraft>()
+            .having((component) => component.country, 'country', 'Brazil')
+            .having((component) => component.region, 'region', 'Cerrado')
+            .having(
+              (component) => component.process,
+              'process',
+              Process.natural,
+            )
+            .having((component) => component.ratioPercent, 'ratio', 60),
+        isA<OcrComponentDraft>()
+            .having((component) => component.country, 'country', 'Ethiopia')
+            .having((component) => component.region, 'region', 'Guji')
+            .having((component) => component.process, 'process', Process.washed)
+            .having((component) => component.ratioPercent, 'ratio', 40),
+      ]);
     },
   );
 

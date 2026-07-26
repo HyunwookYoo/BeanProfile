@@ -178,6 +178,66 @@ void main() {
     expect(merged.chips, ['Shared', 'Primary', 'Secondary']);
   });
 
+  test('merge fills matching component blanks from the other candidate', () {
+    final merged = mergeOcrCandidates(
+      candidate(
+        draft: const OcrDraft(
+          components: [
+            OcrComponentDraft(
+              country: 'Brazil',
+              region: 'Cerrado',
+              ratioPercent: 60,
+            ),
+            OcrComponentDraft(country: 'Ethiopia', ratioPercent: 40),
+          ],
+          chips: ['BRAZIL', '60%', 'ETHIOPIA', '40%'],
+        ),
+        fromEnhanced: false,
+      ),
+      candidate(
+        draft: const OcrDraft(
+          components: [
+            OcrComponentDraft(
+              country: 'Brazil',
+              region: 'Conflicting region',
+              process: Process.natural,
+              ratioPercent: 55,
+            ),
+            OcrComponentDraft(
+              country: 'Ethiopia',
+              region: 'Guji',
+              process: Process.washed,
+              ratioPercent: 45,
+            ),
+          ],
+          chips: ['NATURAL', 'GUJI', 'WASHED'],
+        ),
+      ),
+    );
+
+    expect(merged.components, [
+      isA<OcrComponentDraft>()
+          .having((component) => component.country, 'country', 'Brazil')
+          .having((component) => component.region, 'region', 'Cerrado')
+          .having((component) => component.process, 'process', Process.natural)
+          .having((component) => component.ratioPercent, 'ratio', 60),
+      isA<OcrComponentDraft>()
+          .having((component) => component.country, 'country', 'Ethiopia')
+          .having((component) => component.region, 'region', 'Guji')
+          .having((component) => component.process, 'process', Process.washed)
+          .having((component) => component.ratioPercent, 'ratio', 40),
+    ]);
+    expect(merged.chips, [
+      'BRAZIL',
+      '60%',
+      'ETHIOPIA',
+      '40%',
+      'NATURAL',
+      'GUJI',
+      'WASHED',
+    ]);
+  });
+
   test(
     'merge recomputes type metadata from both candidates and components',
     () {

@@ -537,6 +537,30 @@ void main() {
     ]);
   });
 
+  test('repeated labeled rows map by layout order over anchor proximity', () {
+    final components = parseOcrComponents(const [
+      OcrLine('BRAZIL 60%', left: 600, top: 80, right: 900, bottom: 120),
+      OcrLine('ETHIOPIA 40%', left: 600, top: 980, right: 960, bottom: 1020),
+      OcrLine('지역', left: 1400, top: 180, right: 1480, bottom: 220),
+      OcrLine('CERRADO', left: 1600, top: 180, right: 1800, bottom: 220),
+      OcrLine('지역', left: 1400, top: 380, right: 1480, bottom: 420),
+      OcrLine('GUJI', left: 1600, top: 380, right: 1720, bottom: 420),
+      OcrLine('가공', left: 1400, top: 580, right: 1480, bottom: 620),
+      OcrLine('NATURAL', left: 1600, top: 580, right: 1800, bottom: 620),
+      OcrLine('가공', left: 1400, top: 680, right: 1480, bottom: 720),
+      OcrLine('WASHED', left: 1600, top: 680, right: 1780, bottom: 720),
+    ]);
+
+    expect(components.map((component) => component.region), [
+      'CERRADO',
+      'GUJI',
+    ]);
+    expect(components.map((component) => component.process), [
+      Process.natural,
+      Process.washed,
+    ]);
+  });
+
   test('unlabeled percentages stay in their repeated country columns', () {
     final components = parseOcrComponents(const [
       OcrLine('Brazil', left: 100, top: 100, right: 180, bottom: 130),

@@ -118,7 +118,7 @@ int _dayDiff(DateTime roast, DateTime tasting) =>
 
 **계산값이 항상 이긴다.** 수동 입력값이 저장된 시음에 나중에 로스팅 날짜가 채워지면, 화면은 계산값으로 바뀌고 저장된 숫자는 쓰이지 않는다. 지우지는 않는다 — 로스팅 날짜를 다시 비우면 그대로 돌아오고, 유지하는 데 코드가 들지 않는다.
 
-상한은 두지 않는다. 128일도 사용자가 실제로 그렇게 마신 기록이다.
+**표시에는 상한이 없다.** 128일이든 400일이든 계산된 그대로 보여준다 — 사용자가 실제로 그렇게 마신 기록이다. (입력칸의 세 자리 제한은 §3.3의 별개 이야기로, 오타를 줄이려는 위젯 제약이지 값의 상한 규칙이 아니다.)
 
 ### 3.3 UI
 
@@ -176,6 +176,7 @@ if (root is! Map || root['schemaVersion'] != _schemaVersion) {
 - `lib/features/tasting/tasting_form_screen.dart` — `roastDate` 파라미터 + 디개싱 줄
 - `lib/features/beans/bean_detail_screen.dart` — 호출부 2곳 + `_tastingRow` 알약
 - `test/widget/tasting_form_test.dart` · `tasting_edit_test.dart` · `keyboard_dismiss_test.dart` — `roastDate: null` 추가
+- `test/widget/bean_detail_test.dart` — 시음 카드 알약 케이스 추가
 - `test/unit/backup_codec_test.dart` — 옛 백업 디코드 케이스 추가
 - `docs/mockups/degassing-days.html` — 목업
 
@@ -207,9 +208,9 @@ v1 스키마를 raw SQL로 만들고 원두+시음을 넣은 뒤 `AppDatabase`�
 - `roastDate` 없음 → 입력칸 있음, 값 넣고 저장 → 다시 열면 남아 있다
 - 입력칸에 문자·음수를 넣어도 들어가지 않는다
 
-### 위젯 — 시음 카드
+### 위젯 — `test/widget/bean_detail_test.dart` (추가)
 
-알약이 뜨는 시음과 뜨지 않는 시음이 한 목록에 같이 있을 때 각각 맞게 그려지는지. `warn` 케이스도 별도로.
+알약이 뜨는 시음과 뜨지 않는 시음이 **한 목록에 같이 있을 때** 각각 맞게 그려지는지. `warn` 케이스도 별도로.
 
 ### 비회귀
 

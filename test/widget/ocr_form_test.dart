@@ -786,6 +786,78 @@ void main() {
 
     expect(find.text('자몽, 초콜릿'), findsOneWidget);
   });
+
+  testWidgets('병합 칩의 ✕를 누르면 원래 칩들로 나뉜다', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    t.view.physicalSize = const Size(2400, 4000);
+    t.view.devicePixelRatio = 3.0;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(wrapApp(
+      const BeanFormScreen(draft: OcrDraft(chips: ['에티오피아', '구지'])),
+      db: db,
+    ));
+    await t.pump();
+
+    await dragChipOnto(t, '에티오피아', '구지'); // 일부러 거꾸로: 구지 · 에티오피아
+    expect(find.byKey(const Key('chip-구지 · 에티오피아')), findsOneWidget);
+
+    await t.tap(find.descendant(
+      of: find.byKey(const Key('chip-구지 · 에티오피아')),
+      matching: find.byIcon(Icons.close),
+    ));
+    await t.pumpAndSettle();
+
+    expect(find.byKey(const Key('chip-구지 · 에티오피아')), findsNothing);
+    expect(find.byKey(const Key('chip-구지')), findsOneWidget);
+    expect(find.byKey(const Key('chip-에티오피아')), findsOneWidget);
+  });
+
+  testWidgets('배정된 칩은 드롭 대상이 되지 않는다', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    t.view.physicalSize = const Size(2400, 4000);
+    t.view.devicePixelRatio = 3.0;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(wrapApp(
+      const BeanFormScreen(draft: OcrDraft(chips: ['에티오피아', '구지'])),
+      db: db,
+    ));
+    await t.pump();
+
+    await t.tap(find.byKey(const Key('chip-에티오피아')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const Key('assign-지역')));
+    await t.pumpAndSettle();
+
+    await dragChipOnto(t, '구지', '에티오피아');
+
+    expect(find.byKey(const Key('chip-에티오피아 · 구지')), findsNothing);
+    expect(find.byKey(const Key('chip-구지')), findsOneWidget);
+  });
+
+  testWidgets('배정된 칩은 끌 수 없다', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    t.view.physicalSize = const Size(2400, 4000);
+    t.view.devicePixelRatio = 3.0;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(wrapApp(
+      const BeanFormScreen(draft: OcrDraft(chips: ['에티오피아', '구지'])),
+      db: db,
+    ));
+    await t.pump();
+
+    await t.tap(find.byKey(const Key('chip-에티오피아')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const Key('assign-지역')));
+    await t.pumpAndSettle();
+
+    await dragChipOnto(t, '에티오피아', '구지'); // 배정된 칩을 끌어본다
+
+    expect(find.byKey(const Key('chip-구지 · 에티오피아')), findsNothing);
+    expect(find.byKey(const Key('chip-에티오피아')), findsOneWidget);
+  });
 }
 
 class FakeDiagnosticsService implements OcrDiagnosticsService {

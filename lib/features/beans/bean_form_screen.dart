@@ -198,6 +198,13 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
           ..addAll(next);
       });
 
+  void _splitChips(int index) => setState(() {
+        final next = splitChip(_chips, index);
+        _chips
+          ..clear()
+          ..addAll(next);
+      });
+
   bool get _auto => widget.existing == null && widget.draft != null;
 
   Future<void> _copyOcrDiagnostics() async {
@@ -416,7 +423,12 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
                   style: TextStyle(fontSize: 12, color: c.espresso)),
             )
           else if (_chips.isNotEmpty)
-            OcrChipsPanel(chips: _chips, onTap: _openAssignSheet, onMerge: _mergeChips),
+            OcrChipsPanel(
+              chips: _chips,
+              onTap: _openAssignSheet,
+              onMerge: _mergeChips,
+              onSplit: _splitChips,
+            ),
           if (diagnosticsEnabled &&
               _auto &&
               widget.photoTempPath != null) ...[

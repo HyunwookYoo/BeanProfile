@@ -10,12 +10,16 @@ class OcrChipsPanel extends StatelessWidget {
     required this.chips,
     required this.onTap,
     required this.onMerge,
+    required this.onSplit,
   });
   final List<OcrChip> chips;
   final void Function(int index) onTap;
 
   /// 떨군 칩(`target`) 뒤에 끌어온 칩(`source`)을 붙인다.
   final void Function(int target, int source) onMerge;
+
+  /// 병합 칩을 조각들로 되돌린다.
+  final void Function(int index) onSplit;
 
   @override
   Widget build(BuildContext context) {
@@ -39,6 +43,8 @@ class OcrChipsPanel extends StatelessWidget {
 
   /// 칩 하나 = 끌 수 있으면서 동시에 받을 수 있는 자리.
   Widget _slot(BuildContext context, int index) {
+    // 배정된 칩은 조작 대상이 아니다 — 끌 수도, 받을 수도 없다.
+    if (chips[index].used) return _chip(context, index, key: _keyOf(index));
     return DragTarget<int>(
       onWillAcceptWithDetails: (d) => d.data != index,
       onAcceptWithDetails: (d) => onMerge(index, d.data),
@@ -65,12 +71,25 @@ class OcrChipsPanel extends StatelessWidget {
   Widget _chip(BuildContext context, int index, {Key? key, bool highlighted = false}) {
     final c = context.colors;
     final chip = chips[index];
+    final border = highlighted ? BorderSide(color: c.cremaInk, width: 2) : null;
+    // 배정된 칩은 병합 칩이어도 ✕ 없이 흐린 ActionChip이다(조작 대상 아님).
+    if (chip.isMerged && !chip.used) {
+      return InputChip(
+        key: key,
+        label: Text(chip.label),
+        onPressed: () => onTap(index),
+        backgroundColor: c.crema,
+        side: border,
+        deleteIcon: const Icon(Icons.close, size: 18),
+        onDeleted: () => onSplit(index),
+      );
+    }
     return ActionChip(
       key: key,
       label: Text(chip.label),
       onPressed: chip.used ? null : () => onTap(index),
       backgroundColor: chip.used ? c.oat : c.crema,
-      side: highlighted ? BorderSide(color: c.cremaInk, width: 2) : null,
+      side: border,
     );
   }
 }

@@ -5,7 +5,11 @@ import '../../providers.dart';
 import '../../services/backup_service.dart';
 import '../../theme.dart';
 
-const kAppVersion = 'v0.6.0';
+// 릴리스 CI가 태그(`v1.2.3` → `1.2.3`)를 `--dart-define=APP_VERSION`으로 주입한다.
+// 주입이 없는 로컬 빌드는 'dev'. 손으로 올리는 상수였을 때 릴리스마다 잊어버려
+// v0.6.1~v0.6.12가 전부 'v0.6.0'으로 표시됐다.
+const _buildName = String.fromEnvironment('APP_VERSION');
+const kAppVersion = _buildName.length == 0 ? 'dev' : 'v$_buildName';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});

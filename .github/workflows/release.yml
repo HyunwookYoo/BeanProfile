@@ -58,6 +58,7 @@ jobs:
           flutter build ios --release --no-codesign \
             --build-name="$BUILD_NAME" \
             --build-number="${{ github.run_number }}" \
+            --dart-define=APP_VERSION="$BUILD_NAME" \
             --dart-define=ENABLE_OCR_DIAGNOSTICS="$OCR_DIAGNOSTICS"
       - name: Package unsigned .ipa
         run: |

@@ -5,6 +5,18 @@ import 'package:flutter_test/flutter_test.dart';
 import '../helpers.dart';
 
 void main() {
+  testWidgets('버전은 빌드에 주입된 값을 표시한다', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    await t.pumpWidget(wrapApp(const SettingsScreen(), db: db, backup: FakeBackupService()));
+
+    // 테스트는 --dart-define 없이 돌므로 폴백이 보여야 한다. 태그 문자열을
+    // 상수/위젯에 하드코딩하면(릴리스마다 손으로 올려야 해서 v0.6.1~v0.6.12를
+    // 놓쳤던 원인) 이 기대가 깨진다.
+    expect(kAppVersion, 'dev');
+    expect(find.text('dev'), findsOneWidget);
+  });
+
   testWidgets('내보내기 탭 → 서비스가 호출된다', (t) async {
     final db = testDatabase();
     addTearDown(db.close);

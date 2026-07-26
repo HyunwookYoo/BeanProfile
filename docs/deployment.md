@@ -53,6 +53,15 @@ git tag v0.0.1 && git push origin v0.0.1
 > ⚠️ **함정:** 실패한 워크플로를 **re-run 하면 `run_number`가 유지**된다 → TestFlight가 중복으로 거부한다.
 > 실패했으면 re-run 하지 말고 **태그를 올려서**(`v0.0.2`) 다시 밀 것.
 
+설정 화면의 버전 표시도 **같은 `BUILD_NAME`에서 나온다** — 워크플로가
+`--dart-define=APP_VERSION="$BUILD_NAME"`으로 주입하고, `kAppVersion`이
+`String.fromEnvironment`로 읽는다. 릴리스 때 **손으로 올릴 상수는 없다.**
+주입이 없는 로컬 빌드는 `dev`로 표시된다.
+
+> M5는 `package_info_plus`를 피하려고 버전을 손으로 관리하는 상수로 뒀는데,
+> 태그와 아무 연결이 없어 `v0.6.1`~`v0.6.12`가 **12번 연속** `v0.6.0`으로 표시됐다.
+> 사람이 기억해야 하는 릴리스 단계는 만들지 않는다.
+
 ### OCR 개발자 진단 빌드
 
 `OCR 진단 복사`는 일반 release 빌드에서 숨긴다. 로컬 debug 빌드에서는 자동으로

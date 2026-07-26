@@ -482,16 +482,53 @@ void main() {
   test('vertical component rows recover a distant metadata column', () {
     final components = parseOcrComponents(const [
       OcrLine('BRAZIL 60%', left: 600, top: 600, right: 860, bottom: 680),
+      OcrLine('ETHIOPIA 40%', left: 600, top: 1500, right: 900, bottom: 1580),
       OcrLine('지역', left: 1400, top: 520, right: 1480, bottom: 560),
       OcrLine('CERRADO', left: 1600, top: 520, right: 1800, bottom: 570),
       OcrLine('NATURAL', left: 1600, top: 720, right: 1800, bottom: 770),
-      OcrLine('ETHIOPIA 40%', left: 600, top: 1080, right: 900, bottom: 1160),
-      OcrLine('GUJI', left: 1600, top: 980, right: 1720, bottom: 1030),
-      OcrLine('WASHED', left: 1600, top: 1190, right: 1780, bottom: 1240),
+      OcrLine('GUJI', left: 1600, top: 1400, right: 1720, bottom: 1450),
+      OcrLine('WASHED', left: 1600, top: 1610, right: 1780, bottom: 1660),
     ]);
 
     expect(components.map((component) => component.region), [
       'CERRADO',
+      'GUJI',
+    ]);
+    expect(components.map((component) => component.process), [
+      Process.natural,
+      Process.washed,
+    ]);
+  });
+
+  test('photographed C card uses standalone ratios as component evidence', () {
+    final components = parseOcrComponents(const [
+      OcrLine('ORIGIN @1 : 구', left: 870, top: 1604, right: 1217, bottom: 1650),
+      OcrLine('성 1', left: 872, top: 1663, right: 972, bottom: 1704),
+      OcrLine('성 2', left: 878, top: 2555, right: 980, bottom: 2600),
+      OcrLine('ORIGIN e2구', left: 889, top: 2505, right: 1226, bottom: 2547),
+      OcrLine('BRAZIL', left: 1361, top: 1544, right: 1696, bottom: 1646),
+      OcrLine('60%', left: 1371, top: 1700, right: 1488, bottom: 1767),
+      OcrLine('ETHIOPIA', left: 1368, top: 2445, right: 1789, bottom: 2550),
+      OcrLine('40%', left: 1367, top: 2600, right: 1488, bottom: 2659),
+      OcrLine('지역', left: 2143, top: 1272, right: 2222, bottom: 1311),
+      OcrLine('가공', left: 2138, top: 1739, right: 2219, bottom: 1777),
+      OcrLine('지역', left: 2132, top: 2193, right: 2210, bottom: 2232),
+      OcrLine('가공', left: 2121, top: 2642, right: 2200, bottom: 2682),
+      OcrLine('BLEND', left: 2625, top: 535, right: 2816, bottom: 580),
+      OcrLine('CERRAD0', left: 2475, top: 1259, right: 2718, bottom: 1307),
+      OcrLine('NATURAL', left: 2466, top: 1727, right: 2699, bottom: 1774),
+      OcrLine('GUJI', left: 2457, top: 2180, right: 2563, bottom: 2230),
+      OcrLine('WASHED', left: 2447, top: 2635, right: 2656, bottom: 2686),
+    ]);
+
+    expect(components, hasLength(2));
+    expect(components.map((component) => component.country), [
+      'Brazil',
+      'Ethiopia',
+    ]);
+    expect(components.map((component) => component.ratioPercent), [60, 40]);
+    expect(components.map((component) => component.region), [
+      'CERRAD0',
       'GUJI',
     ]);
     expect(components.map((component) => component.process), [

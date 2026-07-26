@@ -268,10 +268,56 @@ bool _hasComponentEvidence(
   List<OcrLine> lines,
 ) =>
     mention.ratio != null ||
+    _nearbyStandaloneRatio(mention, mentions, lines) != null ||
     _isStructuredInlineGroup(mention, mentions) ||
     _hasRepeatedTopology(mention, mentions, lines) ||
     _hasLocalComponentLabel(mention, lines) ||
     _hasLocalLabeledRatio(mention, mentions, lines);
+
+int? _nearbyStandaloneRatio(
+  _CountryMention mention,
+  List<_CountryMention> mentions,
+  List<OcrLine> lines,
+) {
+  if (!_hasGeometry(mention.line)) return null;
+  final ownerIndex = mentions.indexOf(mention);
+  for (final line in lines) {
+    final ratio = _standaloneRatioValue(line.text);
+    if (ratio == null ||
+        !_hasGeometry(line) ||
+        _ownerForLine(line, mentions) != ownerIndex ||
+        !_isNearCountryAnchor(mention.line, line)) {
+      continue;
+    }
+    return ratio;
+  }
+  return null;
+}
+
+int? _standaloneRatioValue(String text) {
+  final match = ratioPattern.firstMatch(text);
+  if (match == null) return null;
+  final remainder = text
+      .replaceRange(match.start, match.end, ' ')
+      .replaceAll(RegExp(r'[\s:/|·,;：\-–—]+'), '');
+  return remainder.isEmpty ? int.parse(match.group(1)!) : null;
+}
+
+bool _isNearCountryAnchor(OcrLine country, OcrLine value) {
+  final height = country.height > value.height ? country.height : value.height;
+  final scale = height > 20 ? height : 20.0;
+  final horizontalOverlap =
+      (country.right < value.right ? country.right : value.right) -
+      (country.left > value.left ? country.left : value.left);
+  final below =
+      value.centerY >= country.centerY &&
+      value.centerY - country.centerY <= 2.5 * scale;
+  final right =
+      _sameVisualRow(country, value) &&
+      value.left >= country.right &&
+      value.left - country.right <= 4 * scale;
+  return (horizontalOverlap > 0 && below) || right;
+}
 
 bool _isStructuredInlineGroup(
   _CountryMention mention,
@@ -639,6 +685,7 @@ OcrComponentDraft _componentFor(
     index,
     _ComponentField.ratio,
   );
+  final nearbyRatio = _nearbyStandaloneRatio(mention, mentions, lines);
   final unlabeled = _unlabeledSpatialFields(lines, mentions, index);
   final useSequentialFields = hasLocalSection || !unlabeled.hasLayout;
   final useSequentialRegion =
@@ -656,6 +703,7 @@ OcrComponentDraft _componentFor(
         : _labeledProcessValue(spatialProcess),
     ratioPercent:
         mention.ratio ??
+        nearbyRatio ??
         (spatialRatio == null
             ? unlabeled.ratioPercent ??
                   (useSequentialFields ? sequentialRatio : null)
@@ -720,15 +768,7 @@ _unlabeledSpatialFields(
 
 _RepeatedLayout? _repeatedLayout(List<_CountryMention> mentions) {
   final geometric = mentions.where((mention) => _hasGeometry(mention.line));
-  if (geometric.length < 2 ||
-      !geometric.any(
-        (mention) => geometric.any(
-          (other) =>
-              !identical(mention, other) && _anchorsRepeat(mention, other),
-        ),
-      )) {
-    return null;
-  }
+  if (geometric.length < 2) return null;
   final xs = geometric.map(
     (mention) => (mention.line.left + mention.line.right) / 2,
   );

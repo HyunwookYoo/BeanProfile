@@ -1,6 +1,7 @@
 import 'package:beanprofile/data/bean_repository.dart';
 import 'package:beanprofile/data/database.dart';
 import 'package:beanprofile/data/enums.dart';
+import 'package:beanprofile/features/beans/ocr/ocr_diagnostics.dart';
 import 'package:beanprofile/features/beans/ocr/ocr_pipeline.dart';
 import 'package:beanprofile/providers.dart';
 import 'package:beanprofile/services/backup_service.dart';
@@ -26,10 +27,13 @@ Widget wrapApp(Widget child,
         {AppDatabase? db,
         OcrService? ocr,
         OcrPipeline? pipeline,
+        OcrDiagnosticsService? diagnostics,
         PhotoService? photo,
         BackupService? backup}) =>
     ProviderScope(
       overrides: [
+        if (diagnostics != null)
+          ocrDiagnosticsServiceProvider.overrideWithValue(diagnostics),
         if (db != null) databaseProvider.overrideWithValue(db),
         if (ocr != null) ocrServiceProvider.overrideWithValue(ocr),
         if (pipeline != null) ocrPipelineProvider.overrideWithValue(pipeline),

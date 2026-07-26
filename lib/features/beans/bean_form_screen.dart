@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import '../../data/enums.dart';
 import '../../data/models.dart';
 import '../../providers.dart';
@@ -51,6 +52,7 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
   DateTime? _roastDate;
   final _components = [_ComponentDraft()];
   bool _saving = false;
+  bool _copyingDiagnostics = false;
   bool _typeFromOcr = false;
   final _usedChips = <String>{};
 
@@ -185,6 +187,27 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
   }
 
   bool get _auto => widget.existing == null && widget.draft != null;
+
+  Future<void> _copyOcrDiagnostics() async {
+    final path = widget.photoTempPath;
+    if (path == null || _copyingDiagnostics) return;
+    setState(() => _copyingDiagnostics = true);
+    try {
+      final text = await ref.read(ocrDiagnosticsServiceProvider).collect(path);
+      await Clipboard.setData(ClipboardData(text: text));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('OCR 진단 정보가 복사됐어요')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('OCR 진단 정보를 만들지 못했어요')),
+      );
+    } finally {
+      if (mounted) setState(() => _copyingDiagnostics = false);
+    }
+  }
 
   Future<void> _changeType(BeanType next) async {
     if (next == _type) return;
@@ -381,6 +404,22 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
             )
           else if (widget.draft!.chips.isNotEmpty)
             OcrChipsPanel(chips: widget.draft!.chips, used: _usedChips, onTap: _openAssignSheet),
+          if (_auto && widget.photoTempPath != null) ...[
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              key: const Key('copy-ocr-diagnostics'),
+              onPressed: _copyingDiagnostics ? null : _copyOcrDiagnostics,
+              icon: _copyingDiagnostics
+                  ? const SizedBox.square(
+                      dimension: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.content_copy_outlined),
+              label: Text(
+                _copyingDiagnostics ? '진단 정보 생성 중…' : 'OCR 진단 복사',
+              ),
+            ),
+          ],
         ],
           ],
         ),

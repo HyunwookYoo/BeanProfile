@@ -1,12 +1,225 @@
+import 'dart:async';
+
 import 'package:beanprofile/data/enums.dart';
 import 'package:beanprofile/features/beans/bean_form_screen.dart';
+import 'package:beanprofile/features/beans/ocr/ocr_diagnostics.dart';
 import 'package:beanprofile/features/beans/ocr/ocr_draft.dart';
 import 'package:beanprofile/features/beans/widgets/ocr_chips_panel.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import '../helpers.dart';
 
 void main() {
+  testWidgets('diagnostic button only appears for a photo OCR form', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    t.view.physicalSize = const Size(2400, 4000);
+    t.view.devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+
+    await t.pumpWidget(
+      wrapApp(
+        const BeanFormScreen(
+          draft: OcrDraft(chips: ['Brazil']),
+          photoTempPath: '/tmp/pick.jpg',
+        ),
+        db: db,
+      ),
+    );
+    await t.pump();
+
+    expect(find.byKey(const Key('copy-ocr-diagnostics')), findsOneWidget);
+
+    await t.pumpWidget(wrapApp(const BeanFormScreen(), db: db));
+    await t.pump();
+
+    expect(find.byKey(const Key('copy-ocr-diagnostics')), findsNothing);
+  });
+
+  testWidgets('diagnostic button copies the report and shows success', (
+    t,
+  ) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    final diagnostics = FakeDiagnosticsService();
+    t.view.physicalSize = const Size(2400, 4000);
+    t.view.devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    String? copied;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+          if (call.method == 'Clipboard.setData') {
+            copied = (call.arguments as Map)['text'] as String?;
+          }
+          return null;
+        });
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, null);
+    });
+
+    await t.pumpWidget(
+      wrapApp(
+        const BeanFormScreen(
+          draft: OcrDraft(chips: ['Brazil']),
+          photoTempPath: '/tmp/pick.jpg',
+        ),
+        db: db,
+        diagnostics: diagnostics,
+      ),
+    );
+    await t.pump();
+
+    await t.tap(find.byKey(const Key('copy-ocr-diagnostics')));
+    await t.pump();
+    await t.pump(const Duration(milliseconds: 300));
+
+    expect(diagnostics.paths, ['/tmp/pick.jpg']);
+    expect(copied, 'diagnostic text');
+    expect(find.text('OCR 진단 정보가 복사됐어요'), findsOneWidget);
+  });
+
+  testWidgets('diagnostic collection blocks duplicate taps while running', (
+    t,
+  ) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    final diagnostics = FakeDiagnosticsService()
+      ..pending = Completer<String>();
+    t.view.physicalSize = const Size(2400, 4000);
+    t.view.devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, (_) async => null);
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, null);
+    });
+    await t.pumpWidget(
+      wrapApp(
+        const BeanFormScreen(
+          draft: OcrDraft(chips: ['Brazil']),
+          photoTempPath: '/tmp/pick.jpg',
+        ),
+        db: db,
+        diagnostics: diagnostics,
+      ),
+    );
+    await t.pump();
+
+    await t.tap(find.byKey(const Key('copy-ocr-diagnostics')));
+    await t.pump();
+
+    expect(diagnostics.paths, ['/tmp/pick.jpg']);
+    expect(find.text('진단 정보 생성 중…'), findsOneWidget);
+    expect(
+      t
+          .widget<OutlinedButton>(
+            find.byKey(const Key('copy-ocr-diagnostics')),
+          )
+          .onPressed,
+      isNull,
+    );
+
+    await t.tap(find.byKey(const Key('copy-ocr-diagnostics')));
+    expect(diagnostics.paths, ['/tmp/pick.jpg']);
+
+    diagnostics.pending!.complete('diagnostic text');
+    await t.pump();
+    await t.pump(const Duration(milliseconds: 300));
+
+    expect(
+      t
+          .widget<OutlinedButton>(
+            find.byKey(const Key('copy-ocr-diagnostics')),
+          )
+          .onPressed,
+      isNotNull,
+    );
+  });
+
+  testWidgets('diagnostic service failure shows an error and allows retry', (
+    t,
+  ) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    final diagnostics = FakeDiagnosticsService(error: StateError('failed'));
+    t.view.physicalSize = const Size(2400, 4000);
+    t.view.devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(
+      wrapApp(
+        const BeanFormScreen(
+          draft: OcrDraft(chips: ['Brazil']),
+          photoTempPath: '/tmp/pick.jpg',
+        ),
+        db: db,
+        diagnostics: diagnostics,
+      ),
+    );
+    await t.pump();
+
+    await t.tap(find.byKey(const Key('copy-ocr-diagnostics')));
+    await t.pump();
+    await t.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('OCR 진단 정보를 만들지 못했어요'), findsOneWidget);
+    expect(
+      t
+          .widget<OutlinedButton>(
+            find.byKey(const Key('copy-ocr-diagnostics')),
+          )
+          .onPressed,
+      isNotNull,
+    );
+  });
+
+  testWidgets('clipboard failure shows an error and allows retry', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    final diagnostics = FakeDiagnosticsService();
+    t.view.physicalSize = const Size(2400, 4000);
+    t.view.devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+          if (call.method == 'Clipboard.setData') {
+            throw PlatformException(code: 'clipboard-failed');
+          }
+          return null;
+        });
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, null);
+    });
+    await t.pumpWidget(
+      wrapApp(
+        const BeanFormScreen(
+          draft: OcrDraft(chips: ['Brazil']),
+          photoTempPath: '/tmp/pick.jpg',
+        ),
+        db: db,
+        diagnostics: diagnostics,
+      ),
+    );
+    await t.pump();
+
+    await t.tap(find.byKey(const Key('copy-ocr-diagnostics')));
+    await t.pump();
+    await t.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('OCR 진단 정보를 만들지 못했어요'), findsOneWidget);
+    expect(
+      t
+          .widget<OutlinedButton>(
+            find.byKey(const Key('copy-ocr-diagnostics')),
+          )
+          .onPressed,
+      isNotNull,
+    );
+  });
+
   testWidgets('certain OCR type, process, and ratio show field provenance',
       (t) async {
     final db = testDatabase();
@@ -458,4 +671,20 @@ void main() {
       expect(processTop, regionTop);
     });
   });
+}
+
+class FakeDiagnosticsService implements OcrDiagnosticsService {
+  FakeDiagnosticsService({this.result = 'diagnostic text', this.error});
+
+  final String result;
+  final Object? error;
+  final paths = <String>[];
+  Completer<String>? pending;
+
+  @override
+  Future<String> collect(String imagePath) {
+    paths.add(imagePath);
+    if (error != null) return Future<String>.error(error!);
+    return pending?.future ?? Future.value(result);
+  }
 }

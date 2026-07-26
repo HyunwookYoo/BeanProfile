@@ -191,12 +191,16 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
     });
   }
 
-  void _mergeChips(int target, int source) => setState(() {
-        final next = mergeChips(_chips, target: target, source: source);
-        _chips
-          ..clear()
-          ..addAll(next);
-      });
+  void _mergeChips(int target, int source) {
+    // 두 손가락으로 동시에 끌면 드롭 시점의 인덱스가 이미 낡았을 수 있다.
+    if (target == source || target >= _chips.length || source >= _chips.length) return;
+    setState(() {
+      final next = mergeChips(_chips, target: target, source: source);
+      _chips
+        ..clear()
+        ..addAll(next);
+    });
+  }
 
   void _splitChips(int index) => setState(() {
         final next = splitChip(_chips, index);

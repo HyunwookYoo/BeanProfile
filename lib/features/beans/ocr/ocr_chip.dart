@@ -24,6 +24,8 @@ class OcrChip {
 ///
 /// 병합 칩은 `target`이 있던 순서상 위치에 남고 `source`는 목록에서 사라진다.
 /// 자기 자신에 떨구는 경우(`target == source`)는 패널이 걸러 여기까지 오지 않는다.
+/// 이미 배정된(`used: true`) 칩도 마찬가지로 패널이 걸러낸다 — 여기 오면 1-인자
+/// 생성자 탓에 `used`가 `false`로 되살아난다.
 List<OcrChip> mergeChips(
   List<OcrChip> chips, {
   required int target,

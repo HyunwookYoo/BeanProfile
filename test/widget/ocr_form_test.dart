@@ -813,6 +813,42 @@ void main() {
     expect(find.byKey(const Key('chip-에티오피아')), findsOneWidget);
   });
 
+  testWidgets('병합 칩의 ✕에는 영어 Delete 툴팁이 없다', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    t.view.physicalSize = const Size(2400, 4000);
+    t.view.devicePixelRatio = 3.0;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(wrapApp(
+      const BeanFormScreen(draft: OcrDraft(chips: ['에티오피아', '구지'])),
+      db: db,
+    ));
+    await t.pump();
+
+    await dragChipOnto(t, '구지', '에티오피아');
+
+    expect(find.byTooltip('Delete'), findsNothing);
+  });
+
+  testWidgets('칩을 자기 자신 위로 끌면 그대로 남는다', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    t.view.physicalSize = const Size(2400, 4000);
+    t.view.devicePixelRatio = 3.0;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(wrapApp(
+      const BeanFormScreen(draft: OcrDraft(chips: ['에티오피아', '구지'])),
+      db: db,
+    ));
+    await t.pump();
+
+    await dragChipOnto(t, '에티오피아', '에티오피아');
+
+    expect(find.byKey(const Key('chip-에티오피아')), findsOneWidget);
+    expect(find.byKey(const Key('chip-구지')), findsOneWidget);
+    expect(find.byKey(const Key('chip-에티오피아 · 에티오피아')), findsNothing);
+  });
+
   testWidgets('배정된 칩은 드롭 대상이 되지 않는다', (t) async {
     final db = testDatabase();
     addTearDown(db.close);

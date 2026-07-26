@@ -5,6 +5,7 @@ import '../../data/enums.dart';
 import '../../data/models.dart';
 import '../../providers.dart';
 import '../../theme.dart';
+import 'ocr/ocr_chip.dart';
 import 'ocr/ocr_draft.dart';
 import 'widgets/ocr_chips_panel.dart';
 
@@ -54,7 +55,7 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
   bool _saving = false;
   bool _copyingDiagnostics = false;
   bool _typeFromOcr = false;
-  final _usedChips = <String>{};
+  final _chips = <OcrChip>[];
 
   @override
   void initState() {
@@ -84,6 +85,7 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
       if (_components.isEmpty) _components.add(_ComponentDraft());
     }
     final d = widget.draft;
+    if (d != null) _chips.addAll(d.chips.map((text) => OcrChip([text])));
     if (e == null) {
       _type = widget.initialType ?? d?.inferredType ?? BeanType.singleOrigin;
       _typeFromOcr = d?.inferredType != null && _type == d!.inferredType;
@@ -141,8 +143,9 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
       .where((e) => e.isNotEmpty)
       .toList();
 
-  Future<void> _openAssignSheet(String chip) async {
-    // (라벨, 대상 컨트롤러, append 여부)
+  Future<void> _openAssignSheet(int index) async {
+    final chip = _chips[index];
+    // (라벨, 대상 컨트롤러, append 여부) — append는 곧 '쉼표로 이어붙임'이다.
     final targets = <(String, TextEditingController, bool)>[
       ('제품명', _name, false),
       ('로스터리', _roaster, false),
@@ -159,7 +162,8 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
             padding: const EdgeInsets.fromLTRB(18, 14, 18, 6),
             child: Align(
               alignment: Alignment.centerLeft,
-              child: Text('‘$chip’ 어디에 넣을까요?',
+              // 칩의 ' · '가 아니라 실제로 들어갈 값을 보여준다.
+              child: Text('‘${chip.text(comma: false)}’ 어디에 넣을까요?',
                   style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
             ),
           ),
@@ -175,16 +179,24 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
     );
     if (picked == null || !mounted) return;
     final (_, ctrl, append) = targets[picked];
+    final value = chip.text(comma: append);
     setState(() {
       if (append) {
         final cur = ctrl.text.trim();
-        ctrl.text = cur.isEmpty ? chip : '$cur, $chip';
+        ctrl.text = cur.isEmpty ? value : '$cur, $value';
       } else {
-        ctrl.text = chip;
+        ctrl.text = value;
       }
-      _usedChips.add(chip);
+      _chips[index] = OcrChip(chip.parts, used: true);
     });
   }
+
+  void _mergeChips(int target, int source) => setState(() {
+        final next = mergeChips(_chips, target: target, source: source);
+        _chips
+          ..clear()
+          ..addAll(next);
+      });
 
   bool get _auto => widget.existing == null && widget.draft != null;
 
@@ -403,8 +415,8 @@ class _BeanFormScreenState extends ConsumerState<BeanFormScreen> {
               child: Text('글자를 자동 인식하지 못했어요. 아래 항목을 직접 입력하거나 다시 촬영해 주세요.',
                   style: TextStyle(fontSize: 12, color: c.espresso)),
             )
-          else if (widget.draft!.chips.isNotEmpty)
-            OcrChipsPanel(chips: widget.draft!.chips, used: _usedChips, onTap: _openAssignSheet),
+          else if (_chips.isNotEmpty)
+            OcrChipsPanel(chips: _chips, onTap: _openAssignSheet, onMerge: _mergeChips),
           if (diagnosticsEnabled &&
               _auto &&
               widget.photoTempPath != null) ...[

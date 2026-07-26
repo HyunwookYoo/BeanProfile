@@ -5,10 +5,22 @@ import 'package:beanprofile/features/beans/bean_form_screen.dart';
 import 'package:beanprofile/features/beans/ocr/ocr_diagnostics.dart';
 import 'package:beanprofile/features/beans/ocr/ocr_draft.dart';
 import 'package:beanprofile/features/beans/widgets/ocr_chips_panel.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import '../helpers.dart';
+
+/// 칩 `from`을 길게 눌러 집은 뒤 칩 `onto` 위에 떨군다.
+Future<void> dragChipOnto(WidgetTester t, String from, String onto) async {
+  final gesture = await t.startGesture(t.getCenter(find.byKey(Key('chip-$from'))));
+  // LongPressDraggable은 길게 누르는 시간이 지나야 집힌다.
+  await t.pump(kLongPressTimeout + const Duration(milliseconds: 100));
+  await gesture.moveTo(t.getCenter(find.byKey(Key('chip-$onto'))));
+  await t.pump();
+  await gesture.up();
+  await t.pumpAndSettle();
+}
 
 void main() {
   testWidgets('diagnostic button requires an enabled photo OCR form', (t) async {
@@ -691,6 +703,88 @@ void main() {
       // 위가 맞고 입력 영역 높이가 같으므로(위 테스트) 밑줄도 맞는다.
       expect(processTop, regionTop);
     });
+  });
+
+  testWidgets('칩을 다른 칩 위로 끌면 하나로 합쳐진다', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    t.view.physicalSize = const Size(2400, 4000);
+    t.view.devicePixelRatio = 3.0;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(wrapApp(
+      const BeanFormScreen(draft: OcrDraft(chips: ['에티오피아', '구지'])),
+      db: db,
+    ));
+    await t.pump();
+
+    await dragChipOnto(t, '구지', '에티오피아');
+
+    expect(find.byKey(const Key('chip-에티오피아 · 구지')), findsOneWidget);
+    expect(find.byKey(const Key('chip-에티오피아')), findsNothing);
+    expect(find.byKey(const Key('chip-구지')), findsNothing);
+  });
+
+  testWidgets('드래그 방향이 병합 순서를 정한다', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    t.view.physicalSize = const Size(2400, 4000);
+    t.view.devicePixelRatio = 3.0;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(wrapApp(
+      const BeanFormScreen(draft: OcrDraft(chips: ['에티오피아', '구지'])),
+      db: db,
+    ));
+    await t.pump();
+
+    await dragChipOnto(t, '에티오피아', '구지'); // 반대 방향
+
+    expect(find.byKey(const Key('chip-구지 · 에티오피아')), findsOneWidget);
+    expect(find.byKey(const Key('chip-에티오피아 · 구지')), findsNothing);
+  });
+
+  testWidgets('병합 칩을 지역에 배정하면 공백으로 이어진다', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    t.view.physicalSize = const Size(2400, 4000);
+    t.view.devicePixelRatio = 3.0;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(wrapApp(
+      const BeanFormScreen(draft: OcrDraft(chips: ['에티오피아', '구지'])),
+      db: db,
+    ));
+    await t.pump();
+
+    await dragChipOnto(t, '구지', '에티오피아');
+    await t.tap(find.byKey(const Key('chip-에티오피아 · 구지')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const Key('assign-지역')));
+    await t.pumpAndSettle();
+
+    expect(
+      t.widget<TextField>(find.byKey(const Key('field-region-0'))).controller!.text,
+      '에티오피아 구지',
+    );
+  });
+
+  testWidgets('병합 칩을 컵노트에 추가하면 쉼표로 이어진다', (t) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    t.view.physicalSize = const Size(2400, 4000);
+    t.view.devicePixelRatio = 3.0;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(wrapApp(
+      const BeanFormScreen(draft: OcrDraft(chips: ['자몽', '초콜릿'])),
+      db: db,
+    ));
+    await t.pump();
+
+    await dragChipOnto(t, '초콜릿', '자몽');
+    await t.tap(find.byKey(const Key('chip-자몽 · 초콜릿')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const Key('assign-컵노트에 추가')));
+    await t.pumpAndSettle();
+
+    expect(find.text('자몽, 초콜릿'), findsOneWidget);
   });
 }
 

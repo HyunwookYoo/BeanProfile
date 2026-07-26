@@ -51,6 +51,8 @@ final RegExp _genericCardHeader = RegExp(
   caseSensitive: false,
 );
 
+final RegExp _numericDecoration = RegExp(r'^[\d\s%.,;:/+\-]+$');
+
 final RegExp _brandMarker = RegExp(
   r'(?:\b(?:lab|roasters?|roastery)\b|로스터스|로스터리|랩)\s*$',
   caseSensitive: false,
@@ -151,7 +153,18 @@ String? _valueFor(
 
 /// 제품명=상단 최대폰트 줄, 로스터리=그 위 작은 줄. 균일 텍스트면 (null,null)로 오채움 회피.
 (String?, String?) _titleEyebrow(List<OcrLine> lines) {
-  final real = lines.where((l) => l.text.trim().isNotEmpty).toList();
+  // EXIF 회전이 좌표에 남아 있거나 카드에 세로 푸터가 있으면 세로 텍스트의
+  // bounding box 높이가 가장 커진다. 제품명 후보는 가로로 읽히는 줄만 사용한다.
+  final real = lines.where((line) {
+    final text = line.text.trim();
+    if (text.isEmpty ||
+        line.height <= 0 ||
+        _numericDecoration.hasMatch(text)) {
+      return false;
+    }
+    final width = line.right - line.left;
+    return width >= 1.2 * line.height;
+  }).toList();
   if (real.length < 2) return (null, null);
   final hs = real.map((l) => l.height).toList()..sort();
   final n = hs.length;

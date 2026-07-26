@@ -270,6 +270,36 @@ void main() {
       expect(d.name, 'DAYBREAK HOUSE');
       expect(d.roaster, 'BEANPROFILE LAB');
     });
+    test('세로 푸터가 있어도 가로 제품명을 선택함', () {
+      final d = parseOcr(const [
+        OcrLine(
+          'BEANPROFILE LAB',
+          left: 990,
+          top: 555,
+          right: 1532,
+          bottom: 602,
+        ),
+        OcrLine('BLEND', left: 2625, top: 538, right: 2818, bottom: 580),
+        OcrLine(
+          'DAYBREAK HOUSE BLEND',
+          left: 996,
+          top: 650,
+          right: 2665,
+          bottom: 806,
+        ),
+        OcrLine('BRAZIL', left: 1373, top: 1539, right: 1696, bottom: 1646),
+        OcrLine(
+          'CUPPING LAB TWO ORIGINS ROAST PROFILE 04',
+          left: 193,
+          top: 2882,
+          right: 264,
+          bottom: 3907,
+        ),
+      ]);
+
+      expect(d.name, 'DAYBREAK HOUSE BLEND');
+      expect(d.roaster, 'BEANPROFILE LAB');
+    });
     test('가드: 균일 높이면 name/roaster null', () {
       final d = parseOcr(const [
         OcrLine('원산지', left: 10, top: 10, right: 70, bottom: 30),

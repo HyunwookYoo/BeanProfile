@@ -1,0 +1,109 @@
+<title>iOS OCR 진단 복사 설계</title>
+<style>
+*{box-sizing:border-box}
+:root{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+  --font-sans:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Consolas,"Malgun Gothic",monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}}
+:root[data-theme="light"]{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+}
+:root[data-theme="dark"]{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-sans);line-height:1.7;-webkit-font-smoothing:antialiased}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.doc{max-width:880px;margin:0 auto;padding:44px 24px 96px}
+.crumb{font-family:var(--font-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:16px}
+h1{font-size:clamp(26px,4vw,38px);font-weight:800;letter-spacing:-.025em;line-height:1.2;margin:.1em 0 .5em;text-wrap:balance}
+h2{font-size:22px;font-weight:700;margin:2em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line);letter-spacing:-.01em;text-wrap:balance}
+h3{font-size:16.5px;font-weight:700;color:var(--accent-ink);margin:1.7em 0 .5em}
+h4{font-size:14px;font-weight:700;margin:1.3em 0 .4em}
+p{margin:.7em 0}
+a{color:var(--accent);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+strong{font-weight:700;color:var(--fg)}
+hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+code.ic{font-family:var(--font-mono);font-size:.85em;background:var(--ic-bg);color:var(--ic-fg);padding:1.5px 6px;border-radius:6px}
+pre.code{position:relative;background:var(--code-bg);color:var(--code-fg);border-radius:12px;padding:16px 18px;margin:1em 0;overflow-x:auto;border:1px solid rgba(0,0,0,.28)}
+pre.code code{font-family:var(--font-mono);font-size:12.75px;line-height:1.6;white-space:pre;color:inherit;background:none;padding:0}
+pre.code[data-lang]::before{content:attr(data-lang);position:absolute;top:9px;right:13px;font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(236,227,211,.42)}
+.tablewrap{overflow-x:auto;margin:1.1em 0}
+table{border-collapse:collapse;width:100%;font-size:13.75px}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--th);font-weight:700}
+tbody tr:nth-child(even){background:var(--surface)}
+blockquote{margin:1.1em 0;padding:11px 16px;border-left:3px solid var(--accent);background:var(--surface);border-radius:0 10px 10px 0;color:var(--muted)}
+blockquote strong{color:var(--fg)}
+ul,ol{margin:.7em 0;padding-left:1.4em}
+li{margin:.32em 0}
+ul.tasklist{list-style:none;padding-left:.15em}
+ul.tasklist li.task{position:relative;padding-left:30px;margin:.5em 0}
+ul.tasklist li.task::before{content:"";position:absolute;left:0;top:.18em;width:17px;height:17px;border:2px solid var(--accent);border-radius:5px;background:transparent}
+ul.tasklist li.task.done::before{content:"\2713";background:var(--accent);color:#fff;font-size:12px;font-weight:800;text-align:center;line-height:15px}
+</style>
+<article class="doc"><div class="crumb">BeanProfile · docs/superpowers/specs</div>
+<h1>iOS OCR 진단 복사 설계</h1>
+<h2>목적</h2>
+<p>동일한 C 카드가 Android 에뮬레이터에서는 정상 파싱되지만 iPhone 직접 촬영에서는 구성 필드가 누락되는 원인을 확인한다. 추측성 파서 수정을 반복하지 않도록 iPhone의 실제 ML Kit 출력과 파이프라인 판정 결과를 사용자가 클립보드로 복사해 전달할 수 있게 한다.</p>
+<h2>범위</h2>
+<ul><li>사진 OCR로 진입한 원두 입력 화면에만 <code class="ic">OCR 진단 복사</code> 버튼을 표시한다.</li><li>버튼을 누를 때 원본 사진과 대비 보정본을 각각 강제로 OCR 분석한다.</li><li>분석 결과를 사람이 읽을 수 있는 일반 텍스트로 만들어 클립보드에 복사한다.</li><li>진단 결과는 DB, 원두 메모, 로그 파일에 저장하지 않는다.</li><li>일반 사진 OCR 흐름과 저장 데이터 형식은 변경하지 않는다.</li></ul>
+<p>진단 버튼은 iOS 원인 확인을 위한 임시 도구다. 필요한 실기기 자료를 확보하고 수정이 검증되면 후속 버전에서 제거한다.</p>
+<h2>사용자 흐름</h2>
+<ol><li>사용자가 촬영 또는 갤러리 사진으로 OCR을 실행한다.</li><li>원두 입력 화면에서 <code class="ic">OCR 진단 복사</code>를 누른다.</li><li>버튼이 비활성화되고 진행 표시가 나타난다.</li><li>앱이 현재 사진을 원본과 대비 보정본으로 각각 재분석한다.</li><li>성공하면 진단 텍스트를 클립보드에 복사하고 <code class="ic">OCR 진단 정보가 복사됐어요</code> 메시지를 표시한다.</li><li>사용자는 이 대화에 클립보드 내용을 그대로 붙여넣는다.</li></ol>
+<p>직접 입력·기존 원두 편집처럼 OCR 사진 임시 경로가 없는 화면에는 버튼을 표시하지 않는다.</p>
+<h2>구조</h2>
+<h3><code class="ic">OcrDiagnosticsService</code></h3>
+<p>일반 <code class="ic">OcrPipeline</code>과 분리된 일회성 진단 서비스다. <code class="ic">OcrService</code>, <code class="ic">ImageQualityAnalyzer</code>, <code class="ic">OcrImagePreprocessor</code>를 주입받는다.</p>
+<p>서비스는 다음 작업만 담당한다.</p>
+<ul><li>원본 이미지 품질 분석</li><li>원본 OCR 라인과 파싱 후보 생성</li><li>대비 보정 이미지 생성</li><li>보정본 OCR 라인과 파싱 후보 생성</li><li>일반 파이프라인과 같은 비교·병합 규칙으로 최종 후보 계산</li><li>임시 보정 이미지 정리</li><li>진단 보고서 생성</li></ul>
+<p>일반 OCR 처리에는 이 서비스가 호출되지 않으므로 평상시 촬영 시간은 늘어나지 않는다.</p>
+<h3><code class="ic">OcrDiagnosticsReport</code></h3>
+<p>진단 결과를 보관하고 <code class="ic">toClipboardText()</code>로 안정적인 텍스트 형식을 만든다. UI가 OCR 내부 객체를 직접 포맷하지 않게 한다.</p>
+<p>보고서에는 다음 정보가 포함된다.</p>
+<ul><li>진단 형식 버전</li><li>실행 플랫폼</li><li>원본 이미지의 디코딩 크기와 EXIF 방향 값(읽을 수 있는 경우)</li><li>이미지 품질 이슈</li><li>원본·보정본의 후보 점수 정보</li><li>원본·보정본 OCR 라인: 텍스트, bounding box, 신뢰도</li><li>원본·보정본 파싱 결과</li><li>선택된 후보와 최종 병합 결과</li></ul>
+<p>사진 바이트, 로컬 파일 경로, 기기 식별자와 계정 정보는 포함하지 않는다.</p>
+<h3>화면 연결</h3>
+<p><code class="ic">BeanFormScreen</code>은 기존 <code class="ic">photoTempPath</code>가 있고 OCR 초안으로 열린 경우에만 진단 버튼을 노출한다. 버튼은 Provider를 통해 진단 서비스를 호출하고 Flutter의 <code class="ic">Clipboard</code> API로 텍스트를 복사한다.</p>
+<p>진단 실행 상태는 화면 내부의 단일 불리언으로 관리한다. 실행 중 중복 탭을 막고, 화면이 닫힌 뒤에는 메시지나 상태 변경을 시도하지 않는다.</p>
+<h2>진단 텍스트 형식</h2>
+<p>각 섹션은 고정 헤더를 사용해 붙여넣은 결과를 회귀 테스트 픽스처로 옮기기 쉽게 한다.</p>
+<pre class="code" data-lang="text"><code>=== BEANPROFILE OCR DIAGNOSTICS v1 ===
+platform: ios
+image: 3024x4032, exifOrientation=6
+quality: lowContrast, blurry
+
+--- ORIGINAL ---
+candidate: ...
+[left,top,right,bottom] confidence | text
+...
+draft:
+  component[0]: country=... ratio=... region=... process=...
+
+--- ENHANCED ---
+...
+
+--- FINAL ---
+selected: original
+component[0]: ...
+component[1]: ...</code></pre>
+<p>OCR 텍스트는 한 줄 단위로 기록한다. confidence가 제공되지 않으면 <code class="ic">null</code>로 출력한다. 좌표는 비교가 쉽도록 소수점 한 자리까지 출력한다.</p>
+<h2>오류 처리</h2>
+<ul><li>품질 분석 실패: 빈 품질 결과로 계속 진행하고 보고서에 실패 상태를 기록한다.</li><li>보정 또는 보정본 OCR 실패: 원본 결과는 유지하고 보정 실패를 보고서에 기록한다.</li><li>클립보드 복사 실패: 폼을 유지하고 오류 메시지를 표시한다.</li><li>임시 보정 이미지 삭제 실패: 진단 결과를 버리지는 않지만 보고서에 정리 실패를 기록한다.</li><li>중복 탭: 실행 중 버튼 비활성화로 차단한다.</li></ul>
+<h2>테스트</h2>
+<h3>단위 테스트</h3>
+<ul><li>원본과 보정본을 항상 한 번씩 분석한다.</li><li>후보 비교·병합 결과가 일반 파이프라인과 일치한다.</li><li>보정 실패 시에도 원본 보고서를 만든다.</li><li>임시 보정 이미지를 성공·실패 경로 모두에서 정리한다.</li><li>보고서 텍스트가 좌표, 신뢰도, 품질, 후보, 최종 구성 정보를 포함한다.</li><li>보고서가 읽을 수 있는 이미지 크기와 EXIF 방향 값을 포함한다.</li><li>보고서에 이미지 경로나 사진 바이트가 포함되지 않는다.</li></ul>
+<h3>위젯 테스트</h3>
+<ul><li>OCR 사진이 있는 폼에서만 진단 버튼이 보인다.</li><li>버튼 탭 시 중복 실행이 차단되고 성공 후 클립보드 안내가 표시된다.</li><li>서비스 실패 시 폼을 유지하고 오류 안내가 표시된다.</li></ul>
+<h3>전체 검증</h3>
+<ul><li><code class="ic">flutter analyze</code></li><li>전체 <code class="ic">flutter test</code></li><li>Android 에뮬레이터에서 기존 OCR 통합 테스트 비회귀</li><li><code class="ic">v0.6.10</code> iPhone 설치 후 C 카드 촬영 → 진단 복사 → 이 대화에 붙여넣기</li></ul>
+<h2>완료 조건</h2>
+<ul><li>일반 OCR 처리 시간과 저장 데이터에 변화가 없다.</li><li>iPhone에서 버튼 한 번으로 원본·보정 OCR 좌표와 최종 매핑을 전달할 수 있다.</li><li>전달된 텍스트만으로 iOS 실패를 호스트 단위 테스트에 재현할 수 있다.</li></ul>
+</article>

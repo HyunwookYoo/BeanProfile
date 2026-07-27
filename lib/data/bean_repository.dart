@@ -120,6 +120,7 @@ class BeanRepository {
           bitterness: t.bitterness,
           overall: t.overall,
           comment: Value(t.comment),
+          degassingDays: Value(t.degassingDays),
           createdAt: DateTime.now(),
         ));
   }
@@ -134,6 +135,7 @@ class BeanRepository {
       bitterness: Value(t.bitterness),
       overall: Value(t.overall),
       comment: Value(t.comment),
+      degassingDays: Value(t.degassingDays),
     ));
   }
 

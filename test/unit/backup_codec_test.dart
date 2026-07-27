@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:beanprofile/data/enums.dart';
 import 'package:beanprofile/data/models.dart';
@@ -62,5 +63,24 @@ void main() {
 
   test('깨진 JSON은 FormatException', () {
     expect(() => decodeBackup('not json at all'), throwsFormatException);
+  });
+
+  test('degassingDays 키가 없는 옛 백업도 그대로 읽힌다', () {
+    final snap = TasteSnapshot(
+      beans: [beanRow(id: 1)],
+      components: const [],
+      tastings: [tastingRow(id: 1, beanId: 1, degassingDays: 8)],
+    );
+    final fresh = encodeBackup(snap, const {}, exportedAt: DateTime.utc(2026, 7, 22));
+
+    // v0.5.0이 만든 백업 파일에는 이 키가 아예 없다 — 지워서 그때 파일을 재현한다.
+    final root = jsonDecode(fresh) as Map<String, dynamic>;
+    for (final t in (root['tastings'] as List)) {
+      expect((t as Map).remove('degassingDays'), 8, reason: '새 백업에는 키가 실려야 한다');
+    }
+
+    final decoded = decodeBackup(jsonEncode(root));
+    expect(decoded.snapshot.tastings.single.degassingDays, isNull,
+        reason: '키가 없는 옛 백업은 null로 읽혀야 한다 — 예외를 던지면 안 된다');
   });
 }

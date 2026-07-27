@@ -80,6 +80,7 @@ class TastingInput {
   final int bitterness;
   final int overall;
   final String? comment;
+  final int? degassingDays;
   const TastingInput({
     required this.date,
     required this.acidity,
@@ -88,6 +89,7 @@ class TastingInput {
     required this.bitterness,
     required this.overall,
     this.comment,
+    this.degassingDays,
   });
 
   factory TastingInput.fromTasting(Tasting t) => TastingInput(
@@ -98,6 +100,7 @@ class TastingInput {
         bitterness: t.bitterness,
         overall: t.overall,
         comment: t.comment,
+        degassingDays: t.degassingDays,
       );
 }
 

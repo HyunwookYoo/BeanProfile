@@ -51,5 +51,6 @@ class Tastings extends Table {
   IntColumn get bitterness => integer()();
   IntColumn get overall => integer()();
   TextColumn get comment => text().nullable()();
+  IntColumn get degassingDays => integer().nullable()();
   DateTimeColumn get createdAt => dateTime()();
 }

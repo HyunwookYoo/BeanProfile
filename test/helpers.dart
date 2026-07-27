@@ -75,11 +75,13 @@ TastingInput sampleTasting({
   int overall = 4,
   String? comment = '균형이 좋다',
   DateTime? date,
+  int? degassingDays,
 }) =>
     TastingInput(
       date: date ?? DateTime(2026, 7, 1),
       acidity: acidity, sweetness: sweetness, body: body,
       bitterness: bitterness, overall: overall, comment: comment,
+      degassingDays: degassingDays,
     );
 
 extension BeanInputPhoto on BeanInput {
@@ -207,10 +209,12 @@ Tasting tastingRow({
   int sweetness = 3,
   int body = 3,
   int bitterness = 3,
+  int? degassingDays,
 }) =>
     Tasting(
       id: id, beanId: beanId, date: DateTime(2026, 7, 1),
       acidity: acidity, sweetness: sweetness, body: body,
       bitterness: bitterness, overall: overall,
+      degassingDays: degassingDays,
       createdAt: DateTime(2026, 7, 1),
     );

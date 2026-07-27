@@ -1461,6 +1461,17 @@ class $TastingsTable extends Tastings with TableInfo<$TastingsTable, Tasting> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _degassingDaysMeta = const VerificationMeta(
+    'degassingDays',
+  );
+  @override
+  late final GeneratedColumn<int> degassingDays = GeneratedColumn<int>(
+    'degassing_days',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -1483,6 +1494,7 @@ class $TastingsTable extends Tastings with TableInfo<$TastingsTable, Tasting> {
     bitterness,
     overall,
     comment,
+    degassingDays,
     createdAt,
   ];
   @override
@@ -1562,6 +1574,15 @@ class $TastingsTable extends Tastings with TableInfo<$TastingsTable, Tasting> {
         comment.isAcceptableOrUnknown(data['comment']!, _commentMeta),
       );
     }
+    if (data.containsKey('degassing_days')) {
+      context.handle(
+        _degassingDaysMeta,
+        degassingDays.isAcceptableOrUnknown(
+          data['degassing_days']!,
+          _degassingDaysMeta,
+        ),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -1615,6 +1636,10 @@ class $TastingsTable extends Tastings with TableInfo<$TastingsTable, Tasting> {
         DriftSqlType.string,
         data['${effectivePrefix}comment'],
       ),
+      degassingDays: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}degassing_days'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -1638,6 +1663,7 @@ class Tasting extends DataClass implements Insertable<Tasting> {
   final int bitterness;
   final int overall;
   final String? comment;
+  final int? degassingDays;
   final DateTime createdAt;
   const Tasting({
     required this.id,
@@ -1649,6 +1675,7 @@ class Tasting extends DataClass implements Insertable<Tasting> {
     required this.bitterness,
     required this.overall,
     this.comment,
+    this.degassingDays,
     required this.createdAt,
   });
   @override
@@ -1664,6 +1691,9 @@ class Tasting extends DataClass implements Insertable<Tasting> {
     map['overall'] = Variable<int>(overall);
     if (!nullToAbsent || comment != null) {
       map['comment'] = Variable<String>(comment);
+    }
+    if (!nullToAbsent || degassingDays != null) {
+      map['degassing_days'] = Variable<int>(degassingDays);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     return map;
@@ -1682,6 +1712,9 @@ class Tasting extends DataClass implements Insertable<Tasting> {
       comment: comment == null && nullToAbsent
           ? const Value.absent()
           : Value(comment),
+      degassingDays: degassingDays == null && nullToAbsent
+          ? const Value.absent()
+          : Value(degassingDays),
       createdAt: Value(createdAt),
     );
   }
@@ -1701,6 +1734,7 @@ class Tasting extends DataClass implements Insertable<Tasting> {
       bitterness: serializer.fromJson<int>(json['bitterness']),
       overall: serializer.fromJson<int>(json['overall']),
       comment: serializer.fromJson<String?>(json['comment']),
+      degassingDays: serializer.fromJson<int?>(json['degassingDays']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
@@ -1717,6 +1751,7 @@ class Tasting extends DataClass implements Insertable<Tasting> {
       'bitterness': serializer.toJson<int>(bitterness),
       'overall': serializer.toJson<int>(overall),
       'comment': serializer.toJson<String?>(comment),
+      'degassingDays': serializer.toJson<int?>(degassingDays),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
@@ -1731,6 +1766,7 @@ class Tasting extends DataClass implements Insertable<Tasting> {
     int? bitterness,
     int? overall,
     Value<String?> comment = const Value.absent(),
+    Value<int?> degassingDays = const Value.absent(),
     DateTime? createdAt,
   }) => Tasting(
     id: id ?? this.id,
@@ -1742,6 +1778,9 @@ class Tasting extends DataClass implements Insertable<Tasting> {
     bitterness: bitterness ?? this.bitterness,
     overall: overall ?? this.overall,
     comment: comment.present ? comment.value : this.comment,
+    degassingDays: degassingDays.present
+        ? degassingDays.value
+        : this.degassingDays,
     createdAt: createdAt ?? this.createdAt,
   );
   Tasting copyWithCompanion(TastingsCompanion data) {
@@ -1757,6 +1796,9 @@ class Tasting extends DataClass implements Insertable<Tasting> {
           : this.bitterness,
       overall: data.overall.present ? data.overall.value : this.overall,
       comment: data.comment.present ? data.comment.value : this.comment,
+      degassingDays: data.degassingDays.present
+          ? data.degassingDays.value
+          : this.degassingDays,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -1773,6 +1815,7 @@ class Tasting extends DataClass implements Insertable<Tasting> {
           ..write('bitterness: $bitterness, ')
           ..write('overall: $overall, ')
           ..write('comment: $comment, ')
+          ..write('degassingDays: $degassingDays, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -1789,6 +1832,7 @@ class Tasting extends DataClass implements Insertable<Tasting> {
     bitterness,
     overall,
     comment,
+    degassingDays,
     createdAt,
   );
   @override
@@ -1804,6 +1848,7 @@ class Tasting extends DataClass implements Insertable<Tasting> {
           other.bitterness == this.bitterness &&
           other.overall == this.overall &&
           other.comment == this.comment &&
+          other.degassingDays == this.degassingDays &&
           other.createdAt == this.createdAt);
 }
 
@@ -1817,6 +1862,7 @@ class TastingsCompanion extends UpdateCompanion<Tasting> {
   final Value<int> bitterness;
   final Value<int> overall;
   final Value<String?> comment;
+  final Value<int?> degassingDays;
   final Value<DateTime> createdAt;
   const TastingsCompanion({
     this.id = const Value.absent(),
@@ -1828,6 +1874,7 @@ class TastingsCompanion extends UpdateCompanion<Tasting> {
     this.bitterness = const Value.absent(),
     this.overall = const Value.absent(),
     this.comment = const Value.absent(),
+    this.degassingDays = const Value.absent(),
     this.createdAt = const Value.absent(),
   });
   TastingsCompanion.insert({
@@ -1840,6 +1887,7 @@ class TastingsCompanion extends UpdateCompanion<Tasting> {
     required int bitterness,
     required int overall,
     this.comment = const Value.absent(),
+    this.degassingDays = const Value.absent(),
     required DateTime createdAt,
   }) : beanId = Value(beanId),
        date = Value(date),
@@ -1859,6 +1907,7 @@ class TastingsCompanion extends UpdateCompanion<Tasting> {
     Expression<int>? bitterness,
     Expression<int>? overall,
     Expression<String>? comment,
+    Expression<int>? degassingDays,
     Expression<DateTime>? createdAt,
   }) {
     return RawValuesInsertable({
@@ -1871,6 +1920,7 @@ class TastingsCompanion extends UpdateCompanion<Tasting> {
       if (bitterness != null) 'bitterness': bitterness,
       if (overall != null) 'overall': overall,
       if (comment != null) 'comment': comment,
+      if (degassingDays != null) 'degassing_days': degassingDays,
       if (createdAt != null) 'created_at': createdAt,
     });
   }
@@ -1885,6 +1935,7 @@ class TastingsCompanion extends UpdateCompanion<Tasting> {
     Value<int>? bitterness,
     Value<int>? overall,
     Value<String?>? comment,
+    Value<int?>? degassingDays,
     Value<DateTime>? createdAt,
   }) {
     return TastingsCompanion(
@@ -1897,6 +1948,7 @@ class TastingsCompanion extends UpdateCompanion<Tasting> {
       bitterness: bitterness ?? this.bitterness,
       overall: overall ?? this.overall,
       comment: comment ?? this.comment,
+      degassingDays: degassingDays ?? this.degassingDays,
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -1931,6 +1983,9 @@ class TastingsCompanion extends UpdateCompanion<Tasting> {
     if (comment.present) {
       map['comment'] = Variable<String>(comment.value);
     }
+    if (degassingDays.present) {
+      map['degassing_days'] = Variable<int>(degassingDays.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -1949,6 +2004,7 @@ class TastingsCompanion extends UpdateCompanion<Tasting> {
           ..write('bitterness: $bitterness, ')
           ..write('overall: $overall, ')
           ..write('comment: $comment, ')
+          ..write('degassingDays: $degassingDays, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -2967,6 +3023,7 @@ typedef $$TastingsTableCreateCompanionBuilder =
       required int bitterness,
       required int overall,
       Value<String?> comment,
+      Value<int?> degassingDays,
       required DateTime createdAt,
     });
 typedef $$TastingsTableUpdateCompanionBuilder =
@@ -2980,6 +3037,7 @@ typedef $$TastingsTableUpdateCompanionBuilder =
       Value<int> bitterness,
       Value<int> overall,
       Value<String?> comment,
+      Value<int?> degassingDays,
       Value<DateTime> createdAt,
     });
 
@@ -3052,6 +3110,11 @@ class $$TastingsTableFilterComposer
 
   ColumnFilters<String> get comment => $composableBuilder(
     column: $table.comment,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get degassingDays => $composableBuilder(
+    column: $table.degassingDays,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3133,6 +3196,11 @@ class $$TastingsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get degassingDays => $composableBuilder(
+    column: $table.degassingDays,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -3196,6 +3264,11 @@ class $$TastingsTableAnnotationComposer
 
   GeneratedColumn<String> get comment =>
       $composableBuilder(column: $table.comment, builder: (column) => column);
+
+  GeneratedColumn<int> get degassingDays => $composableBuilder(
+    column: $table.degassingDays,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -3261,6 +3334,7 @@ class $$TastingsTableTableManager
                 Value<int> bitterness = const Value.absent(),
                 Value<int> overall = const Value.absent(),
                 Value<String?> comment = const Value.absent(),
+                Value<int?> degassingDays = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
               }) => TastingsCompanion(
                 id: id,
@@ -3272,6 +3346,7 @@ class $$TastingsTableTableManager
                 bitterness: bitterness,
                 overall: overall,
                 comment: comment,
+                degassingDays: degassingDays,
                 createdAt: createdAt,
               ),
           createCompanionCallback:
@@ -3285,6 +3360,7 @@ class $$TastingsTableTableManager
                 required int bitterness,
                 required int overall,
                 Value<String?> comment = const Value.absent(),
+                Value<int?> degassingDays = const Value.absent(),
                 required DateTime createdAt,
               }) => TastingsCompanion.insert(
                 id: id,
@@ -3296,6 +3372,7 @@ class $$TastingsTableTableManager
                 bitterness: bitterness,
                 overall: overall,
                 comment: comment,
+                degassingDays: degassingDays,
                 createdAt: createdAt,
               ),
           withReferenceMapper: (p0) => p0

@@ -6,6 +6,7 @@ import '../../data/enums.dart';
 import '../../data/models.dart';
 import '../../providers.dart';
 import '../../theme.dart';
+import '../tasting/degassing.dart';
 import '../tasting/tasting_form_screen.dart';
 import 'bean_form_screen.dart';
 import 'widgets/bean_thumbnail.dart';
@@ -199,8 +200,30 @@ class _DetailBody extends StatelessWidget {
     );
   }
 
+  Widget _degassingPill(BuildContext context, ({String text, bool warn}) deg, int tastingId) {
+    final c = context.colors;
+    return Container(
+      key: Key('degassing-pill-$tastingId'),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 2),
+      decoration: BoxDecoration(
+        color: deg.warn ? c.cherry.withValues(alpha: 0.12) : c.oat,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: deg.warn ? c.cherry : c.appLine),
+      ),
+      child: Text(deg.text,
+          style: monoStyle(
+              size: 10.5, weight: FontWeight.w700,
+              color: deg.warn ? c.cherry : c.cremaInk)),
+    );
+  }
+
   Widget _tastingRow(BuildContext context, Tasting t) {
     final c = context.colors;
+    final deg = degassingLabel(
+      roastDate: detail.bean.roastDate,
+      tastingDate: t.date,
+      manualDays: t.degassingDays,
+    );
     return Dismissible(
       key: ValueKey('tasting-${t.id}'),
       direction: DismissDirection.endToStart,
@@ -222,7 +245,14 @@ class _DetailBody extends StatelessWidget {
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(color: c.cup, borderRadius: BorderRadius.circular(12), border: Border.all(color: c.appLine)),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(t.date.toIso8601String().substring(0, 10), style: monoStyle(size: 11, color: c.appMuted)),
+            Row(children: [
+              Text(t.date.toIso8601String().substring(0, 10),
+                  style: monoStyle(size: 11, color: c.appMuted)),
+              if (deg != null) ...[
+                const SizedBox(width: 7),
+                _degassingPill(context, deg, t.id),
+              ],
+            ]),
             const SizedBox(height: 4),
             Row(children: [
               Expanded(

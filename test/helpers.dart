@@ -182,10 +182,11 @@ Bean beanRow({
   List<String> cupNotes = const [],
   String? photoPath,
   DateTime? createdAt,
+  DateTime? roastDate,
 }) =>
     Bean(
       id: id, name: name, roaster: roaster, type: BeanType.singleOrigin,
-      cupNotes: cupNotes, photoPath: photoPath,
+      cupNotes: cupNotes, photoPath: photoPath, roastDate: roastDate,
       createdAt: createdAt ?? DateTime(2026, 7, 1),
     );
 
@@ -210,9 +211,10 @@ Tasting tastingRow({
   int body = 3,
   int bitterness = 3,
   int? degassingDays,
+  DateTime? date,
 }) =>
     Tasting(
-      id: id, beanId: beanId, date: DateTime(2026, 7, 1),
+      id: id, beanId: beanId, date: date ?? DateTime(2026, 7, 1),
       acidity: acidity, sweetness: sweetness, body: body,
       bitterness: bitterness, overall: overall,
       degassingDays: degassingDays,

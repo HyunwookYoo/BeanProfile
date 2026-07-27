@@ -79,6 +79,17 @@ void main() {
     expect(find.text('날짜 확인'), findsOneWidget);
     expect(find.byKey(const Key('degassing-pill-1')), findsOneWidget);
     expect(find.byKey(const Key('degassing-pill-3')), findsOneWidget);
+
+    // 음수(날짜 확인) 알약은 경고색, 정상(디개싱 8일) 알약은 평상색을 써야 한다.
+    final warnPill = tester.widget<Container>(find.byKey(const Key('degassing-pill-3')));
+    final warnBorder = (warnPill.decoration as BoxDecoration).border as Border;
+    expect(warnBorder.top.color, AppColors.light.cherry);
+    expect(tester.widget<Text>(find.text('날짜 확인')).style!.color, AppColors.light.cherry);
+
+    final normalPill = tester.widget<Container>(find.byKey(const Key('degassing-pill-1')));
+    final normalBorder = (normalPill.decoration as BoxDecoration).border as Border;
+    expect(normalBorder.top.color, AppColors.light.appLine);
+    expect(tester.widget<Text>(find.text('디개싱 8일')).style!.color, AppColors.light.cremaInk);
   });
 
   testWidgets('로스팅 날짜가 없으면 입력값을 쓰고, 그것도 없으면 알약이 없다', (tester) async {

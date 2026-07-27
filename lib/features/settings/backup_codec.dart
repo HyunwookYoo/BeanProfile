@@ -4,6 +4,9 @@ import 'dart:typed_data';
 import '../../data/database.dart';
 import '../../data/models.dart';
 
+// 백업 "파일 형식" 버전이다. DB 마이그레이션 버전인 AppDatabase.schemaVersion과는
+// 별개이니 그쪽이 올랐다고 맞춰 올리지 말 것 — decodeBackup은 정확히 일치하는지만
+// 보므로, 올리는 순간 사용자가 이미 갖고 있는 기존 백업 파일이 전부 거부된다.
 const _schemaVersion = 1;
 
 /// 사진 base64를 포함한 단일 JSON 문자열. 순수 함수 — DB·파일·플러그인 무관.

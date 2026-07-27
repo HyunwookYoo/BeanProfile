@@ -29,4 +29,31 @@ void main() {
     expect(updated.tastings.first.degassingDays, 8,
         reason: '건드리지 않은 일수가 저장에서 지워지면 안 된다');
   });
+
+  testWidgets('입력칸이 안 보여도 저장된 일수가 지워지지 않는다', (tester) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    final repo = testRepository(db);
+    final beanId = await repo.createBean(sampleSingle());
+    await repo.createTasting(beanId, sampleTasting(degassingDays: 8));
+    final tasting = (await repo.getBeanDetail(beanId))!.tastings.first;
+
+    // roastDate가 있으므로 디개싱은 계산값으로 읽기 전용 표시되고, 입력칸 자체가 없다.
+    await tester.pumpWidget(wrapApp(
+        TastingFormScreen(
+            beanId: beanId,
+            roastDate: DateTime(2026, 6, 1),
+            existing: tasting),
+        db: db));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('degassing-input')), findsNothing);
+    await tester.tap(find.byKey(const Key('star-5')));
+    await tester.tap(find.byKey(const Key('save-tasting')));
+    await tester.pumpAndSettle();
+
+    final updated = await repo.getBeanDetail(beanId);
+    expect(updated!.tastings.first.degassingDays, 8,
+        reason: '보이지 않는 입력칸 때문에 저장된 일수가 지워지면 안 된다');
+  });
 }

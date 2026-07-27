@@ -113,4 +113,43 @@ void main() {
     expect(detail!.tastings.single.degassingDays, 8,
         reason: '부호와 문자는 formatter가 걸러 8만 남는다');
   });
+
+  testWidgets('로스팅 날짜와 시음일이 같으면 당일로 보여준다', (tester) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    final repo = testRepository(db);
+    final beanId = await repo.createBean(sampleSingle());
+    // 시음일을 고정해야 roastDate를 같은 날로 맞춰 값을 결정적으로 만들 수 있다.
+    await repo.createTasting(beanId, sampleTasting(date: DateTime(2026, 7, 20)));
+    final tasting = (await repo.getBeanDetail(beanId))!.tastings.first;
+
+    await tester.pumpWidget(wrapApp(
+        TastingFormScreen(
+            beanId: beanId,
+            roastDate: DateTime(2026, 7, 20),
+            existing: tasting),
+        db: db));
+    await tester.pumpAndSettle();
+
+    expect(find.text('당일'), findsOneWidget);
+  });
+
+  testWidgets('로스팅 날짜가 시음일보다 늦으면 날짜 확인으로 보여준다', (tester) async {
+    final db = testDatabase();
+    addTearDown(db.close);
+    final repo = testRepository(db);
+    final beanId = await repo.createBean(sampleSingle());
+    await repo.createTasting(beanId, sampleTasting(date: DateTime(2026, 7, 20)));
+    final tasting = (await repo.getBeanDetail(beanId))!.tastings.first;
+
+    await tester.pumpWidget(wrapApp(
+        TastingFormScreen(
+            beanId: beanId,
+            roastDate: DateTime(2026, 7, 25),
+            existing: tasting),
+        db: db));
+    await tester.pumpAndSettle();
+
+    expect(find.text('날짜 확인'), findsOneWidget);
+  });
 }

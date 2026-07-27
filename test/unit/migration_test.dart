@@ -1,4 +1,5 @@
 import 'package:beanprofile/data/database.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -83,5 +84,21 @@ void main() {
     // beforeOpen의 PRAGMA가 마이그레이션 후에도 적용됐는지 — FK cascade가 여기 달려 있다.
     final fk = await db.customSelect('PRAGMA foreign_keys').getSingle();
     expect(fk.data.values.first, 1, reason: 'FK가 꺼지면 원두 삭제 시 시음이 고아로 남는다');
+
+    // 위 expect들은 전부 '읽기'다 — SELECT *는 없는 컬럼을 조용히 null로 읽으므로
+    // onUpgrade가 통째로 no-op이어도 (컬럼이 아예 없어도) 똑같이 통과한다.
+    // 마이그레이션이 실제로 컬럼을 더했는지는 스키마를 직접 봐야 판별된다.
+    final cols = await db.customSelect("PRAGMA table_info('tastings')").get();
+    expect(cols.map((r) => r.data['name']), contains('degassing_days'),
+        reason: '마이그레이션이 실제로 컬럼을 더했는지');
+
+    // 컬럼이 없으면 여기서 SqliteException('no such column: degassing_days')이
+    // 터진다 — 읽기만으로는 못 잡는 no-op 마이그레이션을 쓰기로 잡는다.
+    await db.into(db.tastings).insert(TastingsCompanion.insert(
+        beanId: 1, date: DateTime(2026, 7, 27),
+        acidity: 3, sweetness: 3, body: 3, bitterness: 3, overall: 4,
+        degassingDays: const Value(8), createdAt: DateTime(2026, 7, 27)));
+    expect((await db.select(db.tastings).get()).map((t) => t.degassingDays),
+        containsAll([null, 8]));
   });
 }

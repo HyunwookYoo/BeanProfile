@@ -13,7 +13,7 @@ void main() {
     final snap = TasteSnapshot(
       beans: [beanRow(id: 42, name: '복원된 원두', cupNotes: const ['자몽'])],
       components: [compRow(id: 7, beanId: 42, country: 'Kenya')],
-      tastings: [tastingRow(id: 3, beanId: 42, overall: 5)],
+      tastings: [tastingRow(id: 3, beanId: 42, overall: 5, degassingDays: 8)],
     );
 
     await repo.replaceAll(snap);
@@ -23,6 +23,8 @@ void main() {
     expect(after.beans.single.id, 42); // id 보존
     expect(after.components.single.country, 'Kenya');
     expect(after.tastings.single.overall, 5);
+    expect(after.tastings.single.degassingDays, 8,
+        reason: '내보내기→복원 왕복에서 디개싱 일수도 살아남아야 한다');
   });
 
   test('replaceAll에 빈 스냅샷을 주면 전부 비운다', () async {

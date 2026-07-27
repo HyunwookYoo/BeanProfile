@@ -56,7 +56,8 @@ class BeanDetailScreen extends ConsumerWidget {
           child: FilledButton.icon(
             key: const Key('add-tasting'),
             onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => TastingFormScreen(beanId: beanId))),
+                builder: (_) => TastingFormScreen(
+                    beanId: beanId, roastDate: detail?.bean.roastDate))),
             icon: const Icon(Icons.add),
             label: const Text('시음 추가'),
             style: FilledButton.styleFrom(
@@ -212,7 +213,10 @@ class _DetailBody extends StatelessWidget {
         key: Key('tasting-row-${t.id}'),
         borderRadius: BorderRadius.circular(12),
         onTap: () => Navigator.of(context).push(MaterialPageRoute(
-            builder: (_) => TastingFormScreen(beanId: t.beanId, existing: t))),
+            builder: (_) => TastingFormScreen(
+                beanId: t.beanId,
+                roastDate: detail.bean.roastDate,
+                existing: t))),
         child: Container(
           margin: const EdgeInsets.only(bottom: 8),
           padding: const EdgeInsets.all(12),

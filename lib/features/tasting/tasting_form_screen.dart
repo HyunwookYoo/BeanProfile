@@ -1,15 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/database.dart';
 import '../../data/models.dart';
 import '../../providers.dart';
 import '../../theme.dart';
+import 'degassing.dart';
 import 'widgets/intensity_selector.dart';
 import 'widgets/star_input.dart';
 
 class TastingFormScreen extends ConsumerStatefulWidget {
-  const TastingFormScreen({super.key, required this.beanId, this.existing});
+  const TastingFormScreen({
+    super.key,
+    required this.beanId,
+    required this.roastDate,
+    this.existing,
+  });
   final int beanId;
+  /// 원두의 로스팅 날짜. 있으면 디개싱 일수를 계산해 읽기 전용으로 보여주고,
+  /// 없으면 사용자가 직접 적는다.
+  final DateTime? roastDate;
   final Tasting? existing;
   @override
   ConsumerState<TastingFormScreen> createState() => _TastingFormScreenState();
@@ -19,6 +29,7 @@ class _TastingFormScreenState extends ConsumerState<TastingFormScreen> {
   DateTime _date = DateTime.now();
   int _acidity = 3, _sweetness = 3, _body = 3, _bitterness = 3, _overall = 3;
   final _comment = TextEditingController();
+  final _degassing = TextEditingController();
   bool _saving = false;
 
   @override
@@ -33,12 +44,14 @@ class _TastingFormScreenState extends ConsumerState<TastingFormScreen> {
       _bitterness = e.bitterness;
       _overall = e.overall;
       _comment.text = e.comment ?? '';
+      _degassing.text = e.degassingDays?.toString() ?? '';
     }
   }
 
   @override
   void dispose() {
     _comment.dispose();
+    _degassing.dispose();
     super.dispose();
   }
 
@@ -49,6 +62,7 @@ class _TastingFormScreenState extends ConsumerState<TastingFormScreen> {
       acidity: _acidity, sweetness: _sweetness, body: _body,
       bitterness: _bitterness, overall: _overall,
       comment: _comment.text.trim().isEmpty ? null : _comment.text.trim(),
+      degassingDays: int.tryParse(_degassing.text),
     );
     try {
       final repo = ref.read(beanRepositoryProvider);
@@ -91,6 +105,44 @@ class _TastingFormScreenState extends ConsumerState<TastingFormScreen> {
     }
   }
 
+  Widget _degassingRow(BuildContext context) {
+    final c = context.colors;
+    const label = SizedBox(
+        width: 52, child: Text('디개싱', style: TextStyle(fontSize: 13.5)));
+
+    if (widget.roastDate == null) {
+      return Row(children: [
+        label,
+        SizedBox(
+          width: 82,
+          child: TextField(
+            key: const Key('degassing-input'),
+            controller: _degassing,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            maxLength: 3,
+            decoration: const InputDecoration(counterText: '', suffixText: '일'),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Text('로스팅 날짜 없음', style: TextStyle(fontSize: 11.5, color: c.appMuted)),
+      ]);
+    }
+
+    final deg = degassingLabel(roastDate: widget.roastDate, tastingDate: _date);
+    if (deg == null) return const SizedBox.shrink(); // roastDate가 있으면 도달하지 않는다
+    return Row(children: [
+      label,
+      Text(deg.text,
+          style: monoStyle(
+              size: 13, weight: FontWeight.w600,
+              color: deg.warn ? c.cherry : c.espresso)),
+      const SizedBox(width: 10),
+      Text('로스팅 ${widget.roastDate!.toIso8601String().substring(0, 10)}',
+          style: TextStyle(fontSize: 11.5, color: c.appMuted)),
+    ]);
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
@@ -130,7 +182,8 @@ class _TastingFormScreenState extends ConsumerState<TastingFormScreen> {
             child: const Text('날짜 선택'),
           ),
         ]),
-        const SizedBox(height: 8),
+        _degassingRow(context),
+        const Divider(height: 20),
         Text('강도', style: TextStyle(fontWeight: FontWeight.w700, color: c.espresso)),
         IntensitySelector(label: '산미', value: _acidity, onChanged: (v) => setState(() => _acidity = v)),
         IntensitySelector(label: '단맛', value: _sweetness, onChanged: (v) => setState(() => _sweetness = v)),
@@ -142,6 +195,7 @@ class _TastingFormScreenState extends ConsumerState<TastingFormScreen> {
         StarInput(value: _overall, onChanged: (v) => setState(() => _overall = v)),
         const SizedBox(height: 14),
         TextField(
+          key: const Key('tasting-comment'),
           controller: _comment,
           maxLines: 3,
           decoration: const InputDecoration(labelText: '코멘트'),

@@ -16,10 +16,11 @@ void main() {
   testWidgets('tasting form: tapping empty area dismisses the keyboard', (tester) async {
     final db = testDatabase();
     addTearDown(db.close);
-    await tester.pumpWidget(wrapApp(const TastingFormScreen(beanId: 1), db: db));
+    await tester.pumpWidget(
+        wrapApp(const TastingFormScreen(beanId: 1, roastDate: null), db: db));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byType(TextField).first); // focus the comment field
+    await tester.tap(find.byKey(const Key('tasting-comment'))); // focus the comment field
     await tester.pump();
     expect(_textFieldFocused(), isTrue);
 

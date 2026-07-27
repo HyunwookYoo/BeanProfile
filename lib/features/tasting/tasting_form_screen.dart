@@ -132,7 +132,6 @@ class _TastingFormScreenState extends ConsumerState<TastingFormScreen> {
     final deg = degassingLabel(roastDate: widget.roastDate, tastingDate: _date);
     if (deg == null) return const SizedBox.shrink(); // roastDate가 있으면 도달하지 않는다
     return Row(children: [
-      label,
       Text(deg.text,
           style: monoStyle(
               size: 13, weight: FontWeight.w600,

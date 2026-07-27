@@ -42,6 +42,8 @@ void main() {
         reason: '숫자의 출처를 감추지 않는다');
     expect(find.byKey(const Key('degassing-input')), findsNothing,
         reason: '계산되는 값이라 입력칸이 없어야 한다');
+    expect(find.textContaining('디개싱'), findsOneWidget,
+        reason: '별도 라벨과 계산된 텍스트가 겹쳐 두 번 나오면 안 된다');
   });
 
   testWidgets('시음일을 바꾸면 표시된 일수가 따라 바뀐다', (tester) async {
@@ -49,20 +51,29 @@ void main() {
     addTearDown(db.close);
     final repo = testRepository(db);
     final beanId = await repo.createBean(sampleSingle());
+    // 시음일을 고정해야 날짜 선택기의 initialDate(=_date)가 항상 같은 달로 열리고,
+    // DateTime.now()에 얹혀 있던 흔들리는 값(달 경계 넘으면 실패)이 사라진다.
+    await repo.createTasting(beanId, sampleTasting(date: DateTime(2026, 7, 20)));
+    final tasting = (await repo.getBeanDetail(beanId))!.tastings.first;
 
     await tester.pumpWidget(wrapApp(
-        TastingFormScreen(beanId: beanId, roastDate: DateTime(2026, 7, 19)),
+        TastingFormScreen(
+            beanId: beanId,
+            roastDate: DateTime(2026, 7, 19),
+            existing: tasting),
         db: db));
     await tester.pumpAndSettle();
 
+    expect(find.text('디개싱 1일'), findsOneWidget); // 2026-07-20 기준, 바뀌기 전
+
     await tester.tap(find.text('날짜 선택'));
     await tester.pumpAndSettle();
-    // 날짜 선택기를 27일로 옮긴다 — 기본값이 오늘이라 직접 고른다.
+    // 날짜 선택기가 시음일(2026-07-20)이 속한 7월로 열리므로 27을 눌러 같은 달 안에서 옮긴다.
     await tester.tap(find.text('27'));
     await tester.tap(find.text('OK'));
     await tester.pumpAndSettle();
 
-    expect(find.text('디개싱 8일'), findsOneWidget);
+    expect(find.text('디개싱 8일'), findsOneWidget); // 2026-07-27로 바뀐 뒤
   });
 
   testWidgets('로스팅 날짜가 없으면 직접 입력해서 저장한다', (tester) async {

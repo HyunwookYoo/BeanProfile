@@ -108,6 +108,9 @@ base64 -w 0 beanprofile.jks > beanprofile.jks.base64   # → Secret에 붙여넣
 | 5 | App Store Connect **API 키** (`.p8`, App Manager 역할) | App Store Connect → Users and Access → Integrations |
 | 6 | 앱 레코드 생성 (App ID 연결) | App Store Connect |
 
+> **Team ID = `9J2FNH63M2`** (2026-07-28 확보). 비밀값이 아니다 — `project.pbxproj`의
+> `DEVELOPMENT_TEAM`에 커밋돼 있고, CI가 만드는 `ExportOptions.plist`에도 들어간다.
+
 > 🔒 **번들 ID `com.hyunwook.beanprofile`은 영구값이다.** Apple App ID이자 Android `applicationId`로 굳는다.
 > 나중에 바꾸면 **양쪽 OS 모두 "다른 앱"으로 취급** → 기존 앱 위에 설치 불가 → 삭제 후 재설치 → **시음 기록 소실**. iOS는 App Store Connect 레코드도 새로 만들어야 한다.
 > **2번을 하기 전에 확정할 것.** (`flutter create --org com.hyunwook --project-name beanprofile`과 반드시 일치)
@@ -118,13 +121,21 @@ base64 -w 0 beanprofile.jks > beanprofile.jks.base64   # → Secret에 붙여넣
 
 ```bash
 openssl genrsa -out ios_dist.key 2048
-openssl req -new -key ios_dist.key -out ios_dist.csr \
+# MSYS_NO_PATHCONV=1 필수 — 없으면 Git Bash가 "/emailAddress=..."를 Windows 경로로
+# 변환해 'C:/Program Files/Git/emailAddress=...'가 되고 req가 형식 오류로 죽는다.
+MSYS_NO_PATHCONV=1 openssl req -new -key ios_dist.key -out ios_dist.csr \
   -subj "/emailAddress=hyunwook5636@gmail.com/CN=hyunwook/C=KR"
 # → developer.apple.com에 ios_dist.csr 업로드 → dist.cer 다운로드
 openssl x509 -inform DER -in dist.cer -out dist.pem
 openssl pkcs12 -export -inkey ios_dist.key -in dist.pem -out dist.p12
 base64 -w 0 dist.p12 > dist.p12.base64
 ```
+
+> 실제 산출물은 저장소 밖 **`C:\Users\hyunw\BeanProfile-signing\`** 에 둔다(2026-07-28 생성).
+
+> ⚠️ CI의 `import-codesign-certs` 스텝이 `.p12`를 못 읽고 죽으면 **OpenSSL 3.x의 PKCS12
+> 기본 알고리즘**을 의심할 것. 3.0부터 기본이 AES-256/PBKDF2로 바뀌어 macOS `security import`가
+> 거부하는 경우가 있다. 그때는 `-export`에 `-legacy`를 붙여 다시 만든다.
 
 **인증서는 1년짜리다. 연 1회 갱신이 필요하다(§6).**
 
@@ -346,7 +357,7 @@ jobs:
 
 > ⚠️ **IPA 이름을 하드코딩하지 말 것.** `flutter build ipa`는 Xcode 제품명으로 파일명을 짓는다(`beanprofile.ipa` 등). 하드코딩하면 업로드 스텝에서 파일을 못 찾고 실패하는데, 맥이 없으면 이걸 CI 로그로만 진단해야 해서 시간을 크게 잡아먹는다. 위처럼 `ls`로 찾아서 넘긴다.
 
-### `ios/ExportOptions.plist` (커밋함 — 비밀 아님)
+### `ios/ExportOptions.plist` (커밋하지 않음 — CI가 매 빌드 생성)
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -366,7 +377,17 @@ jobs:
 </plist>
 ```
 
-`TEAM_ID`·`PROFILE_NAME`·번들 ID는 M0에서 실제 값으로 채운다. 최신 Xcode는 `method`로 `app-store-connect`를 선호하므로 경고가 뜨면 교체한다.
+**실제 구현은 이 파일을 커밋하지 않는다.** `appstore` 잡이 프로비저닝 프로파일을 복호화해
+`Name`·`UUID`·`TeamIdentifier`를 읽어낸 뒤 위 형태로 생성한다(`method`는 `app-store-connect`,
+프로파일은 이름 대신 **UUID**로 지정).
+
+이유는 `.ipa` 파일명을 `ls`로 찾는 것과 같다 — **프로파일 이름을 하드코딩하면 오타나 프로파일
+재발급으로 이름이 바뀌었을 때 맥 없이 CI 로그만 보고 진단해야 한다.** 프로파일 자신에게서 읽으면
+그 실패 경로가 아예 없어지고, 매년 인증서·프로파일을 갱신해도 워크플로를 고칠 필요가 없다.
+
+> ⚠️ §2의 "re-run 하면 `run_number`가 유지된다" 함정이 **이제 실제로 문제가 된다.** 미서명
+> AltStore 빌드만 있던 동안엔 빌드 번호 중복이 무해했지만, App Store Connect는 중복 번호를
+> 거부한다. 실패했으면 re-run 하지 말고 태그를 올려서 다시 밀 것.
 
 ---
 

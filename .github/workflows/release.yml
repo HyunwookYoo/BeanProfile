@@ -1,8 +1,11 @@
 name: release
 
 # BeanProfile 배포 파이프라인 — v* 태그 push 또는 수동 진단 빌드 시 실행.
-# 무료 Apple ID 경로: CI(macOS 러너)가 "미서명" .ipa를 만들어 GitHub Release에 첨부.
-# 서명·설치는 로컬 AltStore가 담당 (CI에 Apple 서명 비밀 없음).
+#
+# 두 경로가 나란히 돈다:
+#  - ios      : "미서명" .ipa → GitHub Release. 서명·설치는 로컬 AltStore가 담당.
+#  - appstore : 서명된 .ipa → App Store Connect 업로드. 서명 시크릿이 있을 때만 실행.
+# App Store 심사를 통과하기 전까지 AltStore 경로가 유일한 설치 수단이므로 함께 유지한다.
 # 규약: docs/deployment.md · 계획: docs/plans/milestone-0-delivery.md
 on:
   push:
@@ -84,3 +87,97 @@ jobs:
             설치: 아이폰에서 이 .ipa를 내려받아 AltStore → My Apps → + 로 선택하면
             AltStore가 서명해 설치합니다. (PC에서 AltServer 실행 + 같은 WiFi 필요)
           files: beanprofile-${{ github.ref_name }}.ipa
+
+  # 서명 시크릿이 아직 없을 때 appstore 잡을 통째로 건너뛰기 위한 게이트.
+  # secrets 컨텍스트는 job 수준 if에서 못 읽으므로 별도 잡의 output으로 넘긴다.
+  appstore-gate:
+    needs: test
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.check.outputs.ready }}
+    steps:
+      - id: check
+        env:
+          CERT_B64: ${{ secrets.IOS_DIST_CERT_P12_BASE64 }}
+          PROFILE_B64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+          KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+        run: |
+          if [ -n "$CERT_B64" ] && [ -n "$PROFILE_B64" ] && [ -n "$KEY_ID" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::App Store 서명 시크릿이 없어 업로드를 건너뜁니다. AltStore용 미서명 .ipa는 정상 생성됩니다."
+          fi
+
+  appstore:
+    needs: [test, appstore-gate]
+    if: needs.appstore-gate.outputs.ready == 'true'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+
+      - name: 배포 인증서 가져오기
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.IOS_DIST_CERT_P12_BASE64 }}
+          p12-password: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+
+      # 프로파일 이름을 하드코딩하지 않고 프로파일 자체에서 읽어 쓴다.
+      # 맥이 없어 CI 로그로만 진단해야 하므로, 이름 오타 한 글자로 막히는 경로를 없앤다
+      # (.ipa 파일명을 ls로 찾는 것과 같은 이유 — docs/deployment.md §8).
+      - name: 프로비저닝 프로파일 설치 + ExportOptions.plist 생성
+        env:
+          PROFILE_B64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          dest="$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$dest"
+          echo "$PROFILE_B64" | base64 -d > /tmp/profile.mobileprovision
+          security cms -D -i /tmp/profile.mobileprovision > /tmp/profile.plist
+          uuid=$(/usr/libexec/PlistBuddy -c 'Print :UUID' /tmp/profile.plist)
+          name=$(/usr/libexec/PlistBuddy -c 'Print :Name' /tmp/profile.plist)
+          team=$(/usr/libexec/PlistBuddy -c 'Print :TeamIdentifier:0' /tmp/profile.plist)
+          cp /tmp/profile.mobileprovision "$dest/$uuid.mobileprovision"
+          echo "프로파일 '$name' / UUID $uuid / 팀 $team"
+          cat > ios/ExportOptions.plist <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>teamID</key><string>$team</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>uploadSymbols</key><true/>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>com.hyunwook.beanprofile</key><string>$uuid</string>
+            </dict>
+          </dict>
+          </plist>
+          EOF
+
+      # 진단 기능은 App Store 빌드에 절대 실리면 안 되므로 false로 못박는다.
+      - name: 서명된 .ipa 빌드
+        run: |
+          BUILD_NAME="${GITHUB_REF_NAME#v}"
+          flutter build ipa --release \
+            --build-name="$BUILD_NAME" \
+            --build-number="${{ github.run_number }}" \
+            --dart-define=APP_VERSION="$BUILD_NAME" \
+            --dart-define=ENABLE_OCR_DIAGNOSTICS=false \
+            --export-options-plist=ios/ExportOptions.plist
+
+      - name: .ipa 경로 확인
+        run: echo "IPA_PATH=$(ls build/ios/ipa/*.ipa | head -1)" >> "$GITHUB_ENV"
+
+      - name: App Store Connect 업로드
+        uses: apple-actions/upload-testflight-build@v4
+        with:
+          app-path: ${{ env.IPA_PATH }}
+          issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ secrets.APPSTORE_KEY_ID }}
+          api-private-key: ${{ secrets.APPSTORE_PRIVATE_KEY }}

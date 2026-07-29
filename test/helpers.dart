@@ -1,3 +1,4 @@
+import 'package:beanprofile/app.dart';
 import 'package:beanprofile/data/bean_repository.dart';
 import 'package:beanprofile/data/database.dart';
 import 'package:beanprofile/data/enums.dart';
@@ -43,7 +44,14 @@ Widget wrapApp(Widget child,
         if (photo != null) photoServiceProvider.overrideWithValue(photo),
         if (backup != null) backupServiceProvider.overrideWithValue(backup),
       ],
-      child: MaterialApp(theme: AppTheme.light, home: child),
+      child: MaterialApp(
+        theme: AppTheme.light,
+        // 실제 앱과 같은 언어로 렌더해야 시스템 위젯(날짜 선택기 등)을 찾는
+        // 단언이 화면과 어긋나지 않는다. lib/app.dart의 주석 참고.
+        localizationsDelegates: appLocalizationsDelegates,
+        supportedLocales: appSupportedLocales,
+        home: child,
+      ),
     );
 
 /// 샘플 싱글 오리진.

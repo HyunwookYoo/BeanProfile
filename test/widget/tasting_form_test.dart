@@ -70,7 +70,7 @@ void main() {
     await tester.pumpAndSettle();
     // 날짜 선택기가 시음일(2026-07-20)이 속한 7월로 열리므로 27을 눌러 같은 달 안에서 옮긴다.
     await tester.tap(find.text('27'));
-    await tester.tap(find.text('OK'));
+    await tester.tap(find.text('확인'));
     await tester.pumpAndSettle();
 
     expect(find.text('디개싱 8일'), findsOneWidget); // 2026-07-27로 바뀐 뒤

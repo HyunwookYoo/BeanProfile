@@ -82,9 +82,9 @@ class OcrChipsPanel extends StatelessWidget {
         side: border,
         deleteIcon: const Icon(Icons.close, size: 18),
         onDeleted: () => onSplit(index),
-        // 기본 삭제 툴팁은 MaterialLocalizations의 영어 'Delete'로 떨어진다(로컬라이제이션
-        // 미등록) — 문구도 틀리고(✕는 분해지 삭제가 아님), Tooltip이 LongPressDraggable과
-        // 같은 kLongPressTimeout에 경쟁하는 제스처 인식기까지 깐다. 빈 문자열은
+        // 기본 삭제 툴팁은 MaterialLocalizations의 '삭제'로 떨어진다 — 문구가 틀리고
+        // (✕는 분해지 삭제가 아님), Tooltip이 LongPressDraggable과 같은
+        // kLongPressTimeout에 경쟁하는 제스처 인식기까지 깐다. 빈 문자열은
         // Tooltip.build가 그대로 반환해 둘 다 없앤다.
         deleteButtonTooltipMessage: '',
       );

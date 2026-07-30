@@ -25,6 +25,23 @@ end
 
 require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
 
+# ML Kit은 arm64-iphoneos와 x86_64-iphonesimulator 슬라이스만 배포한다 —
+# arm64 시뮬레이터 슬라이스가 없다. 그래서 Apple Silicon 러너에서 시뮬레이터로
+# 빌드하면 Pods 우산 프레임워크가 만들어지지 못하고 링커가 이렇게 죽는다:
+#   Error (Xcode): Framework 'Pods_Runner' not found
+# google_mlkit_commons가 제공하는 옵트인 헬퍼가 빌드마다 arm64 슬라이스의
+# 플랫폼 라벨을 대상에 맞춰 바꿔 이를 우회한다.
+#
+# 스크린샷(시뮬레이터) 빌드에서만 켠다. App Store로 나가는 기기 빌드는 이 경로를
+# 로드조차 하지 않으므로, 재라벨링이 출시 바이너리에 닿을 여지가 없다.
+mlkit_sim_patch = ENV['MLKIT_SIM_PATCH'] == 'true'
+if mlkit_sim_patch
+  require File.expand_path(
+    '.symlinks/plugins/google_mlkit_commons/ios/scripts/apple_silicon_simulator',
+    __dir__,
+  )
+end
+
 flutter_ios_podfile_setup
 
 target 'Runner' do
@@ -43,4 +60,5 @@ post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
   end
+  mlkit_apple_silicon_simulator_patch(installer) if mlkit_sim_patch
 end

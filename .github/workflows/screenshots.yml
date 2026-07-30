@@ -47,7 +47,11 @@ jobs:
           xcrun simctl bootstatus "$UDID"
           echo "SIM_UDID=$UDID" >> "$GITHUB_ENV"
 
+      # MLKIT_SIM_PATCH는 Podfile의 arm64 시뮬레이터 우회를 켠다. 시뮬레이터
+      # 빌드에만 필요하며, release.yml은 이 값을 설정하지 않는다.
       - name: 촬영
+        env:
+          MLKIT_SIM_PATCH: 'true'
         run: |
           flutter devices
           flutter drive \

@@ -236,9 +236,36 @@ Error (Xcode): Framework 'Pods_Runner' not found
 Error (Xcode): Linker command failed with exit code 1
 ```
 
-로컬 재현이 불가능한 종류다 — Windows에는 Xcode가 없어 `flutter build ios`를 돌려볼 수 없고, 러너의 Flutter는 `stable`을 따라 조용히 올라간다. **v0.8.0까지 멀쩡하던 파이프라인이 코드 변경 없이 깨질 수 있다는 뜻이다.**
-
 플러그인 두 개가 SPM을 못 쓰는 이상 이 프로젝트는 CocoaPods가 정답이므로, 이건 임시방편이 아니라 올바른 설정이다. 적용 대상: `release.yml`의 `ios`·`appstore`, `screenshots.yml`의 `screenshots`. (`test` 잡은 ubuntu라 해당 없음.)
+
+> **주의 — 이건 아래 F의 원인이 아니다.** SPM을 끈 뒤에도 시뮬레이터 빌드는 같은
+> `Pods_Runner not found`로 계속 실패했다. 두 로그를 비교해 확인한 사실이다.
+> SPM 비활성화는 빌드를 결정적으로 만드는 별개의 옳은 설정일 뿐,
+> 기기(릴리스) 빌드가 이것 때문에 깨진 적은 없다 — `v0.8.0`은 정상 출시됐다.
+
+### F. ML Kit은 arm64 시뮬레이터 슬라이스가 없다 🏗️
+
+**증상은 E와 똑같지만 원인이 다르다.** Apple Silicon 러너(`macos-26-arm64`)에서 시뮬레이터로 빌드하면:
+
+```
+Could not build the application for the simulator.
+Error (Xcode): Framework 'Pods_Runner' not found
+```
+
+Google의 `GoogleMLKit/*` 팟은 **`arm64-iphoneos`와 `x86_64-iphonesimulator`만** 배포하고 시뮬레이터 빌드에서 arm64를 제외한다. iOS 26부터 시뮬레이터가 Rosetta를 기본으로 쓰지 않으므로, Apple Silicon에서는 arm64 시뮬레이터가 필수인데 그 슬라이스가 없다. 그래서 Pods 우산 프레임워크가 만들어지지 못한다. (업스트림: `issuetracker.google.com/issues/178965151`)
+
+`google_mlkit_commons` 0.12.0이 옵트인 Podfile 헬퍼를 제공한다. `ios/Podfile`에서 **`MLKIT_SIM_PATCH=true`일 때만** 켜지게 해뒀다.
+
+| 빌드 | 환경변수 | 헬퍼 |
+|---|---|---|
+| `screenshots.yml` (시뮬레이터) | `MLKIT_SIM_PATCH=true` | 적용 |
+| `release.yml` (기기 → App Store) | 설정 안 함 | **`require`조차 안 함** |
+
+기기 빌드는 이 코드 경로를 로드하지도 않으므로, 바이너리 재라벨링이 출시본에 닿을 수 없다. **이 구분을 없애지 말 것** — 스크린샷은 있으면 좋은 것이고 출시 바이너리는 그렇지 않다.
+
+> **이 계열 고장은 CI에서만 드러난다.** Windows에는 Xcode도 CocoaPods도 없어
+> `flutter build ios`를 로컬에서 돌려볼 수 없다. 시뮬레이터 경로가 막혀도
+> 기기 경로는 멀쩡할 수 있으니, 둘을 같은 고장으로 묶어 판단하지 말 것.
 
 ---
 

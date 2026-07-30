@@ -221,6 +221,25 @@ TestFlight 빌드는 **업로드 90일 후 만료**되고, 만료되면 아이�
 
 AltStore 사이드로드는 "일단 이전 빌드로 되돌려보자"가 흔한 트러블슈팅이라 특히 걸리기 쉽다. **해결책은 v0.8.0 이상 빌드를 다시 설치하는 것** — 실패한 다운그레이드 자체가 데이터를 지우진 않는다(DB 파일은 그대로 남고, 여는 데만 실패한다).
 
+### E. iOS를 빌드하는 잡은 SPM을 꺼야 한다 📦
+
+**iOS를 빌드하는 모든 CI 잡은 `flutter config --no-enable-swift-package-manager`를 먼저 실행해야 한다.**
+
+`flutter config`의 `enable-swift-package-manager`는 **기본값이 on**이라, 러너의 Flutter가 빌드 도중 이 CocoaPods 프로젝트를 Swift Package Manager로 자동 마이그레이션한다. 그런데 `google_mlkit_commons`·`google_mlkit_text_recognition`이 SPM을 지원하지 않아 CocoaPods와 섞이고, 링커가 이렇게 죽는다:
+
+```
+Adding Swift Package Manager integration...
+The following plugins do not support Swift Package Manager for ios:
+  - google_mlkit_commons
+  - google_mlkit_text_recognition
+Error (Xcode): Framework 'Pods_Runner' not found
+Error (Xcode): Linker command failed with exit code 1
+```
+
+로컬 재현이 불가능한 종류다 — Windows에는 Xcode가 없어 `flutter build ios`를 돌려볼 수 없고, 러너의 Flutter는 `stable`을 따라 조용히 올라간다. **v0.8.0까지 멀쩡하던 파이프라인이 코드 변경 없이 깨질 수 있다는 뜻이다.**
+
+플러그인 두 개가 SPM을 못 쓰는 이상 이 프로젝트는 CocoaPods가 정답이므로, 이건 임시방편이 아니라 올바른 설정이다. 적용 대상: `release.yml`의 `ios`·`appstore`, `screenshots.yml`의 `screenshots`. (`test` 잡은 ubuntu라 해당 없음.)
+
 ---
 
 ## 7. 로드맵 편입 — M0 신설

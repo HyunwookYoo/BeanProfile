@@ -18,6 +18,8 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+      # SPM 자동 마이그레이션을 끈다 — 켜두면 Pods_Runner 링크가 깨진다(§6-E).
+      - run: flutter config --no-enable-swift-package-manager
       # database.g.dart가 커밋돼 있어 codegen 없이 빌드된다(ios 잡과 같은 전제).
       - run: flutter pub get
 

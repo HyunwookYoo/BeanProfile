@@ -48,6 +48,8 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+      # SPM 자동 마이그레이션을 끈다 — 켜두면 Pods_Runner 링크가 깨진다(§6-E).
+      - run: flutter config --no-enable-swift-package-manager
       - run: flutter pub get
       - name: Build unsigned iOS app
         env:
@@ -119,6 +121,8 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+      # SPM 자동 마이그레이션을 끈다 — 켜두면 Pods_Runner 링크가 깨진다(§6-E).
+      - run: flutter config --no-enable-swift-package-manager
       - run: flutter pub get
 
       - name: 배포 인증서 가져오기

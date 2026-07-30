@@ -1,0 +1,68 @@
+name: screenshots
+
+# App Store 제출용 스크린샷을 macOS 러너의 iOS 시뮬레이터에서 촬영한다.
+#
+# 개발 머신이 Windows라 이 잡은 로컬에서 한 번도 돌려볼 수 없다. 그래서
+#  - 태그가 아니라 수동 실행 전용으로 두고(반복 비용을 사람이 통제),
+#  - 실패해도 산출물을 artifact로 올려 눈으로 원인을 볼 수 있게 하고,
+#  - 시뮬레이터 목록·선택 결과·실제 해상도를 전부 로그에 찍는다.
+# 규약: docs/deployment.md
+on:
+  workflow_dispatch:
+
+jobs:
+  screenshots:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      # database.g.dart가 커밋돼 있어 codegen 없이 빌드된다(ios 잡과 같은 전제).
+      - run: flutter pub get
+
+      - name: 시뮬레이터 선택 + 부팅
+        run: |
+          echo "--- 설치된 런타임 ---"
+          xcrun simctl list runtimes
+          echo "--- 사용 가능한 iPhone ---"
+          xcrun simctl list devices available | grep -i iphone || true
+
+          # 6.9인치(1320x2868) 계열을 우선한다. 없으면 6.7인치로 내려간다.
+          UDID=""
+          for NAME in "iPhone 17 Pro Max" "iPhone 16 Pro Max" "iPhone 15 Pro Max"; do
+            UDID=$(xcrun simctl list devices available \
+                   | grep "$NAME (" | head -1 \
+                   | sed -E 's/.*\(([0-9A-Fa-f-]{36})\).*/\1/')
+            if [ -n "$UDID" ]; then echo "선택: $NAME ($UDID)"; break; fi
+          done
+          if [ -z "$UDID" ]; then
+            echo "::error::Pro Max 시뮬레이터를 찾지 못했습니다 — 위 목록에서 기종명을 확인해 워크플로를 고쳐야 합니다"
+            exit 1
+          fi
+
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID"
+          echo "SIM_UDID=$UDID" >> "$GITHUB_ENV"
+
+      - name: 촬영
+        run: |
+          flutter devices
+          flutter drive \
+            --driver=test_driver/screenshot_driver.dart \
+            --target=integration_test/screenshots_test.dart \
+            -d "$SIM_UDID"
+
+      # 실패해도 돌린다 — 몇 장까지 찍혔는지가 곧 어디서 멈췄는지의 단서다.
+      - name: 규격 검증
+        if: always()
+        run: python3 scripts/verify_screenshots.py screenshots
+
+      - name: 업로드
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: appstore-screenshots
+          path: screenshots/
+          retention-days: 14
+          if-no-files-found: warn

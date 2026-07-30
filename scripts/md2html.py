@@ -7,7 +7,10 @@
 
 사용법:
     python scripts/md2html.py docs/plans/roadmap.md [다른.md ...]
-    python scripts/md2html.py --all      # docs/ 아래 모든 .md 변환
+    python scripts/md2html.py --all           # docs/ 아래 모든 .md 변환
+    python scripts/md2html.py --standalone docs/privacy.md
+        # 완전한 HTML 문서로 출력(doctype·charset·viewport 포함).
+        # Artifact가 아니라 GitHub Pages처럼 파일을 그대로 서빙할 때 쓴다.
 
 각 <경로>.md 는 같은 위치에 <경로>.html 로 출력된다.
 Artifact로 발행하려면 생성된 .html 을 발행하면 된다(동일 경로 재발행 시 URL 유지).
@@ -199,18 +202,29 @@ def crumb_for(md_path):
         return 'BeanProfile'
 
 
-def build(md_path):
+def build(md_path, standalone=False):
     md = md_path.read_text(encoding='utf-8')
     body, title = convert(md)
-    page = ('<title>%s</title>\n<style>%s</style>\n'
-            '<article class="doc"><div class="crumb">%s</div>\n%s\n</article>'
-            % (title, CSS, html.escape(crumb_for(md_path), quote=False), body))
+    head = '<title>%s</title>\n<style>%s</style>\n' % (title, CSS)
+    doc = ('<article class="doc"><div class="crumb">%s</div>\n%s\n</article>'
+           % (html.escape(crumb_for(md_path), quote=False), body))
+    if standalone:
+        # Artifact 발행은 doctype/head를 대신 감싸주지만, GitHub Pages처럼 파일을
+        # 그대로 서빙하는 곳에서는 viewport 메타가 없으면 폰에서 축소돼 보인다.
+        page = ('<!DOCTYPE html>\n<html lang="ko">\n<head>\n'
+                '<meta charset="utf-8">\n'
+                '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
+                '%s</head>\n<body>\n%s\n</body>\n</html>\n' % (head, doc))
+    else:
+        page = head + doc
     out_path = md_path.with_suffix('.html')
     out_path.write_text(page, encoding='utf-8')
     return out_path, title
 
 
 def main(argv):
+    standalone = '--standalone' in argv
+    argv = [a for a in argv if a != '--standalone']
     if not argv:
         print(__doc__)
         return 1
@@ -225,7 +239,7 @@ def main(argv):
         if not md_path.exists():
             print('건너뜀(없음): %s' % md_path)
             continue
-        out_path, title = build(md_path)
+        out_path, title = build(md_path, standalone)
         print('생성: %s  (제목: %s)' % (out_path.relative_to(ROOT) if out_path.is_relative_to(ROOT) else out_path, title))
     return 0
 

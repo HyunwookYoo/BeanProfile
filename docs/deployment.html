@@ -76,6 +76,8 @@ ul.tasklist li.task.done::before{content:"\2713";background:var(--accent);color:
 <p>태그 <code class="ic">v1.2.3</code> → <code class="ic">--build-name=1.2.3</code>, <code class="ic">--build-number=&lt;github.run_number&gt;</code>.</p>
 <p>빌드 번호는 <strong>반드시 단조 증가</strong>해야 한다. TestFlight는 중복 번호를 거부하고, Android <code class="ic">versionCode</code>도 역행할 수 없다. <code class="ic">run_number</code>는 워크플로 실행마다 증가하므로 조건을 만족한다.</p>
 <blockquote>⚠️ <strong>함정:</strong> 실패한 워크플로를 <strong>re-run 하면 <code class="ic">run_number</code>가 유지</strong>된다 → TestFlight가 중복으로 거부한다. 실패했으면 re-run 하지 말고 <strong>태그를 올려서</strong>(<code class="ic">v0.0.2</code>) 다시 밀 것.</blockquote>
+<p>설정 화면의 버전 표시도 <strong>같은 <code class="ic">BUILD_NAME</code>에서 나온다</strong> — 워크플로가 <code class="ic">--dart-define=APP_VERSION="$BUILD_NAME"</code>으로 주입하고, <code class="ic">kAppVersion</code>이 <code class="ic">String.fromEnvironment</code>로 읽는다. 릴리스 때 <strong>손으로 올릴 상수는 없다.</strong> 주입이 없는 로컬 빌드는 <code class="ic">dev</code>로 표시된다.</p>
+<blockquote>M5는 <code class="ic">package_info_plus</code>를 피하려고 버전을 손으로 관리하는 상수로 뒀는데, 태그와 아무 연결이 없어 <code class="ic">v0.6.1</code>~<code class="ic">v0.6.12</code>가 <strong>12번 연속</strong> <code class="ic">v0.6.0</code>으로 표시됐다. 사람이 기억해야 하는 릴리스 단계는 만들지 않는다.</blockquote>
 <h3>OCR 개발자 진단 빌드</h3>
 <p><code class="ic">OCR 진단 복사</code>는 일반 release 빌드에서 숨긴다. 로컬 debug 빌드에서는 자동으로 표시되고, iPhone에서 다시 필요할 때만 GitHub Actions의 <strong>release → Run workflow</strong>를 수동 실행한다.</p>
 <ol><li>실행할 브랜치를 선택한다.</li><li><code class="ic">build_name</code>에 현재 앱 버전(예: <code class="ic">0.6.11</code>)을 입력한다.</li><li>완료 후 실행 결과의 Artifacts에서 <code class="ic">beanprofile-diagnostic-*</code>를 내려받는다.</li><li>압축 안의 미서명 IPA를 AltStore로 설치한다.</li></ol>
@@ -92,16 +94,21 @@ base64 -w 0 beanprofile.jks &gt; beanprofile.jks.base64   # → Secret에 붙여
 <h2>4. 1회성 셋업 — Apple (~1~2시간)</h2>
 <p>맥 없이 <strong>브라우저 + 아이폰 + Windows의 OpenSSL</strong>로 전부 가능하다.</p>
 <div class="tablewrap"><table><thead><tr><th>#</th><th>할 일</th><th>어디서</th></tr></thead><tbody><tr><td>1</td><td>Developer Program 가입 ($99/년)</td><td>아이폰 Apple Developer 앱 또는 웹</td></tr><tr><td>2</td><td>App ID 생성 — <strong><code class="ic">com.hyunwook.beanprofile</code></strong> (확정, §4 하단 참고)</td><td>developer.apple.com</td></tr><tr><td>3</td><td>배포 인증서 → <code class="ic">.p12</code></td><td><strong>Windows / OpenSSL</strong> (아래)</td></tr><tr><td>4</td><td>Provisioning Profile (App Store 배포용)</td><td>developer.apple.com</td></tr><tr><td>5</td><td>App Store Connect <strong>API 키</strong> (<code class="ic">.p8</code>, App Manager 역할)</td><td>App Store Connect → Users and Access → Integrations</td></tr><tr><td>6</td><td>앱 레코드 생성 (App ID 연결)</td><td>App Store Connect</td></tr></tbody></table></div>
+<blockquote><strong>Team ID = <code class="ic">9J2FNH63M2</code></strong> (2026-07-28 확보). 비밀값이 아니다 — <code class="ic">project.pbxproj</code>의 <code class="ic">DEVELOPMENT_TEAM</code>에 커밋돼 있고, CI가 만드는 <code class="ic">ExportOptions.plist</code>에도 들어간다.</blockquote>
 <blockquote>🔒 <strong>번들 ID <code class="ic">com.hyunwook.beanprofile</code>은 영구값이다.</strong> Apple App ID이자 Android <code class="ic">applicationId</code>로 굳는다. 나중에 바꾸면 <strong>양쪽 OS 모두 "다른 앱"으로 취급</strong> → 기존 앱 위에 설치 불가 → 삭제 후 재설치 → <strong>시음 기록 소실</strong>. iOS는 App Store Connect 레코드도 새로 만들어야 한다. <strong>2번을 하기 전에 확정할 것.</strong> (<code class="ic">flutter create --org com.hyunwook --project-name beanprofile</code>과 반드시 일치)</blockquote>
 <h3>3번 — 맥 없이 인증서 만들기</h3>
 <p>보통 Keychain Access(맥)로 하는 CSR 생성을 OpenSSL로 대체한다.</p>
 <pre class="code" data-lang="bash"><code>openssl genrsa -out ios_dist.key 2048
-openssl req -new -key ios_dist.key -out ios_dist.csr \
+# MSYS_NO_PATHCONV=1 필수 — 없으면 Git Bash가 "/emailAddress=..."를 Windows 경로로
+# 변환해 'C:/Program Files/Git/emailAddress=...'가 되고 req가 형식 오류로 죽는다.
+MSYS_NO_PATHCONV=1 openssl req -new -key ios_dist.key -out ios_dist.csr \
   -subj "/emailAddress=hyunwook5636@gmail.com/CN=hyunwook/C=KR"
 # → developer.apple.com에 ios_dist.csr 업로드 → dist.cer 다운로드
 openssl x509 -inform DER -in dist.cer -out dist.pem
 openssl pkcs12 -export -inkey ios_dist.key -in dist.pem -out dist.p12
 base64 -w 0 dist.p12 &gt; dist.p12.base64</code></pre>
+<blockquote>실제 산출물은 저장소 밖 <strong><code class="ic">C:\Users\hyunw\BeanProfile-signing\</code></strong> 에 둔다(2026-07-28 생성).</blockquote>
+<blockquote>⚠️ CI의 <code class="ic">import-codesign-certs</code> 스텝이 <code class="ic">.p12</code>를 못 읽고 죽으면 <strong>OpenSSL 3.x의 PKCS12 기본 알고리즘</strong>을 의심할 것. 3.0부터 기본이 AES-256/PBKDF2로 바뀌어 macOS <code class="ic">security import</code>가 거부하는 경우가 있다. 그때는 <code class="ic">-export</code>에 <code class="ic">-legacy</code>를 붙여 다시 만든다.</blockquote>
 <p><strong>인증서는 1년짜리다. 연 1회 갱신이 필요하다(§6).</strong></p>
 <blockquote><strong>6번 주의:</strong> App Store Connect의 앱 이름은 <strong>App Store 전체에서 유일</strong>해야 한다. <code class="ic">BeanProfile</code>이 선점돼 있으면 다른 이름으로 등록한다(앱 내 표시명과 무관).</blockquote>
 <h3>대안 (지금은 채택 안 함)</h3>
@@ -133,6 +140,9 @@ android/key.properties</code></pre>
 <pre class="code" data-lang="xml"><code>&lt;key&gt;ITSAppUsesNonExemptEncryption&lt;/key&gt;
 &lt;false/&gt;</code></pre>
 <p>없으면 <strong>빌드마다 App Store Connect 웹에서 수출 규정 질문에 손으로 답해야</strong> 테스터에게 풀린다. 태그 자동화가 거기서 멈추므로 반드시 넣는다.</p>
+<h3>D. 마이그레이션 이후로 다운그레이드하면 DB가 안 열린다 ⬇️</h3>
+<p><code class="ic">v0.8.0</code>부터 <code class="ic">Tastings</code>에 이 프로젝트 첫 drift 마이그레이션(<code class="ic">schemaVersion</code> 1→2)이 들어갔다. 한 번 v2로 연 폰에 <strong>그보다 오래된 빌드</strong>(마이그레이션이 없는 버전)를 다시 설치하면, drift가 자신이 모르는 스키마 버전을 만나 "마이그레이션 전략이 없다"는 예외를 던지며 <strong>DB 자체를 못 연다</strong> — 앱이 뜨지 않는다.</p>
+<p>AltStore 사이드로드는 "일단 이전 빌드로 되돌려보자"가 흔한 트러블슈팅이라 특히 걸리기 쉽다. <strong>해결책은 v0.8.0 이상 빌드를 다시 설치하는 것</strong> — 실패한 다운그레이드 자체가 데이터를 지우진 않는다(DB 파일은 그대로 남고, 여는 데만 실패한다).</p>
 <hr>
 <h2>7. 로드맵 편입 — M0 신설</h2>
 <p>파이프라인은 <code class="ic">flutter create</code> 직후에 뚫는다. 이유:</p>
@@ -249,7 +259,7 @@ jobs:
           api-key-id: ${{ secrets.APPSTORE_KEY_ID }}
           api-private-key: ${{ secrets.APPSTORE_PRIVATE_KEY }}</code></pre>
 <blockquote>⚠️ <strong>IPA 이름을 하드코딩하지 말 것.</strong> <code class="ic">flutter build ipa</code>는 Xcode 제품명으로 파일명을 짓는다(<code class="ic">beanprofile.ipa</code> 등). 하드코딩하면 업로드 스텝에서 파일을 못 찾고 실패하는데, 맥이 없으면 이걸 CI 로그로만 진단해야 해서 시간을 크게 잡아먹는다. 위처럼 <code class="ic">ls</code>로 찾아서 넘긴다.</blockquote>
-<h3><code class="ic">ios/ExportOptions.plist</code> (커밋함 — 비밀 아님)</h3>
+<h3><code class="ic">ios/ExportOptions.plist</code> (커밋하지 않음 — CI가 매 빌드 생성)</h3>
 <pre class="code" data-lang="xml"><code>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
 &lt;!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"&gt;
 &lt;plist version="1.0"&gt;
@@ -265,7 +275,9 @@ jobs:
   &lt;/dict&gt;
 &lt;/dict&gt;
 &lt;/plist&gt;</code></pre>
-<p><code class="ic">TEAM_ID</code>·<code class="ic">PROFILE_NAME</code>·번들 ID는 M0에서 실제 값으로 채운다. 최신 Xcode는 <code class="ic">method</code>로 <code class="ic">app-store-connect</code>를 선호하므로 경고가 뜨면 교체한다.</p>
+<p><strong>실제 구현은 이 파일을 커밋하지 않는다.</strong> <code class="ic">appstore</code> 잡이 프로비저닝 프로파일을 복호화해 <code class="ic">Name</code>·<code class="ic">UUID</code>·<code class="ic">TeamIdentifier</code>를 읽어낸 뒤 위 형태로 생성한다(<code class="ic">method</code>는 <code class="ic">app-store-connect</code>, 프로파일은 이름 대신 <strong>UUID</strong>로 지정).</p>
+<p>이유는 <code class="ic">.ipa</code> 파일명을 <code class="ic">ls</code>로 찾는 것과 같다 — <strong>프로파일 이름을 하드코딩하면 오타나 프로파일 재발급으로 이름이 바뀌었을 때 맥 없이 CI 로그만 보고 진단해야 한다.</strong> 프로파일 자신에게서 읽으면 그 실패 경로가 아예 없어지고, 매년 인증서·프로파일을 갱신해도 워크플로를 고칠 필요가 없다.</p>
+<blockquote>⚠️ §2의 "re-run 하면 <code class="ic">run_number</code>가 유지된다" 함정이 <strong>이제 실제로 문제가 된다.</strong> 미서명 AltStore 빌드만 있던 동안엔 빌드 번호 중복이 무해했지만, App Store Connect는 중복 번호를 거부한다. 실패했으면 re-run 하지 말고 태그를 올려서 다시 밀 것.</blockquote>
 <hr>
 <h2>9. 릴리스 체크리스트</h2>
 <ul class="tasklist"><li class="task"><code class="ic">flutter analyze &amp;&amp; flutter test</code> 로컬 초록불</li><li class="task">커밋 &amp; 푸시 (main)</li><li class="task"><code class="ic">git tag vX.Y.Z &amp;&amp; git push origin vX.Y.Z</code></li><li class="task">Actions에서 <code class="ic">test</code> → <code class="ic">android</code>/<code class="ic">ios</code> 초록불 확인</li><li class="task">안드로이드: GitHub Release에서 APK 받아 설치</li><li class="task">iOS: TestFlight 앱에서 업데이트 확인 (업로드 후 처리에 5~15분)</li><li class="task">실패 시 <strong>re-run 하지 말고</strong> 태그를 올려서 다시 푸시 (§2 함정)</li></ul>

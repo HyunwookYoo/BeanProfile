@@ -34,13 +34,13 @@ require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelpe
 #
 # 스크린샷(시뮬레이터) 빌드에서만 켠다. App Store로 나가는 기기 빌드는 이 경로를
 # 로드조차 하지 않으므로, 재라벨링이 출시 바이너리에 닿을 여지가 없다.
+#
+# 헬퍼의 require는 최상단이 아니라 post_install에서 한다. 헬퍼는
+# .symlinks/plugins/ 아래에 있는데, 그 디렉터리는 아래 target 블록의
+# flutter_install_all_ios_pods가 만든다(podhelper.rb의 flutter_install_plugin_pods가
+# rm -rf 후 재생성). 여기서 require하면 깨끗한 CI 체크아웃에서
+# "cannot load such file"로 pod install이 죽는다.
 mlkit_sim_patch = ENV['MLKIT_SIM_PATCH'] == 'true'
-if mlkit_sim_patch
-  require File.expand_path(
-    '.symlinks/plugins/google_mlkit_commons/ios/scripts/apple_silicon_simulator',
-    __dir__,
-  )
-end
 
 flutter_ios_podfile_setup
 
@@ -60,5 +60,11 @@ post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
   end
-  mlkit_apple_silicon_simulator_patch(installer) if mlkit_sim_patch
+  if mlkit_sim_patch
+    require File.expand_path(
+      '.symlinks/plugins/google_mlkit_commons/ios/scripts/apple_silicon_simulator',
+      __dir__,
+    )
+    mlkit_apple_silicon_simulator_patch(installer)
+  end
 end

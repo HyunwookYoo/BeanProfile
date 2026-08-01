@@ -34,7 +34,7 @@ void main() {
     final heroBeanId = await _seed();
 
     app.main();
-    await tester.pumpAndSettle();
+    await _settleWithImages(tester);
 
     // ① 원두 목록
     await binding.takeScreenshot('01_beans');
@@ -54,7 +54,7 @@ void main() {
     await tester.ensureVisible(hero);
     await tester.pumpAndSettle();
     await tester.tap(hero);
-    await tester.pumpAndSettle();
+    await _settleWithImages(tester);
     await binding.takeScreenshot('03_detail');
 
     // ④ 시음 입력 — 강도 4축·별점·코멘트를 모두 채운다. 빈 폼은 하단이 통째로
@@ -75,6 +75,19 @@ void main() {
   });
 }
 
+/// 사진이 다 그려진 뒤에 프레임을 확정한다.
+///
+/// `Image.file`은 파일을 읽고 디코딩하는 동안 아무것도 그리지 않는데(실패했을
+/// 때만 errorBuilder가 뜬다), `pumpAndSettle`은 그 작업을 기다려 주지 않는다.
+/// 그래서 그냥 찍으면 어떤 썸네일은 나오고 어떤 썸네일은 빈칸으로 남는 경합이
+/// 생긴다 — 실제로 촬영할 때마다 빈칸이 되는 카드가 달라졌다.
+/// `runAsync`로 실시간을 흘려보내 디코딩을 끝낸 뒤 다시 pump한다.
+Future<void> _settleWithImages(WidgetTester tester) async {
+  await tester.pumpAndSettle();
+  await tester.runAsync(() => Future<void>.delayed(const Duration(seconds: 2)));
+  await tester.pumpAndSettle();
+}
+
 /// 번들 에셋을 앱 문서 디렉터리의 photos/로 복사하고 절대 경로를 돌려준다.
 /// 앱의 PhotoService.persist가 쓰는 위치와 같게 맞춘다(BeanThumbnail은
 /// Image.file로 이 경로를 그대로 읽는다).
@@ -84,7 +97,10 @@ Future<String> _seedPhoto(String assetPath, String fileName) async {
   final photos = Directory('${dir.path}/photos');
   if (!await photos.exists()) await photos.create(recursive: true);
   final file = File('${photos.path}/$fileName');
-  await file.writeAsBytes(bytes.buffer.asUint8List());
+  // ByteData는 더 큰 버퍼의 일부일 수 있다. buffer를 통째로 쓰면 엉뚱한
+  // 바이트가 섞이므로 offset/length로 자기 구간만 꺼낸다.
+  await file.writeAsBytes(
+      bytes.buffer.asUint8List(bytes.offsetInBytes, bytes.lengthInBytes));
   return file.path;
 }
 
@@ -101,12 +117,13 @@ Future<int> _seed() async {
   DateTime daysAgo(int d) =>
       DateTime(today.year, today.month, today.day).subtract(Duration(days: d));
 
-  // 사진은 목록 상단 2개에만 넣는다(아래 stamp가 순서를 확정한다).
-  // 나머지 OCR 카드는 여백이 넓어 48x60 썸네일로 잘리면 흰 화면처럼 보였다.
-  // 그래서 목록에 사진·빈칸·플레이스홀더 세 상태가 섞여 렌더링 오류처럼 읽혔다.
-  // 남은 원두는 플레이스홀더로 두어 "사진 있음 / 없음" 두 상태로만 정리한다.
+  // 사진은 목록 상단 4개에 간다(아래 stamp가 순서를 확정한다).
+  // ocr_bad_quality_en은 일부러 저품질로 만든 카드라 쓰지 않는다.
   final photoCard = await _seedPhoto('assets/test/ocr_card_ko.png', 'a.png');
+  final photoOrig = await _seedPhoto('assets/test/ocr_card_orig.png', 'b.png');
   final photoBlend = await _seedPhoto('assets/test/ocr_blend_en.png', 'c.png');
+  final photoDark =
+      await _seedPhoto('assets/test/ocr_dark_blend_en.png', 'd.png');
 
   // 컵노트는 의도적으로 겹치게 둔다. 선호 컵노트는 '원두 1표'로 세므로
   // 겹치지 않으면 모든 막대가 1이 되어 차트가 무의미해 보인다.
@@ -163,6 +180,7 @@ Future<int> _seed() async {
           process: Process.washed,
           altitude: '1550m'),
     ],
+    photoPath: photoOrig,
   ));
 
   final blend = await repo.createBean(BeanInput(
@@ -179,6 +197,7 @@ Future<int> _seed() async {
       ComponentInput(
           country: 'Ethiopia', process: Process.washed, ratioPercent: 40),
     ],
+    photoPath: photoDark,
   ));
 
   final costarica = await repo.createBean(BeanInput(

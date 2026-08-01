@@ -143,6 +143,40 @@ android/key.properties</code></pre>
 <h3>D. 마이그레이션 이후로 다운그레이드하면 DB가 안 열린다 ⬇️</h3>
 <p><code class="ic">v0.8.0</code>부터 <code class="ic">Tastings</code>에 이 프로젝트 첫 drift 마이그레이션(<code class="ic">schemaVersion</code> 1→2)이 들어갔다. 한 번 v2로 연 폰에 <strong>그보다 오래된 빌드</strong>(마이그레이션이 없는 버전)를 다시 설치하면, drift가 자신이 모르는 스키마 버전을 만나 "마이그레이션 전략이 없다"는 예외를 던지며 <strong>DB 자체를 못 연다</strong> — 앱이 뜨지 않는다.</p>
 <p>AltStore 사이드로드는 "일단 이전 빌드로 되돌려보자"가 흔한 트러블슈팅이라 특히 걸리기 쉽다. <strong>해결책은 v0.8.0 이상 빌드를 다시 설치하는 것</strong> — 실패한 다운그레이드 자체가 데이터를 지우진 않는다(DB 파일은 그대로 남고, 여는 데만 실패한다).</p>
+<h3>E. iOS를 빌드하는 잡은 SPM을 꺼야 한다 📦</h3>
+<p><strong>iOS를 빌드하는 모든 CI 잡은 <code class="ic">flutter config --no-enable-swift-package-manager</code>를 먼저 실행해야 한다.</strong></p>
+<p><code class="ic">flutter config</code>의 <code class="ic">enable-swift-package-manager</code>는 <strong>기본값이 on</strong>이라, 러너의 Flutter가 빌드 도중 이 CocoaPods 프로젝트를 Swift Package Manager로 자동 마이그레이션한다. 그런데 <code class="ic">google_mlkit_commons</code>·<code class="ic">google_mlkit_text_recognition</code>이 SPM을 지원하지 않아 CocoaPods와 섞이고, 링커가 이렇게 죽는다:</p>
+<pre class="code"><code>Adding Swift Package Manager integration...
+The following plugins do not support Swift Package Manager for ios:
+  - google_mlkit_commons
+  - google_mlkit_text_recognition
+Error (Xcode): Framework 'Pods_Runner' not found
+Error (Xcode): Linker command failed with exit code 1</code></pre>
+<p>플러그인 두 개가 SPM을 못 쓰는 이상 이 프로젝트는 CocoaPods가 정답이므로, 이건 임시방편이 아니라 올바른 설정이다. 적용 대상: <code class="ic">release.yml</code>의 <code class="ic">ios</code>·<code class="ic">appstore</code>, <code class="ic">screenshots.yml</code>의 <code class="ic">screenshots</code>. (<code class="ic">test</code> 잡은 ubuntu라 해당 없음.)</p>
+<blockquote><strong>주의 — 이건 아래 F의 원인이 아니다.</strong> SPM을 끈 뒤에도 시뮬레이터 빌드는 같은 <code class="ic">Pods_Runner not found</code>로 계속 실패했다. 두 로그를 비교해 확인한 사실이다. SPM 비활성화는 빌드를 결정적으로 만드는 별개의 옳은 설정일 뿐, 기기(릴리스) 빌드가 이것 때문에 깨진 적은 없다 — <code class="ic">v0.8.0</code>은 정상 출시됐다.</blockquote>
+<h3>F. ML Kit은 arm64 시뮬레이터 슬라이스가 없다 🏗️</h3>
+<p><strong>증상은 E와 똑같지만 원인이 다르다.</strong> Apple Silicon 러너(<code class="ic">macos-26-arm64</code>)에서 시뮬레이터로 빌드하면:</p>
+<pre class="code"><code>Could not build the application for the simulator.
+Error (Xcode): Framework 'Pods_Runner' not found</code></pre>
+<p>Google의 <code class="ic">GoogleMLKit/*</code> 팟은 <strong><code class="ic">arm64-iphoneos</code>와 <code class="ic">x86_64-iphonesimulator</code>만</strong> 배포하고 시뮬레이터 빌드에서 arm64를 제외한다. iOS 26부터 시뮬레이터가 Rosetta를 기본으로 쓰지 않으므로, Apple Silicon에서는 arm64 시뮬레이터가 필수인데 그 슬라이스가 없다. 그래서 Pods 우산 프레임워크가 만들어지지 못한다. (업스트림: <code class="ic">issuetracker.google.com/issues/178965151</code>)</p>
+<p><code class="ic">google_mlkit_commons</code> 0.12.0이 옵트인 Podfile 헬퍼를 제공한다. <code class="ic">ios/Podfile</code>에서 <strong><code class="ic">MLKIT_SIM_PATCH=true</code>일 때만</strong> 켜지게 해뒀다.</p>
+<div class="tablewrap"><table><thead><tr><th>빌드</th><th>환경변수</th><th>헬퍼</th></tr></thead><tbody><tr><td><code class="ic">screenshots.yml</code> (시뮬레이터)</td><td><code class="ic">MLKIT_SIM_PATCH=true</code></td><td>적용</td></tr><tr><td><code class="ic">release.yml</code> (기기 → App Store)</td><td>설정 안 함</td><td><strong><code class="ic">require</code>조차 안 함</strong></td></tr></tbody></table></div>
+<p>기기 빌드는 이 코드 경로를 로드하지도 않으므로, 바이너리 재라벨링이 출시본에 닿을 수 없다. <strong>이 구분을 없애지 말 것</strong> — 스크린샷은 있으면 좋은 것이고 출시 바이너리는 그렇지 않다.</p>
+<blockquote><strong>이 계열 고장은 CI에서만 드러난다.</strong> Windows에는 Xcode도 CocoaPods도 없어 <code class="ic">flutter build ios</code>를 로컬에서 돌려볼 수 없다. 시뮬레이터 경로가 막혀도 기기 경로는 멀쩡할 수 있으니, 둘을 같은 고장으로 묶어 판단하지 말 것.</blockquote>
+<h3>G. Release 설정에 <code class="ic">CODE_SIGN_STYLE = Manual</code>이 있어야 한다 ✍️</h3>
+<p><code class="ic">DEVELOPMENT_TEAM</code>만 넣고 <code class="ic">CODE_SIGN_STYLE</code>을 비워두면 <strong>자동 서명</strong>으로 빠진다. 자동 서명은 Apple 계정에 로그인해 <strong>개발용</strong> 프로파일을 받아오려 하는데, CI에는 로그인된 계정이 없다:</p>
+<pre class="code"><code>Automatically signing iOS for device deployment using specified development team: 9J2FNH63M2
+Error (Xcode): No Accounts: Add a new account in Accounts settings.
+Error (Xcode): No profiles for 'com.hyunwook.beanprofile' were found:
+  Xcode couldn't find any iOS App Development provisioning profiles</code></pre>
+<p>키체인에 배포 인증서를 넣고 App Store 프로파일을 설치해도 소용없다 — <strong>자동 서명은 그걸 아예 쳐다보지 않는다.</strong> 인증서·프로파일 스텝이 초록불이라 원인을 엉뚱한 곳에서 찾기 쉽다.</p>
+<p>Flutter 소스가 근거다(<code class="ic">ios/code_signing.dart</code>): <code class="ic">CODE_SIGN_STYLE</code>이 <code class="ic">Automatic</code>이거나 <strong>비어 있을 때만</strong> 자동 서명 경로를 탄다. <code class="ic">Manual</code>이면 <code class="ic">PROVISIONING_PROFILE_SPECIFIER</code>와 <code class="ic">DEVELOPMENT_TEAM</code>을 읽어 수동 서명으로 간다(<code class="ic">commands/build_ios.dart</code>).</p>
+<p><strong>Runner 타깃의 Release 설정에만</strong> 넣는다:</p>
+<pre class="code"><code>CODE_SIGN_IDENTITY = "Apple Distribution";
+CODE_SIGN_STYLE = Manual;
+PROVISIONING_PROFILE_SPECIFIER = "BeanProfile App Store";</code></pre>
+<blockquote><strong>Debug·Profile에는 넣지 말 것.</strong> 스크린샷 워크플로의 <code class="ic">flutter drive</code>는 Debug로 시뮬레이터를 빌드하는데, 시뮬레이터는 서명이 필요 없고 수동 서명을 강제하면 맞는 프로파일이 없어 막힌다.</blockquote>
+<p>여기서만 프로파일 <strong>이름</strong>을 하드코딩한다(§8의 ExportOptions는 여전히 UUID를 런타임에 읽는다). 이름이 어긋나면 <code class="ic">No profiles for ... were found</code>가 그 이름을 그대로 찍어주므로 진단이 즉시 되기 때문이다. <strong>프로파일을 재발급할 때 이름을 같게 유지하면</strong> 이 줄을 고칠 일이 없다.</p>
 <hr>
 <h2>7. 로드맵 편입 — M0 신설</h2>
 <p>파이프라인은 <code class="ic">flutter create</code> 직후에 뚫는다. 이유:</p>

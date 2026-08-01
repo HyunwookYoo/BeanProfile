@@ -267,6 +267,33 @@ Google의 `GoogleMLKit/*` 팟은 **`arm64-iphoneos`와 `x86_64-iphonesimulator`�
 > `flutter build ios`를 로컬에서 돌려볼 수 없다. 시뮬레이터 경로가 막혀도
 > 기기 경로는 멀쩡할 수 있으니, 둘을 같은 고장으로 묶어 판단하지 말 것.
 
+### G. Release 설정에 `CODE_SIGN_STYLE = Manual`이 있어야 한다 ✍️
+
+`DEVELOPMENT_TEAM`만 넣고 `CODE_SIGN_STYLE`을 비워두면 **자동 서명**으로 빠진다. 자동 서명은 Apple 계정에 로그인해 **개발용** 프로파일을 받아오려 하는데, CI에는 로그인된 계정이 없다:
+
+```
+Automatically signing iOS for device deployment using specified development team: 9J2FNH63M2
+Error (Xcode): No Accounts: Add a new account in Accounts settings.
+Error (Xcode): No profiles for 'com.hyunwook.beanprofile' were found:
+  Xcode couldn't find any iOS App Development provisioning profiles
+```
+
+키체인에 배포 인증서를 넣고 App Store 프로파일을 설치해도 소용없다 — **자동 서명은 그걸 아예 쳐다보지 않는다.** 인증서·프로파일 스텝이 초록불이라 원인을 엉뚱한 곳에서 찾기 쉽다.
+
+Flutter 소스가 근거다(`ios/code_signing.dart`): `CODE_SIGN_STYLE`이 `Automatic`이거나 **비어 있을 때만** 자동 서명 경로를 탄다. `Manual`이면 `PROVISIONING_PROFILE_SPECIFIER`와 `DEVELOPMENT_TEAM`을 읽어 수동 서명으로 간다(`commands/build_ios.dart`).
+
+**Runner 타깃의 Release 설정에만** 넣는다:
+
+```
+CODE_SIGN_IDENTITY = "Apple Distribution";
+CODE_SIGN_STYLE = Manual;
+PROVISIONING_PROFILE_SPECIFIER = "BeanProfile App Store";
+```
+
+> **Debug·Profile에는 넣지 말 것.** 스크린샷 워크플로의 `flutter drive`는 Debug로 시뮬레이터를 빌드하는데, 시뮬레이터는 서명이 필요 없고 수동 서명을 강제하면 맞는 프로파일이 없어 막힌다.
+
+여기서만 프로파일 **이름**을 하드코딩한다(§8의 ExportOptions는 여전히 UUID를 런타임에 읽는다). 이름이 어긋나면 `No profiles for ... were found`가 그 이름을 그대로 찍어주므로 진단이 즉시 되기 때문이다. **프로파일을 재발급할 때 이름을 같게 유지하면** 이 줄을 고칠 일이 없다.
+
 ---
 
 ## 7. 로드맵 편입 — M0 신설

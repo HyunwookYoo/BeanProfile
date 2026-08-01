@@ -114,7 +114,7 @@ Future<int> _seed() async {
 
   final kenya = await repo.createBean(BeanInput(
     name: '케냐 니에리 AA',
-    roaster: '모모스커피',
+    roaster: '첫물커피',
     type: BeanType.singleOrigin,
     roastLevel: RoastLevel.light,
     roastDate: daysAgo(34),
@@ -131,7 +131,7 @@ Future<int> _seed() async {
 
   final colombia = await repo.createBean(BeanInput(
     name: '콜롬비아 라 팔마',
-    roaster: '커피리브레',
+    roaster: '소소로스터리',
     type: BeanType.singleOrigin,
     roastLevel: RoastLevel.medium,
     roastDate: daysAgo(26),
@@ -149,7 +149,7 @@ Future<int> _seed() async {
 
   final guatemala = await repo.createBean(BeanInput(
     name: '과테말라 안티구아',
-    roaster: '나무사이로',
+    roaster: '담담커피로스터스',
     type: BeanType.singleOrigin,
     roastLevel: RoastLevel.medium,
     roastDate: daysAgo(18),
@@ -168,7 +168,7 @@ Future<int> _seed() async {
 
   final blend = await repo.createBean(BeanInput(
     name: '하우스 블렌드',
-    roaster: '테라로사',
+    roaster: '언덕집로스터리',
     type: BeanType.blend,
     roastLevel: RoastLevel.mediumDark,
     roastDate: daysAgo(6),
@@ -185,7 +185,7 @@ Future<int> _seed() async {
 
   final costarica = await repo.createBean(BeanInput(
     name: '코스타리카 따라주',
-    roaster: '앤트러사이트',
+    roaster: '볕드는창커피',
     type: BeanType.singleOrigin,
     roastLevel: RoastLevel.lightMedium,
     roastDate: daysAgo(9),
@@ -203,7 +203,7 @@ Future<int> _seed() async {
 
   final yirgacheffe = await repo.createBean(BeanInput(
     name: '예가체프 코체레',
-    roaster: '프릳츠커피',
+    roaster: '오후세시로스터스',
     type: BeanType.singleOrigin,
     roastLevel: RoastLevel.lightMedium,
     roastDate: daysAgo(12),

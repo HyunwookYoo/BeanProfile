@@ -15,6 +15,8 @@
 //    카드를 사진으로 넣는다(이 앱의 실제 용례가 '봉투·카드 촬영'이라 잘 맞는다).
 import 'dart:io';
 
+import 'package:drift/drift.dart' as drift;
+
 import 'package:beanprofile/data/bean_repository.dart';
 import 'package:beanprofile/data/database.dart';
 import 'package:beanprofile/data/enums.dart';
@@ -43,10 +45,15 @@ void main() {
     await tester.pumpAndSettle();
     await binding.takeScreenshot('02_taste');
 
-    // ③ 원두 상세 — 시딩에서 마지막에 만든 원두가 목록 맨 위라 스크롤이 필요 없다.
+    // ③ 원두 상세 — 시딩이 createdAt을 명시해 주인공 원두가 목록 맨 위에 오지만,
+    //    레이아웃에 기대지 않도록 탭 전에 화면 안으로 끌어온다. 2차 촬영에서
+    //    이 원두가 화면 밖(y=900)에 있어 탭이 내비게이션 바를 때렸다.
     await tester.tap(find.byIcon(Icons.coffee_outlined));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(ValueKey('bean-$heroBeanId')));
+    final hero = find.byKey(ValueKey('bean-$heroBeanId'));
+    await tester.ensureVisible(hero);
+    await tester.pumpAndSettle();
+    await tester.tap(hero);
     await tester.pumpAndSettle();
     await binding.takeScreenshot('03_detail');
 
@@ -94,8 +101,7 @@ Future<int> _seed() async {
   DateTime daysAgo(int d) =>
       DateTime(today.year, today.month, today.day).subtract(Duration(days: d));
 
-  // 목록은 createdAt 내림차순이라 나중에 만든 원두가 위로 온다.
-  // 화면에 보이는 상위 4개에 사진이 가도록 사진 있는 원두를 뒤에 만든다.
+  // 사진은 목록 상단 4개에 간다(아래 stamp가 순서를 확정한다).
   final photoCard = await _seedPhoto('assets/test/ocr_card_ko.png', 'a.png');
   final photoOrig = await _seedPhoto('assets/test/ocr_card_orig.png', 'b.png');
   final photoBlend = await _seedPhoto('assets/test/ocr_blend_en.png', 'c.png');
@@ -214,6 +220,24 @@ Future<int> _seed() async {
     ],
     photoPath: photoCard,
   ));
+
+  // 목록 정렬(createdAt 내림차순)을 확정한다.
+  // createBean은 createdAt에 DateTime.now()를 넣는데, 6건이 같은 초에 들어가면
+  // 정렬이 동률이 되고 SQLite가 삽입 순서로 돌려준다. 2차 촬영에서 주인공 원두가
+  // 맨 아래(화면 밖)로 밀려 탭이 내비게이션 바를 때린 원인이 이것이다.
+  // "나중에 만든 게 위로 온다"에 기대지 말고 값을 직접 박는다.
+  final base = DateTime.now();
+  Future<void> stamp(int beanId, int minutesAgo) =>
+      (db.update(db.beans)..where((b) => b.id.equals(beanId))).write(
+        BeansCompanion(
+            createdAt: drift.Value(base.subtract(Duration(minutes: minutesAgo)))),
+      );
+  await stamp(yirgacheffe, 1); // 목록 최상단 = 상세 화면 주인공
+  await stamp(costarica, 2);
+  await stamp(blend, 3);
+  await stamp(guatemala, 4); // 여기까지 사진 있음
+  await stamp(colombia, 5);
+  await stamp(kenya, 6);
 
   // 예가체프는 상세 화면 주인공이라 기록을 3건 둔다(1차 촬영에선 2건이라
   // 화면 아래쪽이 비어 보였다).

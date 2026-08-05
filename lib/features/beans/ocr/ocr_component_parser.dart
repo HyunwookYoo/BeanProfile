@@ -55,14 +55,17 @@ const countryKeywords = <String, String>{
   '미얀마': 'Myanmar',
   'papua new guinea': 'Papua New Guinea',
   '파푸아뉴기니': 'Papua New Guinea',
-  'timor': 'East Timor',
+  'east timor': 'East Timor',
   '동티모르': 'East Timor',
   'jamaica': 'Jamaica',
   '자메이카': 'Jamaica',
   'hawaii': 'Hawaii',
   '하와이': 'Hawaii',
   // China는 넣지 않는다 — `_matchesIn`이 단어 경계 없는 부분 문자열 매칭이라
-  // 니카라과 산지 `Chinandega`를 China로 오인한다.
+  // 니카라과 산지 `Chinandega`를 China로 오인한다. 같은 이유로 East Timor의
+  // 영문 키도 축약형 `timor`가 아니라 전체 국가명을 쓴다 — `timor`만 쓰면
+  // 커피 품종명 `Catimor`(카투라×티모르 교배종, 베트남·인도 등 실사용) 안의
+  // `timor`를 오매칭한다.
 };
 
 const processKeywords = <String, Process>{
@@ -824,7 +827,7 @@ _RepeatedLayout? _repeatedLayout(List<_CountryMention> mentions) {
 }
 
 final _nonComponentTableText = RegExp(
-  r'\b(?:blend|roast(?:ed|er|ing)?|notes?|coffee|variety|altitude|'
+  r'\b(?:blend(?:ing)?|roast(?:ed|er|ing)?|notes?|coffee|variety|altitude|'
   r'product|name)\b',
   caseSensitive: false,
 );

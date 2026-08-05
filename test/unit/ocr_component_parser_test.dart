@@ -887,6 +887,17 @@ void main() {
       );
     });
 
+    // `%`가 붙어야 오탐이 성분으로까지 승격돼 눈에 보인다 — 품종 줄에 비율이
+    // 없으면 증거 규칙에서 걸러져 이 회귀를 관찰할 수 없다.
+    test('Catimor 품종명이 East Timor 성분으로 잡히지 않는다', () {
+      final components = parseOcrComponents(const [
+        OcrLine('Ethiopia 70%', left: 20, top: 80, right: 240, bottom: 120),
+        OcrLine('Catimor 30%', left: 20, top: 160, right: 240, bottom: 200),
+      ]);
+
+      expect(components.map((c) => c.country), ['Ethiopia']);
+    });
+
     test('줄 중간의 국가 언급만으로는 앵커가 되지 않는다', () {
       final components = parseOcrComponents(const [
         OcrLine('our Ethiopia roast', left: 100, top: 100, right: 700, bottom: 160),

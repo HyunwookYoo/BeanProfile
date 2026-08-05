@@ -471,6 +471,17 @@ void main() {
       // `Natural 70940%`로 붙여 읽어 단어 경계가 사라졌다. 추측해 채우면
       // 조용히 틀린 값이 저장된다.
       expect(d.components.map((c) => c.ratioPercent), [null, 40, 20]);
+      // region은 실측값을 그대로 고정한다 — 지역 라벨이 카드에 아예 없어
+      // 셋 다 지역명이 아니다. Thailand는 "Blending Info" 섹션 헤더를
+      // 값으로 오채움하던 버그를 고쳤지만, 다음으로 가까운 후보인
+      // "bio control Natural 70940%"에서 가공법만 제거한 나머지라 여전히
+      // 지역명이 아니다(같은 OCR 붙어읽기로 비율까지 뭉개진 잔여물). 이
+      // 값을 "더 낫게" 보이도록 추측 로직을 얹지 않는다 — 그러면 라벨
+      // 오채움과 같은 실수를 반복하게 된다.
+      expect(
+        d.components.map((c) => c.region),
+        ['bio control 70940%', 'GI -', 'Papayo'],
+      );
     });
   });
 }

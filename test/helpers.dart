@@ -228,3 +228,36 @@ Tasting tastingRow({
       degassingDays: degassingDays,
       createdAt: DateTime(2026, 7, 1),
     );
+
+// ── 실기기 OCR 좌표 픽스처 ──
+// 2026-08-04 Android 에뮬레이터 ML Kit(korean) ORIGINAL 패스 출력.
+// 원본 4032x3024 / EXIF orientation 6 → ML Kit이 3024x4032 좌표계로 돌려준 값.
+// 줄 순서가 파서 결과에 영향을 준다(순서 의존 경로 있음) — 재정렬 금지.
+const redCascaraLines = <OcrLine>[
+  OcrLine('블렌딩:', left: 876, top: 2453, right: 1095, bottom: 2520),
+  OcrLine('노트:', left: 839, top: 3349, right: 1046, bottom: 3413),
+  OcrLine('Blending Info', left: 876, top: 2559, right: 1218, bottom: 2617),
+  OcrLine('Notes', left: 875, top: 3451, right: 1034, bottom: 3501),
+  OcrLine('UNSPECIALTY BLEND', left: 1191, top: 191, right: 2160, bottom: 260),
+  OcrLine('RED CASCARA', left: 1137, top: 511, right: 2303, bottom: 610),
+  OcrLine('로스터기:', left: 873, top: 3708, right: 1159, bottom: 3781),
+  OcrLine('Roaster', left: 864, top: 3820, right: 1073, bottom: 3874),
+  OcrLine('레드 카스카라', left: 1312, top: 773, right: 2127, bottom: 895),
+  OcrLine('Thailand Phupanna coffee',
+      left: 1329, top: 2465, right: 2096, bottom: 2536),
+  OcrLine('bio control Natural 70940%',
+      left: 1352, top: 2563, right: 2236, bottom: 2622),
+  OcrLine('Ethiopia Sidama Bensa Keramo Ako',
+      left: 1327, top: 2745, right: 2394, bottom: 2807),
+  OcrLine('GI Natural- 40%', left: 1366, top: 2836, right: 1846, bottom: 2901),
+  OcrLine('Colombia Inmaculada Fellow Farnms',
+      left: 1327, top: 3017, right: 2393, bottom: 3078),
+  OcrLine('Papayo Natural 20%',
+      left: 1345, top: 3102, right: 1973, bottom: 3176),
+  OcrLine('Raspberrie, Sapphire Grape,',
+      left: 1328, top: 3351, right: 2318, bottom: 3443),
+  OcrLine('Complexity, Citrus fnish',
+      left: 1328, top: 3450, right: 2197, bottom: 3527),
+  OcrLine('Stronghold S7X Ver.2',
+      left: 1326, top: 3704, right: 2065, bottom: 3780),
+];

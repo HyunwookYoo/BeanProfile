@@ -46,6 +46,20 @@ final RegExp _beanTypeOnly = RegExp(
   caseSensitive: false,
 );
 
+final RegExp _beanTypeSuffix = RegExp(
+  r'\s+(?:blend|블렌드|single[\s-]*origin|싱글\s*오리진)$',
+  caseSensitive: false,
+);
+
+/// 이브로우 끝의 원두 타입 토큰을 뗀다 — `UNSPECIALTY BLEND` → `UNSPECIALTY`.
+/// 앞에 다른 글자가 있을 때만(`\s+` 요구) 뗀다. 토큰 단독이면 그대로 두어
+/// `parseOcr`의 기존 `_beanTypeOnly` 처리가 null로 만들게 한다.
+String? _stripBeanTypeSuffix(String? text) {
+  if (text == null) return null;
+  final stripped = text.replaceFirst(_beanTypeSuffix, '').trim();
+  return stripped.isEmpty ? text : stripped;
+}
+
 final RegExp _genericCardHeader = RegExp(
   r'^(?:coffee\s*(?:info|card)|원두\s*정보)$',
   caseSensitive: false,
@@ -183,11 +197,14 @@ String? _valueFor(
     if (identical(l, title)) continue;
     final above = l.bottom <= title.top + 0.3 * title.height;
     final xOverlap = l.left <= title.right && l.right >= title.left;
-    if (above && xOverlap && l.height < title.height) {
+    // 제목급 크기의 줄은 이브로우가 아니다 — 한/영 병기 제목에서 다른 언어판이
+    // 로스터리로 잡히는 걸 막는다. 임계는 제목 판정과 같은 값을 쓴다.
+    final titleClass = l.height >= 1.3 * medianH;
+    if (above && xOverlap && !titleClass && l.height < title.height) {
       if (eyebrow == null || l.bottom > eyebrow.bottom) eyebrow = l;
     }
   }
-  return (title.text.trim(), eyebrow?.text.trim());
+  return (title.text.trim(), _stripBeanTypeSuffix(eyebrow?.text.trim()));
 }
 
 List<String> _splitNotes(String s) => s

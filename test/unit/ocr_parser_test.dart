@@ -3,6 +3,7 @@ import 'package:beanprofile/features/beans/ocr/ocr_draft.dart';
 import 'package:beanprofile/features/beans/ocr/ocr_parser.dart';
 import 'package:beanprofile/services/ocr_service.dart';
 import 'package:flutter_test/flutter_test.dart';
+import '../helpers.dart';
 
 void main() {
   group('name & roaster', () {
@@ -395,6 +396,29 @@ void main() {
       expect(d.cupNotes, ['딸기', '복숭아', '레드와인']);
       expect(d.name, '콜롬비아 핑크버번 내추럴');
       expect(d.roaster, contains('베이스캠프'));
+    });
+  });
+
+  group('RED CASCARA 실기기 픽스처(한/영 병기 블렌드 카드)', () {
+    test('로스터리는 제목의 영문판이 아니라 그 위 이브로우', () {
+      final d = parseOcr(redCascaraLines);
+
+      expect(d.name, '레드 카스카라');
+      expect(d.roaster, 'UNSPECIALTY');
+    });
+
+    // 가드 — 접미 정리가 이브로우를 빈 문자열로 만들어 기존 null 처리를
+    // 빠져나가지 않는지 본다. 수정 전후 모두 통과해야 한다.
+    test('이브로우가 원두 타입 토큰뿐이면 로스터리는 비운다', () {
+      final d = parseOcr(const [
+        OcrLine('BLEND', left: 100, top: 100, right: 260, bottom: 140),
+        OcrLine('하우스 블렌드', left: 100, top: 200, right: 700, bottom: 290),
+        OcrLine('원산지', left: 100, top: 400, right: 220, bottom: 430),
+        OcrLine('브라질', left: 300, top: 400, right: 450, bottom: 430),
+      ]);
+
+      expect(d.name, '하우스 블렌드');
+      expect(d.roaster, isNull);
     });
   });
 }

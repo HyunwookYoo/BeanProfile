@@ -43,6 +43,26 @@ const countryKeywords = <String, String>{
   '볼리비아': 'Bolivia',
   'ecuador': 'Ecuador',
   '에콰도르': 'Ecuador',
+  'thailand': 'Thailand',
+  '태국': 'Thailand',
+  'vietnam': 'Vietnam',
+  '베트남': 'Vietnam',
+  'india': 'India',
+  '인도': 'India',
+  'laos': 'Laos',
+  '라오스': 'Laos',
+  'myanmar': 'Myanmar',
+  '미얀마': 'Myanmar',
+  'papua new guinea': 'Papua New Guinea',
+  '파푸아뉴기니': 'Papua New Guinea',
+  'timor': 'East Timor',
+  '동티모르': 'East Timor',
+  'jamaica': 'Jamaica',
+  '자메이카': 'Jamaica',
+  'hawaii': 'Hawaii',
+  '하와이': 'Hawaii',
+  // China는 넣지 않는다 — `_matchesIn`이 단어 경계 없는 부분 문자열 매칭이라
+  // 니카라과 산지 `Chinandega`를 China로 오인한다.
 };
 
 const processKeywords = <String, Process>{

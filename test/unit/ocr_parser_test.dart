@@ -458,5 +458,19 @@ void main() {
 
       expect(d.cupNotes, ['딸기', '자두', '블루베리']);
     });
+
+    test('카드 전체 — 성분 3개와 비율, 비율 불명은 null로 남긴다', () {
+      final d = parseOcr(redCascaraLines);
+
+      expect(d.typeDecision, OcrTypeDecision.certainBlend);
+      expect(
+        d.components.map((c) => c.country),
+        ['Thailand', 'Ethiopia', 'Colombia'],
+      );
+      // Thailand의 비율은 복구하지 않는다 — OCR이 `Natural 709 - 40%`를
+      // `Natural 70940%`로 붙여 읽어 단어 경계가 사라졌다. 추측해 채우면
+      // 조용히 틀린 값이 저장된다.
+      expect(d.components.map((c) => c.ratioPercent), [null, 40, 20]);
+    });
   });
 }

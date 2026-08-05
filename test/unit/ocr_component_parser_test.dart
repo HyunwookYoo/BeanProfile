@@ -876,11 +876,14 @@ void main() {
     test('국가 뒤에 농장/등급이 붙어도 성분으로 인정한다', () {
       final components = parseOcrComponents(redCascaraLines);
 
-      expect(components.map((c) => c.country), ['Ethiopia', 'Colombia']);
-      expect(components.map((c) => c.ratioPercent), [40, 20]);
+      expect(
+        components.map((c) => c.country),
+        ['Thailand', 'Ethiopia', 'Colombia'],
+      );
+      expect(components.map((c) => c.ratioPercent), [null, 40, 20]);
       expect(
         components.map((c) => c.process),
-        [Process.natural, Process.natural],
+        [Process.natural, Process.natural, Process.natural],
       );
     });
 

@@ -4,6 +4,8 @@ import 'package:beanprofile/features/beans/ocr/ocr_draft.dart';
 import 'package:beanprofile/services/ocr_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../helpers.dart';
+
 void main() {
   test('repeated rows become two ordered components', () {
     final components = parseOcrComponents(const [
@@ -868,5 +870,27 @@ void main() {
     ]);
     expect(components[0].process, Process.other);
     expect(components[0].region, isNot('무산소 발효'));
+  });
+
+  group('RED CASCARA 실기기 픽스처 — 줄머리 국가 앵커', () {
+    test('국가 뒤에 농장/등급이 붙어도 성분으로 인정한다', () {
+      final components = parseOcrComponents(redCascaraLines);
+
+      expect(components.map((c) => c.country), ['Ethiopia', 'Colombia']);
+      expect(components.map((c) => c.ratioPercent), [40, 20]);
+      expect(
+        components.map((c) => c.process),
+        [Process.natural, Process.natural],
+      );
+    });
+
+    test('줄 중간의 국가 언급만으로는 앵커가 되지 않는다', () {
+      final components = parseOcrComponents(const [
+        OcrLine('our Ethiopia roast', left: 100, top: 100, right: 700, bottom: 160),
+        OcrLine('our Colombia roast', left: 100, top: 300, right: 700, bottom: 360),
+      ]);
+
+      expect(components, hasLength(1));
+    });
   });
 }

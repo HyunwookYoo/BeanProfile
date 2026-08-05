@@ -640,6 +640,15 @@ bool _isTopologyValue(
 }
 
 bool _isCountryAnchorText(_CountryMention mention) {
+  // ① 국가가 줄 머리에 오면 앵커 — `Ethiopia Sidama Bensa Keramo Ako`처럼 국가
+  //    뒤에 농장·지역·등급이 붙는 성분 줄을 살린다. 앵커가 됐다고 성분이 되는
+  //    건 아니다. `_hasComponentEvidence`가 여전히 비율이나 반복 토폴로지를
+  //    요구하고, 반복 토폴로지는 같은 열의 앵커가 둘 이상이어야 성립한다.
+  final prefix = mention.line.text.substring(0, mention.textOffset);
+  if (prefix.replaceAll(RegExp(r'[\s\-–—|/·,:：()\[\]#\d]+'), '').isEmpty) {
+    return true;
+  }
+  // ② 기존: 국가·비율·라벨을 빼고 남은 글자가 없으면 앵커.
   var remainder = mention.line.text.replaceRange(
     mention.textOffset,
     mention.textOffset + mention.matchLength,

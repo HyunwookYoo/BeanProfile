@@ -432,16 +432,20 @@ void main() {
       ]);
     });
 
+    // 판별 테스트 — 라벨 높이 20, 값 높이 60으로 자간을 어긋나게 짜서 블록 병합
+    // 임계(1.5×20=30)와 값 연속 임계(1.5×60=90)를 분리했다. 값 줄과 `Stronghold
+    // S7X` 사이 여백이 90 안이라 연속 가드는 여기서 아무것도 막지 못한다. 남는
+    // 방어선은 상한(다음 라벨 블록의 top)과 그 상한을 만들어 주는 `로스터기`
+    // 어휘 둘뿐이고, 어느 쪽을 지워도 기계 이름이 컵노트로 새어 든다.
     test('값 수집은 다음 라벨 블록에서 멈춘다', () {
-      // 상한이 없으면 `로스터기` 블록 오른쪽의 기계 이름이 컵노트로 새어 든다.
       final d = parseOcr(const [
-        OcrLine('노트', left: 80, top: 100, right: 160, bottom: 140),
-        OcrLine('Notes', left: 80, top: 150, right: 160, bottom: 190),
-        OcrLine('딸기, 자두', left: 300, top: 100, right: 600, bottom: 140),
-        OcrLine('블루베리', left: 300, top: 150, right: 600, bottom: 190),
-        OcrLine('로스터기', left: 80, top: 400, right: 200, bottom: 440),
-        OcrLine('Roaster', left: 80, top: 450, right: 200, bottom: 490),
-        OcrLine('Stronghold S7X', left: 300, top: 400, right: 600, bottom: 440),
+        OcrLine('노트', left: 80, top: 100, right: 200, bottom: 120),
+        OcrLine('Notes', left: 80, top: 140, right: 200, bottom: 160),
+        OcrLine('딸기, 자두', left: 300, top: 100, right: 600, bottom: 160),
+        OcrLine('블루베리', left: 300, top: 170, right: 600, bottom: 230),
+        OcrLine('로스터기', left: 80, top: 240, right: 200, bottom: 260),
+        OcrLine('Roaster', left: 80, top: 280, right: 200, bottom: 300),
+        OcrLine('Stronghold S7X', left: 300, top: 240, right: 600, bottom: 300),
       ]);
 
       expect(d.cupNotes, ['딸기', '자두', '블루베리']);
@@ -457,6 +461,24 @@ void main() {
       ]);
 
       expect(d.cupNotes, ['딸기', '자두', '블루베리']);
+    });
+
+    // 회귀 가드 — 컵노트가 마지막 라벨 블록이면 상한이 무한대이고, 정상 자간으로
+    // 조판된 푸터 열은 여백 가드에도 안 걸린다. 한 줄 라벨까지 여러 줄 수집에
+    // 넘기면 푸터가 통째로 컵노트가 되고, 그 값은 폼뿐 아니라 취향 대시보드의
+    // 컵노트 집계로도 들어간다. 한 줄 라벨은 여러 줄 수집 대상이 아니다.
+    test('한 줄 컵노트 라벨 아래 푸터 열은 컵노트로 딸려오지 않는다', () {
+      final d = parseOcr(const [
+        OcrLine('컵노트', left: 80, top: 100, right: 200, bottom: 140),
+        OcrLine('딸기, 자두', left: 300, top: 100, right: 600, bottom: 140),
+        OcrLine('원두 100g', left: 300, top: 180, right: 600, bottom: 220),
+        OcrLine('@unspecialty_coffee',
+            left: 300, top: 230, right: 600, bottom: 270),
+        OcrLine('서울시 마포구 연남로 1길',
+            left: 300, top: 280, right: 600, bottom: 320),
+      ]);
+
+      expect(d.cupNotes, ['딸기', '자두']);
     });
 
     test('카드 전체 — 성분 3개와 비율, 비율 불명은 null로 남긴다', () {

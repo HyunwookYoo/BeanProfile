@@ -182,6 +182,12 @@ List<String> _valuesRightOf(
 List<String> _cupNoteBlockValues(List<OcrLine> lines) {
   final blocks = _labelBlocks(lines);
   for (final block in blocks) {
+    // 여러 줄 수집은 한/영 2줄 라벨 스택을 위해 만든 규칙이다. 라벨이 한 줄이면
+    // 이 규칙을 쓰지 않고 `_spatialValue`(한 줄 값)로 넘긴다 — 컵노트가 마지막
+    // 라벨 블록이면 상한이 무한대라, 그 아래 정상 자간으로 조판된 푸터 열이
+    // 간격 가드에도 안 걸리고 통째로 컵노트로 딸려 들어온다. 컵노트는 폼을
+    // 채우는 동시에 취향 대시보드 집계로도 들어가므로 과수집 비용이 크다.
+    if (block.length < 2) continue;
     if (!block.any((line) => _cupTokens.contains(_norm(line.text)))) continue;
     final values = _valuesRightOf(
       lines,

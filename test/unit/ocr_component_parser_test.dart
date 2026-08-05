@@ -898,13 +898,23 @@ void main() {
       expect(components.map((c) => c.country), ['Ethiopia']);
     });
 
+    // 판별 테스트 — 산문 두 줄 아래에 평행한 값 줄을 깔아 앵커만 인정되면 반복
+    // 토폴로지가 곧바로 성립하도록 짰다(값 offset +70/+70, 임계 1.5×60=90).
+    // 그래서 `_isCountryAnchorText`의 줄머리 제한이 유일한 방어선이다. 값 줄이
+    // 없으면 `_hasParallelComponentValues`가 앵커와 무관하게 실패해서 이 가드가
+    // 살아 있는지 아닌지를 구별하지 못한다.
     test('줄 중간의 국가 언급만으로는 앵커가 되지 않는다', () {
       final components = parseOcrComponents(const [
-        OcrLine('our Ethiopia roast', left: 100, top: 100, right: 700, bottom: 160),
-        OcrLine('our Colombia roast', left: 100, top: 300, right: 700, bottom: 360),
+        OcrLine('our Ethiopia roast',
+            left: 100, top: 100, right: 700, bottom: 160),
+        OcrLine('Natural 40%', left: 100, top: 170, right: 700, bottom: 230),
+        OcrLine('our Colombia roast',
+            left: 100, top: 300, right: 700, bottom: 360),
+        OcrLine('Washed 60%', left: 100, top: 370, right: 700, bottom: 430),
       ]);
 
       expect(components, hasLength(1));
+      expect(components.single.country, 'Ethiopia');
     });
   });
 }

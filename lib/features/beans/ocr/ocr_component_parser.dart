@@ -66,6 +66,13 @@ const countryKeywords = <String, String>{
   // 영문 키도 축약형 `timor`가 아니라 전체 국가명을 쓴다 — `timor`만 쓰면
   // 커피 품종명 `Catimor`(카투라×티모르 교배종, 베트남·인도 등 실사용) 안의
   // `timor`를 오매칭한다.
+  //
+  // 나머지 신규 키의 부분 문자열 충돌도 훑었고, 남은 건 커피 카드에 실제로는
+  // 안 적히는 문자열뿐이라 그대로 둔다 — `Indiana Farm 50%`가 `india`에,
+  // `Laoshan Estate 50%`가 `laos`에 걸린다(둘 다 사전 확장 전에는 성분 0개).
+  // 한글 `인도`는 `인도네시아`에 삼켜지지 않는다 — `_matchesIn`이 키를 길이
+  // 내림차순으로 훑어 `인도네시아`를 먼저 잡고, 겹침 가드가 그 구간에 걸친
+  // `인도`를 버린다.
 };
 
 const processKeywords = <String, Process>{

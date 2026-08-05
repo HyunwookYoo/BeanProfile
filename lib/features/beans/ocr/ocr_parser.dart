@@ -74,10 +74,14 @@ final RegExp _brandMarker = RegExp(
 
 const Set<String> _regionTokens = {'지역', 'region'};
 const Set<String> _cupTokens = {
-  '컵노트', '컵 노트', 'notes', 'cup notes', 'cup note', 'tasting notes', '향미',
+  '컵노트', '컵 노트', '노트', 'notes', 'cup notes', 'cup note', 'tasting notes', '향미',
 };
 const Set<String> _otherLabelTokens = {
   '원산지','생산지','품종','가공','가공방식','로스팅','로스팅일','고도','제품명','상품명','로스터리','로스터','중량',
+  // 어떤 칸에도 매핑하지 않는다 — "값이 아님" 표시 + 값 수집 구간의 종료자 역할.
+  // `로스터기`는 특히 중요하다: 이 라벨의 값은 로스팅 기계(예: Stronghold S7X)라
+  // 로스터리가 아니고, 라벨로 등록돼 있어야 컵노트 수집이 그 앞에서 멈춘다.
+  '블렌딩','블렌딩정보','blending info','로스터기',
   'origin','variety','varietal','process','roast','roast date','roasted','altitude','name','product name','roaster',
 };
 
@@ -95,6 +99,86 @@ bool _isBareLabel(String text) {
 /// 알려진 모든 라벨(지역·컵노트 + 그 외 카드 라벨). `_isBareLabel`이 찾는 "공간 매칭 대상
 /// 라벨"보다 넓게, "값으로 오채움하면 안 되는 줄"을 가르는 데 쓴다(값 후보 제외 + 아래-폴백 차단).
 bool _isLabel(String text) => _isBareLabel(text) || _otherLabelTokens.contains(_norm(text));
+
+/// 세로로 붙어 있는 같은 열의 라벨 줄 묶음 — 한글 라벨 위, 영문 라벨 아래로
+/// 2줄 스택을 이루는 카드가 있어서 라벨 하나를 두 줄로 봐야 한다.
+List<List<OcrLine>> _labelBlocks(List<OcrLine> lines) {
+  final labels = <OcrLine>[
+    for (final line in lines)
+      if (_isLabel(line.text) && line.height > 0) line,
+  ]..sort((a, b) => a.top.compareTo(b.top));
+
+  final blocks = <List<OcrLine>>[];
+  for (final label in labels) {
+    List<OcrLine>? target;
+    for (final block in blocks) {
+      final previous = block.last;
+      final scale = previous.height > label.height
+          ? previous.height
+          : label.height;
+      if (previous.left <= label.right &&
+          label.left <= previous.right &&
+          label.top >= previous.bottom &&
+          label.top - previous.bottom <= 1.5 * scale) {
+        target = block;
+        break;
+      }
+    }
+    if (target == null) {
+      blocks.add([label]);
+    } else {
+      target.add(label);
+    }
+  }
+  return blocks;
+}
+
+/// 라벨 블록 오른쪽 열의 값 줄들 — 다음 라벨 블록이 시작되기 전까지. 값이 여러
+/// 줄로 이어지는 카드를 위해 `_valueFor`(한 줄)와 별도로 둔다.
+List<String> _valuesRightOf(
+  List<OcrLine> lines,
+  List<List<OcrLine>> blocks,
+  List<OcrLine> block, {
+  required bool Function(String value) acceptsValue,
+}) {
+  final h = block.first.height <= 0 ? 1.0 : block.first.height;
+  final top = block.map((l) => l.top).reduce((a, b) => a < b ? a : b);
+  final right = block.map((l) => l.right).reduce((a, b) => a > b ? a : b);
+  var upper = double.infinity;
+  for (final other in blocks) {
+    if (identical(other, block)) continue;
+    final otherTop = other.map((l) => l.top).reduce((a, b) => a < b ? a : b);
+    if (otherTop > top && otherTop < upper) upper = otherTop;
+  }
+
+  final values = <OcrLine>[];
+  for (final line in lines) {
+    final text = line.text.trim();
+    if (text.isEmpty || _isLabel(text) || !acceptsValue(text)) continue;
+    if (line.left < right - 0.5 * h) continue;
+    if (line.centerY < top - 0.5 * h || line.centerY >= upper) continue;
+    values.add(line);
+  }
+  values.sort((a, b) => a.top.compareTo(b.top));
+  return [for (final line in values) line.text.trim()];
+}
+
+/// 컵노트 라벨을 품은 블록 오른쪽의 값 줄들. 오른쪽에 값이 없는 카드(값이 라벨
+/// 아래에 오는 배치)는 빈 리스트를 돌려 `_spatialValue` 폴백으로 넘긴다.
+List<String> _cupNoteBlockValues(List<OcrLine> lines) {
+  final blocks = _labelBlocks(lines);
+  for (final block in blocks) {
+    if (!block.any((line) => _cupTokens.contains(_norm(line.text)))) continue;
+    final values = _valuesRightOf(
+      lines,
+      blocks,
+      block,
+      acceptsValue: _isCupNoteValue,
+    );
+    if (values.isNotEmpty) return values;
+  }
+  return const [];
+}
 
 /// 바레 라벨과 `Label: value` 형태를 기존 파서 어휘로 판별한다.
 bool isKnownOcrLabel(String text) {
@@ -240,12 +324,19 @@ OcrDraft parseOcr(List<OcrLine> lines) {
 
   // 4.1 좌표 라벨→값
   String? region = _spatialValue(lines, _regionTokens);
-  final cupSpatial = _spatialValue(
-    lines,
-    _cupTokens,
-    acceptsValue: _isCupNoteValue,
-  );
-  var cupNotes = cupSpatial == null ? const <String>[] : _splitNotes(cupSpatial);
+  // 컵노트만 여러 줄을 모은다 — 원래 여러 항목의 나열이라 줄바꿈이 자연스럽다.
+  // 지역·제품명은 한 줄이 관례라 과수집 위험이 커서 단일 줄을 유지한다.
+  var cupNotes = _splitNotes(_cupNoteBlockValues(lines).join(', '));
+  if (cupNotes.isEmpty) {
+    final cupSpatial = _spatialValue(
+      lines,
+      _cupTokens,
+      acceptsValue: _isCupNoteValue,
+    );
+    cupNotes = cupSpatial == null
+        ? const <String>[]
+        : _splitNotes(cupSpatial);
+  }
 
   // 4.2 타이포 제목/이브로우
   final te = _titleEyebrow(lines);

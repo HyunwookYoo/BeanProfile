@@ -420,5 +420,31 @@ void main() {
       expect(d.name, '하우스 블렌드');
       expect(d.roaster, isNull);
     });
+
+    test('한/영 2줄 라벨 옆 컵노트를 두 줄 다 가져온다', () {
+      final d = parseOcr(redCascaraLines);
+
+      expect(d.cupNotes, [
+        'Raspberrie',
+        'Sapphire Grape',
+        'Complexity',
+        'Citrus fnish',
+      ]);
+    });
+
+    test('값 수집은 다음 라벨 블록에서 멈춘다', () {
+      // 상한이 없으면 `로스터기` 블록 오른쪽의 기계 이름이 컵노트로 새어 든다.
+      final d = parseOcr(const [
+        OcrLine('노트', left: 80, top: 100, right: 160, bottom: 140),
+        OcrLine('Notes', left: 80, top: 150, right: 160, bottom: 190),
+        OcrLine('딸기, 자두', left: 300, top: 100, right: 600, bottom: 140),
+        OcrLine('블루베리', left: 300, top: 150, right: 600, bottom: 190),
+        OcrLine('로스터기', left: 80, top: 400, right: 200, bottom: 440),
+        OcrLine('Roaster', left: 80, top: 450, right: 200, bottom: 490),
+        OcrLine('Stronghold S7X', left: 300, top: 400, right: 600, bottom: 440),
+      ]);
+
+      expect(d.cupNotes, ['딸기', '자두', '블루베리']);
+    });
   });
 }

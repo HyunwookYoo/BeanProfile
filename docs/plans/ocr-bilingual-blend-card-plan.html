@@ -1,0 +1,518 @@
+<title>한/영 병기 블렌드 카드 OCR 파싱 — 구현 계획</title>
+<style>
+*{box-sizing:border-box}
+:root{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+  --font-sans:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Consolas,"Malgun Gothic",monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}}
+:root[data-theme="light"]{
+  --bg:#EFEAE0;--fg:#2B2019;--muted:#7A6F62;--line:#DED6C7;--accent:#A66A24;--accent-ink:#8A5A18;
+  --surface:#F7F3EC;--th:#E7DFD1;--code-bg:#221A11;--code-fg:#ECE3D3;--ic-bg:#E7DFD0;--ic-fg:#7A5216;
+}
+:root[data-theme="dark"]{
+  --bg:#1B1510;--fg:#EDE5D8;--muted:#9C9081;--line:#332A21;--accent:#D89A46;--accent-ink:#E4B677;
+  --surface:#241D16;--th:#2B231B;--code-bg:#100D08;--code-fg:#ECE3D3;--ic-bg:#2B231B;--ic-fg:#E4B677;
+}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font-sans);line-height:1.7;-webkit-font-smoothing:antialiased}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.doc{max-width:880px;margin:0 auto;padding:44px 24px 96px}
+.crumb{font-family:var(--font-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:16px}
+h1{font-size:clamp(26px,4vw,38px);font-weight:800;letter-spacing:-.025em;line-height:1.2;margin:.1em 0 .5em;text-wrap:balance}
+h2{font-size:22px;font-weight:700;margin:2em 0 .7em;padding-bottom:.3em;border-bottom:1px solid var(--line);letter-spacing:-.01em;text-wrap:balance}
+h3{font-size:16.5px;font-weight:700;color:var(--accent-ink);margin:1.7em 0 .5em}
+h4{font-size:14px;font-weight:700;margin:1.3em 0 .4em}
+p{margin:.7em 0}
+a{color:var(--accent);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px}
+strong{font-weight:700;color:var(--fg)}
+hr{border:none;border-top:1px solid var(--line);margin:2em 0}
+code.ic{font-family:var(--font-mono);font-size:.85em;background:var(--ic-bg);color:var(--ic-fg);padding:1.5px 6px;border-radius:6px}
+pre.code{position:relative;background:var(--code-bg);color:var(--code-fg);border-radius:12px;padding:16px 18px;margin:1em 0;overflow-x:auto;border:1px solid rgba(0,0,0,.28)}
+pre.code code{font-family:var(--font-mono);font-size:12.75px;line-height:1.6;white-space:pre;color:inherit;background:none;padding:0}
+pre.code[data-lang]::before{content:attr(data-lang);position:absolute;top:9px;right:13px;font-family:var(--font-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(236,227,211,.42)}
+.tablewrap{overflow-x:auto;margin:1.1em 0}
+table{border-collapse:collapse;width:100%;font-size:13.75px}
+th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+th{background:var(--th);font-weight:700}
+tbody tr:nth-child(even){background:var(--surface)}
+blockquote{margin:1.1em 0;padding:11px 16px;border-left:3px solid var(--accent);background:var(--surface);border-radius:0 10px 10px 0;color:var(--muted)}
+blockquote strong{color:var(--fg)}
+ul,ol{margin:.7em 0;padding-left:1.4em}
+li{margin:.32em 0}
+ul.tasklist{list-style:none;padding-left:.15em}
+ul.tasklist li.task{position:relative;padding-left:30px;margin:.5em 0}
+ul.tasklist li.task::before{content:"";position:absolute;left:0;top:.18em;width:17px;height:17px;border:2px solid var(--accent);border-radius:5px;background:transparent}
+ul.tasklist li.task.done::before{content:"\2713";background:var(--accent);color:#fff;font-size:12px;font-weight:800;text-align:center;line-height:15px}
+</style>
+<article class="doc"><div class="crumb">BeanProfile · docs/plans</div>
+<h1>한/영 병기 블렌드 카드 OCR 파싱 — 구현 계획</h1>
+<blockquote><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code class="ic">- [ ]</code>) syntax for tracking.</blockquote>
+<p><strong>Goal:</strong> 실기기 실패 카드(UNSPECIALTY <code class="ic">RED CASCARA</code>)에서 로스터리·컵노트·블렌드 성분이 채워지도록 OCR 파서 규칙 4건을 고친다.</p>
+<p><strong>Architecture:</strong> 파서 전용 변경이다. <code class="ic">ocr_parser.dart</code>에 "라벨 블록"(한/영 2줄 라벨을 하나로 묶기) 개념을 더해 컵노트 값을 여러 줄 모으고, <code class="ic">_titleEyebrow</code>가 제목의 다른 언어판을 로스터리로 오인하지 않게 하며, <code class="ic">ocr_component_parser.dart</code>의 <code class="ic">_isCountryAnchorText</code>를 완화해 "국가 + 농장/등급" 한 줄짜리 성분을 앵커로 인정한다. UI·스키마·백업·프로바이더·의존성 변경 없음.</p>
+<p><strong>Tech Stack:</strong> Flutter / Dart, 순수 함수 + 호스트 단위 테스트. 새 패키지 없음.</p>
+<p><strong>설계 문서:</strong> <a href="./ocr-bilingual-blend-card-design.md"><code class="ic">ocr-bilingual-blend-card-design.md</code></a> — 측정 근거와 기각된 대안이 거기 있다.</p>
+<h2>Global Constraints</h2>
+<ul><li><strong>파서 전용.</strong> <code class="ic">lib/features/beans/ocr/ocr_parser.dart</code>와 <code class="ic">ocr_component_parser.dart</code>, 그리고 테스트 파일만 건드린다. UI·drift 스키마·백업 코덱·프로바이더는 손대지 않는다. 마이그레이션 없음.</li><li><strong>새 의존성 금지.</strong> <code class="ic">pubspec.yaml</code>을 수정하지 않는다.</li><li><strong>기존 346개 테스트 회귀 금지.</strong> 특히 <code class="ic">test/unit/ocr_parser_test.dart</code>의 실기기 좌표 픽스처 2종(<code class="ic">ocr_card_ko</code> 콜론 카드 8필드 · <code class="ic">ocr_card_orig</code> 콜론없음 카드 8필드)이 그대로 통과해야 한다.</li><li><strong>테스트 실행은 Windows 관례를 따른다:</strong> <code class="ic">flutter test --concurrency=1 -r expanded</code> (병렬 실행 시 출력이 중복돼 판독이 어렵다).</li><li><strong><code class="ic">flutter analyze</code>는 0 유지.</strong></li><li><strong>주석은 한국어.</strong> 기존 파일의 주석 밀도·어투를 따른다. "무엇"이 아니라 "왜"를 적는다.</li><li><strong>에뮬레이터·실기기 불필요.</strong> 호스트 픽스처가 기기 출력을 재현하는 것이 확인됐다(설계 §2.4).</li><li><strong>커밋 메시지 끝에 다음 줄을 붙인다:</strong></li></ul>
+<p>  <code class="ic">Co-Authored-By: Claude Opus 5 (1M context) &lt;noreply@anthropic.com&gt;</code></p>
+<hr>
+<h2>Task 1: 실기기 픽스처 도입 + 이브로우가 제목급이면 건너뛴다</h2>
+<p>한/영 병기 제목(<code class="ic">RED CASCARA</code> 위 <code class="ic">레드 카스카라</code>)에서 <code class="ic">_titleEyebrow</code>가 <strong>같은 제품명의 영문판</strong>을 로스터리로 잡는다. 진짜 로스터리는 그 위의 <code class="ic">UNSPECIALTY BLEND</code>다.</p>
+<p><strong>Files:</strong></p>
+<ul><li>Modify: <code class="ic">test/helpers.dart</code> (픽스처 상수 추가)</li><li>Modify: <code class="ic">test/unit/ocr_parser_test.dart</code> (새 group 추가)</li><li>Modify: <code class="ic">lib/features/beans/ocr/ocr_parser.dart:154-191</code> (<code class="ic">_titleEyebrow</code>)</li></ul>
+<p><strong>Interfaces:</strong></p>
+<ul><li>Produces: <code class="ic">redCascaraLines</code> — <code class="ic">const List&lt;OcrLine&gt;</code>, <code class="ic">test/helpers.dart</code>. Task 2·3·4가 그대로 쓴다. <strong>줄 순서를 바꾸지 말 것</strong> (<code class="ic">admitted = [mentions.first]</code> 등 순서 의존 경로가 있다).</li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 1: 픽스처를 <code class="ic">test/helpers.dart</code>에 추가</strong></li></ul>
+<p>파일 끝에 붙인다. <code class="ic">OcrLine</code>은 이미 <code class="ic">package:beanprofile/services/ocr_service.dart</code>로 import돼 있다.</p>
+<pre class="code" data-lang="dart"><code>// ── 실기기 OCR 좌표 픽스처 ──
+// 2026-08-04 Android 에뮬레이터 ML Kit(korean) ORIGINAL 패스 출력.
+// 원본 4032x3024 / EXIF orientation 6 → ML Kit이 3024x4032 좌표계로 돌려준 값.
+// 줄 순서가 파서 결과에 영향을 준다(순서 의존 경로 있음) — 재정렬 금지.
+const redCascaraLines = &lt;OcrLine&gt;[
+  OcrLine('블렌딩:', left: 876, top: 2453, right: 1095, bottom: 2520),
+  OcrLine('노트:', left: 839, top: 3349, right: 1046, bottom: 3413),
+  OcrLine('Blending Info', left: 876, top: 2559, right: 1218, bottom: 2617),
+  OcrLine('Notes', left: 875, top: 3451, right: 1034, bottom: 3501),
+  OcrLine('UNSPECIALTY BLEND', left: 1191, top: 191, right: 2160, bottom: 260),
+  OcrLine('RED CASCARA', left: 1137, top: 511, right: 2303, bottom: 610),
+  OcrLine('로스터기:', left: 873, top: 3708, right: 1159, bottom: 3781),
+  OcrLine('Roaster', left: 864, top: 3820, right: 1073, bottom: 3874),
+  OcrLine('레드 카스카라', left: 1312, top: 773, right: 2127, bottom: 895),
+  OcrLine('Thailand Phupanna coffee',
+      left: 1329, top: 2465, right: 2096, bottom: 2536),
+  OcrLine('bio control Natural 70940%',
+      left: 1352, top: 2563, right: 2236, bottom: 2622),
+  OcrLine('Ethiopia Sidama Bensa Keramo Ako',
+      left: 1327, top: 2745, right: 2394, bottom: 2807),
+  OcrLine('GI Natural- 40%', left: 1366, top: 2836, right: 1846, bottom: 2901),
+  OcrLine('Colombia Inmaculada Fellow Farnms',
+      left: 1327, top: 3017, right: 2393, bottom: 3078),
+  OcrLine('Papayo Natural 20%',
+      left: 1345, top: 3102, right: 1973, bottom: 3176),
+  OcrLine('Raspberrie, Sapphire Grape,',
+      left: 1328, top: 3351, right: 2318, bottom: 3443),
+  OcrLine('Complexity, Citrus fnish',
+      left: 1328, top: 3450, right: 2197, bottom: 3527),
+  OcrLine('Stronghold S7X Ver.2',
+      left: 1326, top: 3704, right: 2065, bottom: 3780),
+];</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 2: 실패하는 테스트를 쓴다</strong></li></ul>
+<p><code class="ic">test/unit/ocr_parser_test.dart</code> 끝(마지막 <code class="ic">}</code> 직전)에 새 group을 넣는다. 파일 상단에 <code class="ic">import '../helpers.dart';</code>가 없으면 추가한다.</p>
+<pre class="code" data-lang="dart"><code>  group('RED CASCARA 실기기 픽스처(한/영 병기 블렌드 카드)', () {
+    test('로스터리는 제목의 영문판이 아니라 그 위 이브로우', () {
+      final d = parseOcr(redCascaraLines);
+
+      expect(d.name, '레드 카스카라');
+      expect(d.roaster, 'UNSPECIALTY');
+    });
+
+    // 가드 — 접미 정리가 이브로우를 빈 문자열로 만들어 기존 null 처리를
+    // 빠져나가지 않는지 본다. 수정 전후 모두 통과해야 한다.
+    test('이브로우가 원두 타입 토큰뿐이면 로스터리는 비운다', () {
+      final d = parseOcr(const [
+        OcrLine('BLEND', left: 100, top: 100, right: 260, bottom: 140),
+        OcrLine('하우스 블렌드', left: 100, top: 200, right: 700, bottom: 290),
+        OcrLine('원산지', left: 100, top: 400, right: 220, bottom: 430),
+        OcrLine('브라질', left: 300, top: 400, right: 450, bottom: 430),
+      ]);
+
+      expect(d.name, '하우스 블렌드');
+      expect(d.roaster, isNull);
+    });
+  });</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 3: 실패를 확인한다</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/unit/ocr_parser_test.dart --plain-name "로스터리는 제목의 영문판이" -r expanded --concurrency=1</code> Expected: FAIL — <code class="ic">Expected: 'UNSPECIALTY'  Actual: 'RED CASCARA'</code></p>
+<p>Run: <code class="ic">flutter test test/unit/ocr_parser_test.dart --plain-name "원두 타입 토큰뿐이면" -r expanded --concurrency=1</code> Expected: PASS — 이건 가드라서 지금도 통과한다. Step 5에서 여전히 통과하는지가 요점이다.</p>
+<ul class="tasklist"><li class="task"><strong>Step 4: <code class="ic">_titleEyebrow</code>를 고친다</strong></li></ul>
+<p><code class="ic">lib/features/beans/ocr/ocr_parser.dart</code>의 <code class="ic">_titleEyebrow</code> 이브로우 루프를 아래로 교체한다.</p>
+<p>기존:</p>
+<pre class="code" data-lang="dart"><code>  OcrLine? eyebrow;
+  for (final l in real) {
+    if (identical(l, title)) continue;
+    final above = l.bottom &lt;= title.top + 0.3 * title.height;
+    final xOverlap = l.left &lt;= title.right &amp;&amp; l.right &gt;= title.left;
+    if (above &amp;&amp; xOverlap &amp;&amp; l.height &lt; title.height) {
+      if (eyebrow == null || l.bottom &gt; eyebrow.bottom) eyebrow = l;
+    }
+  }
+  return (title.text.trim(), eyebrow?.text.trim());</code></pre>
+<p>교체:</p>
+<pre class="code" data-lang="dart"><code>  OcrLine? eyebrow;
+  for (final l in real) {
+    if (identical(l, title)) continue;
+    final above = l.bottom &lt;= title.top + 0.3 * title.height;
+    final xOverlap = l.left &lt;= title.right &amp;&amp; l.right &gt;= title.left;
+    // 제목급 크기의 줄은 이브로우가 아니다 — 한/영 병기 제목에서 다른 언어판이
+    // 로스터리로 잡히는 걸 막는다. 임계는 제목 판정과 같은 값을 쓴다.
+    final titleClass = l.height &gt;= 1.3 * medianH;
+    if (above &amp;&amp; xOverlap &amp;&amp; !titleClass &amp;&amp; l.height &lt; title.height) {
+      if (eyebrow == null || l.bottom &gt; eyebrow.bottom) eyebrow = l;
+    }
+  }
+  return (title.text.trim(), _stripBeanTypeSuffix(eyebrow?.text.trim()));</code></pre>
+<p>같은 파일의 <code class="ic">_beanTypeOnly</code> 선언 바로 아래에 접미 정리를 추가한다.</p>
+<pre class="code" data-lang="dart"><code>final RegExp _beanTypeSuffix = RegExp(
+  r'\s+(?:blend|블렌드|single[\s-]*origin|싱글\s*오리진)$',
+  caseSensitive: false,
+);
+
+/// 이브로우 끝의 원두 타입 토큰을 뗀다 — `UNSPECIALTY BLEND` → `UNSPECIALTY`.
+/// 앞에 다른 글자가 있을 때만(`\s+` 요구) 뗀다. 토큰 단독이면 그대로 두어
+/// `parseOcr`의 기존 `_beanTypeOnly` 처리가 null로 만들게 한다.
+String? _stripBeanTypeSuffix(String? text) {
+  if (text == null) return null;
+  final stripped = text.replaceFirst(_beanTypeSuffix, '').trim();
+  return stripped.isEmpty ? text : stripped;
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 5: 통과를 확인한다</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/unit/ocr_parser_test.dart --plain-name "로스터리는 제목의 영문판이" -r expanded --concurrency=1</code> Expected: PASS</p>
+<ul class="tasklist"><li class="task"><strong>Step 6: 비회귀 — 전체 테스트와 analyze</strong></li></ul>
+<p>Run: <code class="ic">flutter test --concurrency=1 -r expanded</code> Expected: 모두 통과. 특히 <code class="ic">ocr_card_orig</code> 픽스처의 <code class="ic">expect(d.roaster, contains('베이스캠프'))</code>가 살아 있어야 한다(그 카드의 이브로우 높이 31은 제목급 임계 40.3 미만이라 영향받지 않는다).</p>
+<p>Run: <code class="ic">flutter analyze</code> Expected: <code class="ic">No issues found!</code></p>
+<ul class="tasklist"><li class="task"><strong>Step 7: 커밋</strong></li></ul>
+<pre class="code" data-lang="bash"><code>git add test/helpers.dart test/unit/ocr_parser_test.dart lib/features/beans/ocr/ocr_parser.dart
+git commit -m "$(cat &lt;&lt;'EOF'
+fix(ocr): skip title-class lines when picking the roastery eyebrow
+
+A bilingual title stack made _titleEyebrow pick the other-language copy of
+the product name as the roastery. Exclude candidates that are themselves
+title-sized, and strip a trailing bean-type token from the result.
+
+Co-Authored-By: Claude Opus 5 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)"</code></pre>
+<hr>
+<h2>Task 2: 라벨 블록 — 한/영 2줄 라벨 옆 컵노트를 여러 줄 모은다</h2>
+<p><code class="ic">노트:</code>(위) / <code class="ic">Notes</code>(아래) 2줄 라벨이라 각각 다른 값줄과 같은 행에 놓인다. 지금은 <code class="ic">_cupTokens</code>에 <code class="ic">노트</code>가 없어 <code class="ic">Notes</code>로 매칭되고, <code class="ic">_valueFor</code>가 값을 한 줄만 가져와 앞줄이 통째로 사라진다.</p>
+<p><strong>Files:</strong></p>
+<ul><li>Modify: <code class="ic">lib/features/beans/ocr/ocr_parser.dart</code> (<code class="ic">_cupTokens</code>, <code class="ic">_otherLabelTokens</code>, 신규 헬퍼 3개, <code class="ic">parseOcr</code>)</li><li>Modify: <code class="ic">test/unit/ocr_parser_test.dart</code></li></ul>
+<p><strong>Interfaces:</strong></p>
+<ul><li>Consumes: <code class="ic">redCascaraLines</code> (Task 1)</li><li>Produces: 없음 (파일 내부 private 헬퍼)</li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 1: 실패하는 테스트 두 개를 쓴다</strong></li></ul>
+<p>Task 1이 만든 group 안에 추가한다.</p>
+<pre class="code" data-lang="dart"><code>    test('한/영 2줄 라벨 옆 컵노트를 두 줄 다 가져온다', () {
+      final d = parseOcr(redCascaraLines);
+
+      expect(d.cupNotes, [
+        'Raspberrie',
+        'Sapphire Grape',
+        'Complexity',
+        'Citrus fnish',
+      ]);
+    });
+
+    test('값 수집은 다음 라벨 블록에서 멈춘다', () {
+      // 상한이 없으면 `로스터기` 블록 오른쪽의 기계 이름이 컵노트로 새어 든다.
+      final d = parseOcr(const [
+        OcrLine('노트', left: 80, top: 100, right: 160, bottom: 140),
+        OcrLine('Notes', left: 80, top: 150, right: 160, bottom: 190),
+        OcrLine('딸기, 자두', left: 300, top: 100, right: 600, bottom: 140),
+        OcrLine('블루베리', left: 300, top: 150, right: 600, bottom: 190),
+        OcrLine('로스터기', left: 80, top: 400, right: 200, bottom: 440),
+        OcrLine('Roaster', left: 80, top: 450, right: 200, bottom: 490),
+        OcrLine('Stronghold S7X', left: 300, top: 400, right: 600, bottom: 440),
+      ]);
+
+      expect(d.cupNotes, ['딸기', '자두', '블루베리']);
+    });</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 2: 실패를 확인한다</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/unit/ocr_parser_test.dart --plain-name "컵노트를 두 줄" -r expanded --concurrency=1</code> Expected: FAIL — <code class="ic">Actual: ['Complexity', 'Citrus fnish']</code> (앞줄 유실)</p>
+<p>Run: <code class="ic">flutter test test/unit/ocr_parser_test.dart --plain-name "다음 라벨 블록에서 멈춘다" -r expanded --concurrency=1</code> Expected: FAIL — 한 줄만 잡히거나 빈 리스트</p>
+<ul class="tasklist"><li class="task"><strong>Step 3: 어휘를 추가한다</strong></li></ul>
+<p><code class="ic">lib/features/beans/ocr/ocr_parser.dart</code>의 토큰 집합 둘을 고친다.</p>
+<pre class="code" data-lang="dart"><code>const Set&lt;String&gt; _cupTokens = {
+  '컵노트', '컵 노트', '노트', 'notes', 'cup notes', 'cup note', 'tasting notes', '향미',
+};
+const Set&lt;String&gt; _otherLabelTokens = {
+  '원산지','생산지','품종','가공','가공방식','로스팅','로스팅일','고도','제품명','상품명','로스터리','로스터','중량',
+  // 어떤 칸에도 매핑하지 않는다 — "값이 아님" 표시 + 값 수집 구간의 종료자 역할.
+  // `로스터기`는 특히 중요하다: 이 라벨의 값은 로스팅 기계(예: Stronghold S7X)라
+  // 로스터리가 아니고, 라벨로 등록돼 있어야 컵노트 수집이 그 앞에서 멈춘다.
+  '블렌딩','블렌딩정보','blending info','로스터기',
+  'origin','variety','varietal','process','roast','roast date','roasted','altitude','name','product name','roaster',
+};</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 4: 라벨 블록과 값 수집기를 추가한다</strong></li></ul>
+<p><code class="ic">_isLabel</code> 정의 아래(=<code class="ic">isKnownOcrLabel</code> 위)에 넣는다.</p>
+<pre class="code" data-lang="dart"><code>/// 세로로 붙어 있는 같은 열의 라벨 줄 묶음 — 한글 라벨 위, 영문 라벨 아래로
+/// 2줄 스택을 이루는 카드가 있어서 라벨 하나를 두 줄로 봐야 한다.
+List&lt;List&lt;OcrLine&gt;&gt; _labelBlocks(List&lt;OcrLine&gt; lines) {
+  final labels = &lt;OcrLine&gt;[
+    for (final line in lines)
+      if (_isLabel(line.text) &amp;&amp; line.height &gt; 0) line,
+  ]..sort((a, b) =&gt; a.top.compareTo(b.top));
+
+  final blocks = &lt;List&lt;OcrLine&gt;&gt;[];
+  for (final label in labels) {
+    List&lt;OcrLine&gt;? target;
+    for (final block in blocks) {
+      final previous = block.last;
+      final scale = previous.height &gt; label.height
+          ? previous.height
+          : label.height;
+      if (previous.left &lt;= label.right &amp;&amp;
+          label.left &lt;= previous.right &amp;&amp;
+          label.top &gt;= previous.bottom &amp;&amp;
+          label.top - previous.bottom &lt;= 1.5 * scale) {
+        target = block;
+        break;
+      }
+    }
+    if (target == null) {
+      blocks.add([label]);
+    } else {
+      target.add(label);
+    }
+  }
+  return blocks;
+}
+
+/// 라벨 블록 오른쪽 열의 값 줄들 — 다음 라벨 블록이 시작되기 전까지. 값이 여러
+/// 줄로 이어지는 카드를 위해 `_valueFor`(한 줄)와 별도로 둔다.
+List&lt;String&gt; _valuesRightOf(
+  List&lt;OcrLine&gt; lines,
+  List&lt;List&lt;OcrLine&gt;&gt; blocks,
+  List&lt;OcrLine&gt; block, {
+  required bool Function(String value) acceptsValue,
+}) {
+  final h = block.first.height &lt;= 0 ? 1.0 : block.first.height;
+  final top = block.map((l) =&gt; l.top).reduce((a, b) =&gt; a &lt; b ? a : b);
+  final right = block.map((l) =&gt; l.right).reduce((a, b) =&gt; a &gt; b ? a : b);
+  var upper = double.infinity;
+  for (final other in blocks) {
+    if (identical(other, block)) continue;
+    final otherTop = other.map((l) =&gt; l.top).reduce((a, b) =&gt; a &lt; b ? a : b);
+    if (otherTop &gt; top &amp;&amp; otherTop &lt; upper) upper = otherTop;
+  }
+
+  final values = &lt;OcrLine&gt;[];
+  for (final line in lines) {
+    final text = line.text.trim();
+    if (text.isEmpty || _isLabel(text) || !acceptsValue(text)) continue;
+    if (line.left &lt; right - 0.5 * h) continue;
+    if (line.centerY &lt; top - 0.5 * h || line.centerY &gt;= upper) continue;
+    values.add(line);
+  }
+  values.sort((a, b) =&gt; a.top.compareTo(b.top));
+  return [for (final line in values) line.text.trim()];
+}
+
+/// 컵노트 라벨을 품은 블록 오른쪽의 값 줄들. 오른쪽에 값이 없는 카드(값이 라벨
+/// 아래에 오는 배치)는 빈 리스트를 돌려 `_spatialValue` 폴백으로 넘긴다.
+List&lt;String&gt; _cupNoteBlockValues(List&lt;OcrLine&gt; lines) {
+  final blocks = _labelBlocks(lines);
+  for (final block in blocks) {
+    if (!block.any((line) =&gt; _cupTokens.contains(_norm(line.text)))) continue;
+    final values = _valuesRightOf(
+      lines,
+      blocks,
+      block,
+      acceptsValue: _isCupNoteValue,
+    );
+    if (values.isNotEmpty) return values;
+  }
+  return const [];
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 5: <code class="ic">parseOcr</code>에서 블록 수집을 먼저 쓴다</strong></li></ul>
+<p><code class="ic">parseOcr</code>의 <code class="ic">// 4.1 좌표 라벨→값</code> 블록을 교체한다.</p>
+<p>기존:</p>
+<pre class="code" data-lang="dart"><code>  String? region = _spatialValue(lines, _regionTokens);
+  final cupSpatial = _spatialValue(
+    lines,
+    _cupTokens,
+    acceptsValue: _isCupNoteValue,
+  );
+  var cupNotes = cupSpatial == null ? const &lt;String&gt;[] : _splitNotes(cupSpatial);</code></pre>
+<p>교체:</p>
+<pre class="code" data-lang="dart"><code>  String? region = _spatialValue(lines, _regionTokens);
+  // 컵노트만 여러 줄을 모은다 — 원래 여러 항목의 나열이라 줄바꿈이 자연스럽다.
+  // 지역·제품명은 한 줄이 관례라 과수집 위험이 커서 단일 줄을 유지한다.
+  var cupNotes = _splitNotes(_cupNoteBlockValues(lines).join(', '));
+  if (cupNotes.isEmpty) {
+    final cupSpatial = _spatialValue(
+      lines,
+      _cupTokens,
+      acceptsValue: _isCupNoteValue,
+    );
+    cupNotes = cupSpatial == null
+        ? const &lt;String&gt;[]
+        : _splitNotes(cupSpatial);
+  }</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 6: 통과를 확인한다</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/unit/ocr_parser_test.dart -r expanded --concurrency=1</code> Expected: 새 테스트 2개 PASS, 기존 테스트 전부 PASS.</p>
+<p><code class="ic">ocr_card_orig</code> 픽스처가 깨지면 폴백이 안 걸린 것이다 — 그 카드는 컵노트 값(<code class="ic">딸기, 복숭아, 레드와인</code>, left 62)이 라벨(<code class="ic">컵노트</code>, right 156) <strong>왼쪽 아래</strong>에 있어 <code class="ic">_valuesRightOf</code>가 빈 리스트를 줘야 하고, 그래야 <code class="ic">_spatialValue</code>의 아래-폴백이 값을 찾는다.</p>
+<ul class="tasklist"><li class="task"><strong>Step 7: 비회귀 — 전체 테스트와 analyze</strong></li></ul>
+<p>Run: <code class="ic">flutter test --concurrency=1 -r expanded</code> Expected: 모두 통과</p>
+<p>Run: <code class="ic">flutter analyze</code> Expected: <code class="ic">No issues found!</code></p>
+<ul class="tasklist"><li class="task"><strong>Step 8: 커밋</strong></li></ul>
+<pre class="code" data-lang="bash"><code>git add lib/features/beans/ocr/ocr_parser.dart test/unit/ocr_parser_test.dart
+git commit -m "$(cat &lt;&lt;'EOF'
+fix(ocr): collect multi-line cup notes beside bilingual label stacks
+
+Cards that stack a Korean label over its English translation put each label
+line on a different row than the value it belongs to, so single-line value
+matching kept only the last row. Group adjacent label lines into a block and
+collect every value line to its right up to the next block. Register the
+labels that bound that range, including the roasting-machine label.
+
+Co-Authored-By: Claude Opus 5 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)"</code></pre>
+<hr>
+<h2>Task 3: 성분 앵커 완화 — 줄 머리에 국가가 오면 앵커</h2>
+<p>블렌드 성분이 3개인데 1개만 나온다. <code class="ic">_hasComponentEvidence</code>의 여러 경로 중 이 배치를 알아볼 수 있는 건 <code class="ic">_hasRepeatedTopology</code>인데, 그 입구 <code class="ic">_anchorsRepeat</code>가 <code class="ic">_isCountryAnchorText</code>를 요구한다. 이 함수는 국가·비율·라벨을 뺀 나머지가 <strong>비어 있어야</strong> 앵커로 인정하므로 <code class="ic">Ethiopia Sidama Bensa Keramo Ako</code>가 탈락한다. 증거가 0이 되면 <code class="ic">admitted = [mentions.first]</code>로 첫 언급 하나만 남는다.</p>
+<p><strong>Files:</strong></p>
+<ul><li>Modify: <code class="ic">lib/features/beans/ocr/ocr_component_parser.dart:642-653</code> (<code class="ic">_isCountryAnchorText</code>)</li><li>Modify: <code class="ic">test/unit/ocr_component_parser_test.dart</code></li></ul>
+<p><strong>Interfaces:</strong></p>
+<ul><li>Consumes: <code class="ic">redCascaraLines</code> (Task 1). <code class="ic">parseOcrComponents(List&lt;OcrLine&gt;) -&gt; List&lt;OcrComponentDraft&gt;</code>는 기존 공개 함수다.</li><li>Produces: 없음</li></ul>
+<blockquote>이 시점에는 <code class="ic">Thailand</code>가 아직 사전에 없어 성분이 <strong>2개</strong>다. 3개는 Task 4에서 완성된다.</blockquote>
+<ul class="tasklist"><li class="task"><strong>Step 1: 실패하는 테스트를 쓴다</strong></li></ul>
+<p><code class="ic">test/unit/ocr_component_parser_test.dart</code> 끝에 group을 추가한다. 파일 상단에 <code class="ic">import '../helpers.dart';</code>가 없으면 추가한다.</p>
+<pre class="code" data-lang="dart"><code>  group('RED CASCARA 실기기 픽스처 — 줄머리 국가 앵커', () {
+    test('국가 뒤에 농장/등급이 붙어도 성분으로 인정한다', () {
+      final components = parseOcrComponents(redCascaraLines);
+
+      expect(components.map((c) =&gt; c.country), ['Ethiopia', 'Colombia']);
+      expect(components.map((c) =&gt; c.ratioPercent), [40, 20]);
+      expect(
+        components.map((c) =&gt; c.process),
+        [Process.natural, Process.natural],
+      );
+    });
+
+    test('줄 중간의 국가 언급만으로는 앵커가 되지 않는다', () {
+      final components = parseOcrComponents(const [
+        OcrLine('our Ethiopia roast', left: 100, top: 100, right: 700, bottom: 160),
+        OcrLine('our Colombia roast', left: 100, top: 300, right: 700, bottom: 360),
+      ]);
+
+      expect(components, hasLength(1));
+    });
+  });</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 2: 실패를 확인한다</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/unit/ocr_component_parser_test.dart --plain-name "농장/등급이 붙어도" -r expanded --concurrency=1</code> Expected: FAIL — <code class="ic">Actual: ['Ethiopia']</code> (성분 1개)</p>
+<ul class="tasklist"><li class="task"><strong>Step 3: <code class="ic">_isCountryAnchorText</code>에 줄머리 분기를 넣는다</strong></li></ul>
+<p><code class="ic">lib/features/beans/ocr/ocr_component_parser.dart</code>의 <code class="ic">_isCountryAnchorText</code>를 교체한다.</p>
+<pre class="code" data-lang="dart"><code>bool _isCountryAnchorText(_CountryMention mention) {
+  // ① 국가가 줄 머리에 오면 앵커 — `Ethiopia Sidama Bensa Keramo Ako`처럼 국가
+  //    뒤에 농장·지역·등급이 붙는 성분 줄을 살린다. 앵커가 됐다고 성분이 되는
+  //    건 아니다. `_hasComponentEvidence`가 여전히 비율이나 반복 토폴로지를
+  //    요구하고, 반복 토폴로지는 같은 열의 앵커가 둘 이상이어야 성립한다.
+  final prefix = mention.line.text.substring(0, mention.textOffset);
+  if (prefix.replaceAll(RegExp(r'[\s\-–—|/·,:：()\[\]#\d]+'), '').isEmpty) {
+    return true;
+  }
+  // ② 기존: 국가·비율·라벨을 빼고 남은 글자가 없으면 앵커.
+  var remainder = mention.line.text.replaceRange(
+    mention.textOffset,
+    mention.textOffset + mention.matchLength,
+    ' ',
+  );
+  remainder = remainder
+      .replaceAll(ratioPattern, ' ')
+      .replaceFirst(_bareLocalComponentLabel, ' ')
+      .replaceAll(RegExp(r'[\s\-–—|/·,:：()\[\]#\d]+'), '');
+  return remainder.isEmpty;
+}</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 4: 통과를 확인한다</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/unit/ocr_component_parser_test.dart -r expanded --concurrency=1</code> Expected: 새 테스트 2개 PASS.</p>
+<p><strong>국가 2개는 맞는데 <code class="ic">ratioPercent</code>나 <code class="ic">process</code>가 <code class="ic">null</code>이면</strong> — 앵커·토폴로지는 열렸고 값 채움 경로가 막힌 것이다. 확인 순서:</p>
+<ol><li><code class="ic">_isUnlabeledTableCandidate</code>가 <code class="ic">GI Natural- 40%</code> / <code class="ic">Papayo Natural 20%</code>를 후보로 받는지. 값 줄 셋은 <code class="ic">_nonComponentTableText</code>(<code class="ic">blend|roast*|notes?|coffee|variety|altitude|product|name</code>)에 걸리지 않으므로 다른 조건이 원인이다.</li><li><code class="ic">_repeatedLayout(mentions)</code>가 <code class="ic">null</code>이 아닌지(앵커 2개 이상이면 non-null).</li><li><code class="ic">_ownerForLine</code>은 확인됐다 — 앵커가 세로로 넓게 퍼져(centerY 최근접) 배정되고, 최근접 92 대 차순위 179 이상으로 벌어져 있어 0.5px 동점 가드에 걸리지 않는다.</li></ol>
+<p><strong>국가가 여전히 1개면</strong> <code class="ic">_anchorsRepeat</code>의 <code class="ic">sameColumn</code>을 본다(left 차 0 ≤ 124, centerY 차 271.5 ≤ 372이어야 한다).</p>
+<ul class="tasklist"><li class="task"><strong>Step 5: 비회귀 — 전체 테스트와 analyze</strong></li></ul>
+<p>Run: <code class="ic">flutter test --concurrency=1 -r expanded</code> Expected: 모두 통과. 특히 <code class="ic">ocr_blend_en</code>·<code class="ic">ocr_dark_blend_en</code> 관련 기존 성분 테스트가 그대로여야 한다.</p>
+<p>Run: <code class="ic">flutter analyze</code> Expected: <code class="ic">No issues found!</code></p>
+<ul class="tasklist"><li class="task"><strong>Step 6: 커밋</strong></li></ul>
+<pre class="code" data-lang="bash"><code>git add lib/features/beans/ocr/ocr_component_parser.dart test/unit/ocr_component_parser_test.dart
+git commit -m "$(cat &lt;&lt;'EOF'
+fix(ocr): treat a line-initial country as a blend component anchor
+
+Component lines that read "country + farm + grade" failed the anchor test,
+which required nothing to remain after removing the country and ratio. That
+killed repeated-topology detection, so a three-origin blend collapsed to its
+first mention. Accept a country that starts the line; evidence rules still
+gate whether it becomes a component.
+
+Co-Authored-By: Claude Opus 5 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)"</code></pre>
+<hr>
+<h2>Task 4: 국가 사전 확장 + 카드 전체 통합 단언</h2>
+<p><code class="ic">countryKeywords</code>에 <code class="ic">Thailand</code>가 없어 3번째 성분이 후보로도 오르지 못한다.</p>
+<p><strong>Files:</strong></p>
+<ul><li>Modify: <code class="ic">lib/features/beans/ocr/ocr_component_parser.dart:5-46</code> (<code class="ic">countryKeywords</code>)</li><li>Modify: <code class="ic">test/unit/ocr_parser_test.dart</code> (통합 단언)</li></ul>
+<p><strong>Interfaces:</strong></p>
+<ul><li>Consumes: <code class="ic">redCascaraLines</code> (Task 1), Task 2·3의 변경</li><li>Produces: 없음</li></ul>
+<ul class="tasklist"><li class="task"><strong>Step 1: 실패하는 테스트를 쓴다</strong></li></ul>
+<p>Task 1이 만든 group 안에 추가한다.</p>
+<pre class="code" data-lang="dart"><code>    test('카드 전체 — 성분 3개와 비율, 비율 불명은 null로 남긴다', () {
+      final d = parseOcr(redCascaraLines);
+
+      expect(d.typeDecision, OcrTypeDecision.certainBlend);
+      expect(
+        d.components.map((c) =&gt; c.country),
+        ['Thailand', 'Ethiopia', 'Colombia'],
+      );
+      // Thailand의 비율은 복구하지 않는다 — OCR이 `Natural 709 - 40%`를
+      // `Natural 70940%`로 붙여 읽어 단어 경계가 사라졌다. 추측해 채우면
+      // 조용히 틀린 값이 저장된다.
+      expect(d.components.map((c) =&gt; c.ratioPercent), [null, 40, 20]);
+    });</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 2: 실패를 확인한다</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/unit/ocr_parser_test.dart --plain-name "성분 3개와 비율" -r expanded --concurrency=1</code> Expected: FAIL — <code class="ic">Actual: ['Ethiopia', 'Colombia']</code></p>
+<ul class="tasklist"><li class="task"><strong>Step 3: 국가 사전을 늘린다</strong></li></ul>
+<p><code class="ic">countryKeywords</code> 맵의 <code class="ic">'ecuador': 'Ecuador', '에콰도르': 'Ecuador',</code> 다음, 닫는 <code class="ic">};</code> 앞에 추가한다.</p>
+<pre class="code" data-lang="dart"><code>  'thailand': 'Thailand',
+  '태국': 'Thailand',
+  'vietnam': 'Vietnam',
+  '베트남': 'Vietnam',
+  'india': 'India',
+  '인도': 'India',
+  'laos': 'Laos',
+  '라오스': 'Laos',
+  'myanmar': 'Myanmar',
+  '미얀마': 'Myanmar',
+  'papua new guinea': 'Papua New Guinea',
+  '파푸아뉴기니': 'Papua New Guinea',
+  'timor': 'East Timor',
+  '동티모르': 'East Timor',
+  'jamaica': 'Jamaica',
+  '자메이카': 'Jamaica',
+  'hawaii': 'Hawaii',
+  '하와이': 'Hawaii',
+  // China는 넣지 않는다 — `_matchesIn`이 단어 경계 없는 부분 문자열 매칭이라
+  // 니카라과 산지 `Chinandega`를 China로 오인한다.</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 4: 통과를 확인한다</strong></li></ul>
+<p>Run: <code class="ic">flutter test test/unit/ocr_parser_test.dart -r expanded --concurrency=1</code> Expected: 모두 PASS.</p>
+<p>Task 3의 성분 테스트는 이제 2개가 아니라 3개가 되므로 함께 고친다.</p>
+<pre class="code" data-lang="dart"><code>      expect(
+        components.map((c) =&gt; c.country),
+        ['Thailand', 'Ethiopia', 'Colombia'],
+      );
+      expect(components.map((c) =&gt; c.ratioPercent), [null, 40, 20]);
+      expect(
+        components.map((c) =&gt; c.process),
+        [Process.natural, Process.natural, Process.natural],
+      );</code></pre>
+<ul class="tasklist"><li class="task"><strong>Step 5: 비회귀 — 전체 테스트와 analyze</strong></li></ul>
+<p>Run: <code class="ic">flutter test --concurrency=1 -r expanded</code> Expected: 모두 통과</p>
+<p>Run: <code class="ic">flutter analyze</code> Expected: <code class="ic">No issues found!</code></p>
+<ul class="tasklist"><li class="task"><strong>Step 6: 커밋</strong></li></ul>
+<pre class="code" data-lang="bash"><code>git add lib/features/beans/ocr/ocr_component_parser.dart test/unit/ocr_parser_test.dart test/unit/ocr_component_parser_test.dart
+git commit -m "$(cat &lt;&lt;'EOF'
+feat(ocr): add nine coffee origins to the country dictionary
+
+Thailand was missing, so a 40% component never became a candidate. Add the
+Asian and Pacific origins the dictionary lacked. China is deliberately left
+out: substring matching would read Nicaragua's Chinandega as China.
+
+Co-Authored-By: Claude Opus 5 (1M context) &lt;noreply@anthropic.com&gt;
+EOF
+)"</code></pre>
+<hr>
+<h2>완료 확인</h2>
+<ul class="tasklist"><li class="task"><code class="ic">flutter test --concurrency=1 -r expanded</code> 전체 통과, 기존 346개 중 깨진 것 없음</li><li class="task"><code class="ic">flutter analyze</code> → <code class="ic">No issues found!</code></li><li class="task"><code class="ic">git diff --stat main</code> 이 <code class="ic">ocr_parser.dart</code> · <code class="ic">ocr_component_parser.dart</code> · 테스트 3개만 보여준다 (설계의 "파서 전용" 제약)</li><li class="task">설계 §5 기대 결과와 대조: 제품명 <code class="ic">레드 카스카라</code> · 로스터리 <code class="ic">UNSPECIALTY</code> · 컵노트 4개 · 성분 3개(비율 null/40/20) · <code class="ic">certainBlend</code></li><li class="task">배포 후 사용자가 실기기에서 같은 카드를 스캔해 확인 (설계 §9 DoD 4)</li></ul>
+</article>

@@ -160,7 +160,21 @@ List<String> _valuesRightOf(
     values.add(line);
   }
   values.sort((a, b) => a.top.compareTo(b.top));
-  return [for (final line in values) line.text.trim()];
+
+  // 아래에 다음 라벨 블록이 없으면 upper가 무한대라 위 필터만으로는 상한이 없다.
+  // 값 블록은 줄과 줄이 붙어 이어지므로, 간격이 벌어지면 그 뒤는 배치 코드·QR
+  // 캡션 등 다른 내용으로 보고 첫 줄부터 이어지는 구간만 남긴다. 임계는
+  // `_labelBlocks`의 블록 병합 기준과 맞춘다.
+  final contiguous = <OcrLine>[];
+  for (final line in values) {
+    if (contiguous.isNotEmpty) {
+      final previous = contiguous.last;
+      final scale = previous.height > line.height ? previous.height : line.height;
+      if (line.top - previous.bottom > 1.5 * scale) break;
+    }
+    contiguous.add(line);
+  }
+  return [for (final line in contiguous) line.text.trim()];
 }
 
 /// 컵노트 라벨을 품은 블록 오른쪽의 값 줄들. 오른쪽에 값이 없는 카드(값이 라벨

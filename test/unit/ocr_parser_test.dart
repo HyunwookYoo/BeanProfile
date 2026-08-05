@@ -446,5 +446,17 @@ void main() {
 
       expect(d.cupNotes, ['딸기', '자두', '블루베리']);
     });
+
+    test('아래에 라벨이 없어도 값 수집은 여백에서 끊긴다', () {
+      final d = parseOcr(const [
+        OcrLine('노트', left: 80, top: 100, right: 160, bottom: 140),
+        OcrLine('Notes', left: 80, top: 150, right: 160, bottom: 190),
+        OcrLine('딸기, 자두', left: 300, top: 100, right: 600, bottom: 140),
+        OcrLine('블루베리', left: 300, top: 150, right: 600, bottom: 190),
+        OcrLine('LOT A1234', left: 300, top: 900, right: 600, bottom: 940),
+      ]);
+
+      expect(d.cupNotes, ['딸기', '자두', '블루베리']);
+    });
   });
 }

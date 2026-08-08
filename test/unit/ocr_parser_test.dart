@@ -551,4 +551,53 @@ void main() {
       expect(parseOcrText('0 JUL 2026').roastDate, isNull);
     });
   });
+
+  group('HWACHAE 실기기 픽스처 — 카드 전체', () {
+    test('성분 3개와 로스팅 날짜가 채워진다', () {
+      final d = parseOcr(hwachaeLines);
+
+      expect(d.typeDecision, OcrTypeDecision.certainBlend);
+      expect(
+        d.components.map((c) => c.country),
+        ['Panama', 'Ecuador', 'Ethiopia'],
+      );
+      expect(d.components.map((c) => c.ratioPercent), [null, 45, 45]);
+      expect(d.roastDate, DateTime(2026, 7, 13));
+      // process는 실측값을 그대로 고정한다 — 이 카드엔 가공 라벨이 없고, 세
+      // 성분 모두 소유된 후보 줄에도 가공 키워드가 없어 셋 다 null이다.
+      expect(d.components.map((c) => c.process), [null, null, null]);
+      // region도 실측값을 그대로 고정한다 — 카드에 지역 라벨이 아예 없다.
+      // panama·ecuador는 세로 거리로 붙는 소유 후보 줄이 없어 null로 남고,
+      // ethiopia는 라벨 없는 값 줄을 가장 가까운 성분에 붙이는 표-폴백이
+      // 컵노트 조각 `avour berry bomb, tropicalfruits,`(라벨 `flavour.`을
+      // OCR이 `avour`로 뭉갠 잔여물)를 지역으로 오채움한다. 지역명이 아니지만
+      // "더 낫게" 보이도록 여기서 고치지 않는다 — 직전 브랜치가 미룬 "모르면
+      // null" 후속(직전 설계 §8)과 같은 문제이고, 휴리스틱을 덧대면 그 결정을
+      // 뒤엎게 된다.
+      expect(
+        d.components.map((c) => c.region),
+        [null, null, 'avour berry bomb tropicalfruits'],
+      );
+    });
+
+    test('제품명은 비운다 — 사진 속 키보드가 제품명이 되면 안 된다', () {
+      final d = parseOcr(hwachaeLines);
+
+      // 이 카드의 제품명 `HWACHAE BLEND`는 높이가 본문 중앙값과 같아
+      // 타이포그래피로 찾을 수 없다. 억지로 찾게 만들면 사진에 찍힌 키보드
+      // `Alt 한/영`(높이 109)이나 `Designed for`(98)가 제품명이 된다.
+      // 비우는 쪽이 옳다 — 설계 §2.3에 계산 근거가 있다.
+      expect(d.name, isNull);
+    });
+
+    test('컵노트는 비어 있고 로스터리는 OCR이 읽은 그대로다', () {
+      final d = parseOcr(hwachaeLines);
+
+      // 라벨 `flavour.`를 OCR이 `avour`로 뭉갰다. 어휘를 넓혀도 못 잡는다.
+      expect(d.cupNotes, isEmpty);
+      // `Roastery`로 끝나는 유일한 줄을 잡는 규칙은 정상 동작했다.
+      // 철자가 틀린 건 OCR 오독이며 파서가 고칠 수 있는 것이 아니다.
+      expect(d.roaster, 'a Cotee Roastery');
+    });
+  });
 }

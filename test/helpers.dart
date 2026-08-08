@@ -261,3 +261,30 @@ const redCascaraLines = <OcrLine>[
   OcrLine('Stronghold S7X Ver.2',
       left: 1326, top: 3704, right: 2065, bottom: 3780),
 ];
+
+// 2026-08-08 Android 에뮬레이터 ML Kit(korean) ORIGINAL 패스 출력.
+// 원본 4032x3024 / EXIF orientation 6. 줄 순서 유지 — 순서 의존 경로가 있다.
+// `Alt 한/영`은 사진에 찍힌 키보드다. 파서가 실제로 견뎌야 하는 입력이라
+// 일부러 남긴다(설계 §2.3 — 이 줄이 제품명이 되면 안 된다).
+const hwachaeLines = <OcrLine>[
+  OcrLine('info. 109% panama blackmoon, geisha, anaerobic n',
+      left: 157, top: 1376, right: 1672, bottom: 1442),
+  OcrLine('45% ecuador meridiano, typica mejorado, washed',
+      left: 301, top: 1450, right: 1818, bottom: 1520),
+  OcrLine('45% ethiopia gute mini, 74110 peaberry, washed',
+      left: 302, top: 1521, right: 1769, bottom: 1598),
+  OcrLine('avour berry bomb, tropicalfruits,',
+      left: 155, top: 1743, right: 1196, bottom: 1828),
+  OcrLine('igtlk tea, plun sorbet',
+      left: 159, top: 1847, right: 954, bottom: 1915),
+  OcrLine('Alt 한/영', left: 1244, top: 202, right: 1661, bottom: 311),
+  OcrLine('a Cotee Roastery', left: 366, top: 2260, right: 885, bottom: 2328),
+  OcrLine('NSI or quaity, seasonality, and harmony.',
+      left: 229, top: 2344, right: 1455, bottom: 2407),
+  OcrLine('HWACHAE BLEND', left: 2173, top: 1377, right: 2979, bottom: 1452),
+  OcrLine('Designed for', left: 2172, top: 1495, right: 2737, bottom: 1593),
+  OcrLine('UNSPECIALTY', left: 2171, top: 1616, right: 2800, bottom: 1697),
+  OcrLine('13 JUL 2026', left: 2353, top: 2198, right: 2956, bottom: 2340),
+  OcrLine('Roasted in Malaysia',
+      left: 2162, top: 2347, right: 2727, bottom: 2406),
+];

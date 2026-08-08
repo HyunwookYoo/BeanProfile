@@ -608,6 +608,18 @@ bool _hasRepeatedTopology(
       _hasRepeatedTopologyPair(mention, other, lines),
 );
 
+/// 앵커 줄 자체가 성분 데이터를 품고 있는가 — 국가 이름을 뺀 나머지에 비율이나
+/// 가공이 있으면 그 줄 하나가 성분 행이다. 값을 별도 줄로 빼지 않고 한 줄에
+/// 다 적는 카드(`45% ecuador meridiano, typica mejorado, washed`)를 위한 것.
+bool _hasInlineComponentData(_CountryMention mention) {
+  final rest = mention.line.text.replaceRange(
+    mention.textOffset,
+    mention.textOffset + mention.matchLength,
+    ' ',
+  );
+  return ratioPattern.hasMatch(rest) || firstProcessMatch(rest) != null;
+}
+
 bool _hasRepeatedTopologyPair(
   _CountryMention a,
   _CountryMention b,
@@ -617,7 +629,13 @@ bool _hasRepeatedTopologyPair(
   if (_sameRepeatedRow(a, b)) return true;
   final bothLocallyLabeled =
       _hasLocalComponentLabel(a, lines) && _hasLocalComponentLabel(b, lines);
-  return bothLocallyLabeled || _hasParallelComponentValues(a, b, lines);
+  // `_hasParallelComponentValues`는 값이 **별도 줄**로 평행하게 놓일 때만
+  // 성립한다. 값이 앵커 줄 안에 인라인으로 들어가는 카드를 위해 갈래를 하나 더
+  // 둔다. `_anchorsRepeat`가 같은 열과 국가 앵커 텍스트를 이미 요구하므로
+  // 무관한 두 줄이 여기로 붙지는 않는다.
+  return bothLocallyLabeled ||
+      _hasParallelComponentValues(a, b, lines) ||
+      (_hasInlineComponentData(a) && _hasInlineComponentData(b));
 }
 
 bool _hasParallelComponentValues(
@@ -669,13 +687,29 @@ bool _isTopologyValue(
       _unlabeledRegion(text) != null;
 }
 
+/// `_isCountryAnchorText` ① 갈래 전용 접두 잡음. 기존 문자군에 `%`와 `.`을 더해
+/// `45% `·`info. ` 같은 선행 표기를 지운다. ② 갈래는 `ratioPattern`으로 이미
+/// 비율을 지우므로 기존 문자군을 그대로 쓴다 — 넓히면 오탐만 는다.
+final _anchorPrefixNoise = RegExp(r'[\s\-–—|/·,:：()\[\]#\d%.]+');
+
+/// 성분 줄 앞에 붙는 섹션 라벨 — `info. 45% ethiopia …`의 `info.`.
+/// `_bareLocalComponentLabel`은 줄 전체가 라벨인 경우를 보고, 이건 접두만 본다.
+final _leadingComponentLabel = RegExp(
+  r'^(?:info|origin|원산지|생산지|component|구성|blend|블렌드)\s*[.:：·\-]?\s*',
+  caseSensitive: false,
+);
+
 bool _isCountryAnchorText(_CountryMention mention) {
   // ① 국가가 줄 머리에 오면 앵커 — `Ethiopia Sidama Bensa Keramo Ako`처럼 국가
   //    뒤에 농장·지역·등급이 붙는 성분 줄을 살린다. 앵커가 됐다고 성분이 되는
   //    건 아니다. `_hasComponentEvidence`가 여전히 비율이나 반복 토폴로지를
   //    요구하고, 반복 토폴로지는 같은 열의 앵커가 둘 이상이어야 성립한다.
-  final prefix = mention.line.text.substring(0, mention.textOffset);
-  if (prefix.replaceAll(RegExp(r'[\s\-–—|/·,:：()\[\]#\d]+'), '').isEmpty) {
+  //    접두의 섹션 라벨(`info.`)과 선행 비율(`45% `)도 걷어낸다 — 비율을 국가
+  //    앞에 적는 카드가 있다. 라벨을 지운 뒤에도 글자가 남으면 앵커가 아니다.
+  final prefix = mention.line.text
+      .substring(0, mention.textOffset)
+      .replaceFirst(_leadingComponentLabel, '');
+  if (prefix.replaceAll(_anchorPrefixNoise, '').isEmpty) {
     return true;
   }
   // ② 기존: 국가·비율·라벨을 빼고 남은 글자가 없으면 앵커.

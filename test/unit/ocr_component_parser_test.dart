@@ -917,4 +917,39 @@ void main() {
       expect(components.single.country, 'Ethiopia');
     });
   });
+
+  group('HWACHAE 실기기 픽스처 — 인라인 성분 행', () {
+    test('선행 라벨·선행 비율이 붙은 세 줄이 모두 성분이 된다', () {
+      final components = parseOcrComponents(hwachaeLines);
+
+      expect(
+        components.map((c) => c.country),
+        ['Panama', 'Ecuador', 'Ethiopia'],
+      );
+    });
+
+    test('선행 라벨을 걷어내도 산문 줄은 앵커가 아니다', () {
+      // `info` 제거 후에도 `about our`가 남아 앵커가 되면 안 된다.
+      // 비율을 일부러 넣지 않는다 — `mention.ratio`가 잡히면 앵커 여부와
+      // 무관하게 증거가 성립해 이 테스트가 앵커 규칙을 재지 못한다.
+      final components = parseOcrComponents(const [
+        OcrLine('Info about our Ethiopia washed beans',
+            left: 100, top: 100, right: 900, bottom: 160),
+        OcrLine('Info about our Colombia washed beans',
+            left: 100, top: 300, right: 900, bottom: 360),
+      ]);
+
+      expect(components, hasLength(1));
+    });
+
+    test('인라인 성분 데이터가 없는 두 앵커는 인라인 갈래로 붙지 않는다', () {
+      // 국가 이름만 있고 비율도 가공도 없는 줄들.
+      final components = parseOcrComponents(const [
+        OcrLine('Ethiopia', left: 100, top: 100, right: 400, bottom: 160),
+        OcrLine('Colombia', left: 100, top: 300, right: 400, bottom: 360),
+      ]);
+
+      expect(components, hasLength(1));
+    });
+  });
 }

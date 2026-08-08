@@ -834,6 +834,24 @@ void main() {
     expect(components.single.country, 'Colombia');
   });
 
+  test('100% 제목은 구조화된 같은 국가로 접힌다', () {
+    // `100% <국가>`는 커피 포장에 가장 흔한 제목 문구다. 국가 앞 비율을 읽게
+    // 된 뒤로 이 제목이 "비율을 가진 성분"으로 보여 제목 중복 접기가 뚫렸고,
+    // 같은 원두가 성분 2개로 기록됐다.
+    final components = parseOcrComponents(const [
+      OcrLine('100% Ethiopia', left: 80, top: 60, right: 520, bottom: 140),
+      OcrLine('Origin', left: 80, top: 300, right: 200, bottom: 340),
+      OcrLine('Ethiopia', left: 260, top: 300, right: 460, bottom: 340),
+      OcrLine('Guji Washed', left: 260, top: 360, right: 520, bottom: 400),
+    ]);
+
+    expect(components, hasLength(1));
+    expect(components.single.country, 'Ethiopia');
+    expect(components.single.region, 'Guji');
+    expect(components.single.process, Process.washed);
+    expect(components.single.ratioPercent, isNull);
+  });
+
   test('known labels are not parsed as component regions', () {
     final components = parseOcrComponents(const [
       OcrLine('BLEND'),
@@ -952,6 +970,20 @@ void main() {
       expect(components, hasLength(1));
     });
 
+    test('가공 키워드를 품은 산문 단어는 인라인 성분 데이터가 아니다', () {
+      // `naturally`·`honeyed`는 가공 표기가 아니라 맛 묘사다. 부분 문자열로
+      // 세면 줄머리 국가만 같은 열에 있으면 어떤 산문 두 줄이든 블렌드가 된다.
+      final components = parseOcrComponents(const [
+        OcrLine('Ethiopia Yirgacheffe naturally sweet and floral',
+            left: 100, top: 100, right: 900, bottom: 160),
+        OcrLine('Colombia Huila honeyed body with cocoa',
+            left: 100, top: 300, right: 900, bottom: 360),
+      ]);
+
+      expect(components, hasLength(1));
+      expect(components.single.country, 'Ethiopia');
+    });
+
     test('국가 앞에 적힌 비율을 읽는다', () {
       final components = parseOcrComponents(hwachaeLines);
 
@@ -981,6 +1013,19 @@ void main() {
       ]);
 
       expect(components.map((c) => c.ratioPercent), [45, 55]);
+    });
+
+    test('국가와 비율 사이에 글자가 끼면 그 비율을 쓰지 않는다', () {
+      // 앞 구간의 "가장 가까운" 비율이라도 국가와 붙어 있지 않으면 이 성분의
+      // 것이 아니다. 판촉·품질 문구의 `%`가 그대로 성분 비율이 되면 기록도
+      // 틀리고 취향 대시보드의 원산지 가중치까지 흔들린다.
+      final components = parseOcrComponents(const [
+        OcrLine('Sale 30% off Ethiopia beans',
+            left: 100, top: 100, right: 900, bottom: 160),
+      ]);
+
+      expect(components.single.country, 'Ethiopia');
+      expect(components.single.ratioPercent, isNull);
     });
   });
 }

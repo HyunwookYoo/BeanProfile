@@ -147,6 +147,10 @@ class _CountryMention {
   final int matchLength;
   final String country;
   final int? ratio;
+
+  /// 비율을 국가 **앞** 구간에서 읽었는가. `_collapseTitleDuplicates`가 두
+  /// 출처를 구별해야 해서 남긴다 — 근거는 그쪽 주석에 있다.
+  final bool ratioBeforeCountry;
   final OcrLine line;
 
   const _CountryMention({
@@ -155,6 +159,7 @@ class _CountryMention {
     required this.matchLength,
     required this.country,
     required this.ratio,
+    required this.ratioBeforeCountry,
     required this.line,
   });
 }
@@ -372,6 +377,9 @@ bool _isStructuredInlineGroup(
   return RegExp(r'^[\s\d/|·,;:+\-–—()\[\]#]*$').hasMatch(remainder);
 }
 
+/// 앞 구간 비율과 국가 사이에 남아도 되는 것들 — 공백과 구분자뿐이다.
+final _onlySeparators = RegExp(r'^[\s\-–—|/·,:：()\[\]#]*$');
+
 List<_CountryMention> _countryMentions(List<OcrLine> lines) {
   final mentions = <_CountryMention>[];
   for (var lineIndex = 0; lineIndex < lines.length; lineIndex++) {
@@ -388,14 +396,21 @@ List<_CountryMention> _countryMentions(List<OcrLine> lines) {
       // 비율을 국가 앞에 적는 카드(`45% ecuador …`)를 위해 앞 구간도 본다.
       // 줄의 첫 번째 국가에만 적용한다 — 두 번째부터는 "앞 구간"이 직전 국가의
       // "뒤 구간"과 같은 span이라, 허용하면 앞 성분의 비율을 그대로 훔친다.
+      var ratioBeforeCountry = false;
       if (ratioMatch == null && i == 0) {
         // 앞 구간에서는 **마지막** 매치를 쓴다 — 국가에 가장 가까운 비율이 그
         // 성분의 것이다. 뒤 구간은 국가 바로 뒤에서 시작하므로 첫 매치가 곧
         // 가장 가까운 것이지만, 앞 구간은 방향이 반대다.
-        for (final candidate in ratioPattern.allMatches(
-          line.text.substring(0, match.offset),
-        )) {
-          ratioMatch = candidate;
+        final before = line.text.substring(0, match.offset);
+        for (final candidate in ratioPattern.allMatches(before)) {
+          // 가장 가까워도 국가와 붙어 있지 않으면 이 성분의 비율이 아니다 —
+          // 비율과 국가 사이에 글자가 끼면(`Sale 30% off Ethiopia`) 그 `%`는
+          // 판촉·품질 표기다. 비율은 `_hasComponentEvidence`를 혼자 성립시키고
+          // 취향 대시보드의 원산지 가중치까지 흔들어서, 틀린 값의 대가가 크다.
+          if (_onlySeparators.hasMatch(before.substring(candidate.end))) {
+            ratioMatch = candidate;
+            ratioBeforeCountry = true;
+          }
         }
       }
       final mention = _CountryMention(
@@ -404,6 +419,7 @@ List<_CountryMention> _countryMentions(List<OcrLine> lines) {
         matchLength: match.length,
         country: match.country,
         ratio: ratioMatch == null ? null : int.parse(ratioMatch.group(1)!),
+        ratioBeforeCountry: ratioBeforeCountry,
         line: line,
       );
       final duplicate = mentions.any(
@@ -459,8 +475,14 @@ List<_CountryMention> _collapseTitleDuplicates(
     final title = mentions[i];
     for (var j = i + 1; j < mentions.length; j++) {
       final structured = mentions[j];
+      // 비율을 가진 언급은 진짜 성분 행이지 제목 중복이 아니다 — 그게 이
+      // 조건의 뜻이다. 단 **국가 앞**에서 읽은 비율은 제목 쪽에서 그 뜻을
+      // 가지지 못한다. 포장에 가장 흔한 제목 문구 `100% <국가>`가 그 모양을
+      // 그대로 만들어내기 때문이다. 그래서 제목 쪽에서만 앞 구간 출처를
+      // 무시한다. 접기는 **제목**을 지우므로 구조화된 쪽의 앞 구간 비율은
+      // 살아남고, 그쪽까지 무시할 이유가 없다.
       if (title.country == structured.country &&
-          title.ratio == null &&
+          (title.ratio == null || title.ratioBeforeCountry) &&
           structured.ratio == null &&
           title.lineIndex != structured.lineIndex &&
           !_hasRepeatedTopologyPair(title, structured, lines) &&
@@ -630,7 +652,22 @@ bool _hasInlineComponentData(_CountryMention mention) {
     mention.textOffset + mention.matchLength,
     ' ',
   );
-  return ratioPattern.hasMatch(rest) || firstProcessMatch(rest) != null;
+  if (ratioPattern.hasMatch(rest)) return true;
+  final lower = rest.toLowerCase();
+  final letter = RegExp(r'[a-z]');
+  for (final key in processKeywords.keys) {
+    final i = lower.indexOf(key);
+    if (i < 0) continue;
+    final before = i == 0 ? '' : lower[i - 1];
+    final end = i + key.length;
+    final after = end >= lower.length ? '' : lower[end];
+    // 부분 문자열(`naturally`·`honeyed`)은 산문이지 가공 표기가 아니다.
+    // `firstProcessMatch`는 `indexOf`라 이 둘을 못 가린다. 이 갈래는 줄머리
+    // 국가만 같은 열에 있으면 성립하므로, 여기서 막지 않으면 맛 묘사 두 줄이
+    // 블렌드가 된다.
+    if (!letter.hasMatch(before) && !letter.hasMatch(after)) return true;
+  }
+  return false;
 }
 
 bool _hasRepeatedTopologyPair(

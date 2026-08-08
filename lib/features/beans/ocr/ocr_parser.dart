@@ -21,16 +21,35 @@ final List<RegExp> _datePatterns = [
   RegExp(r'(\d{2})[.\-/](\d{1,2})[.\-/](\d{1,2})'),        // 26.07.02
 ];
 
+// 부분 문자열(앞 3글자) 대조가 아니라 전체 단어를 정확히 대조한다 — 'Marcala'
+// 처럼 'Mar'로 시작하는 카드 어휘(온두라스 산지명)가 3월로 오인되는 걸 막는다.
+// 'sept'는 부분매칭이 우연히 커버하던 흔한 축약형이라 명시적으로 남긴다.
 const _englishMonths = <String, int>{
-  'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6,
-  'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12,
+  'jan': 1, 'january': 1,
+  'feb': 2, 'february': 2,
+  'mar': 3, 'march': 3,
+  'apr': 4, 'april': 4,
+  'may': 5,
+  'jun': 6, 'june': 6,
+  'jul': 7, 'july': 7,
+  'aug': 8, 'august': 8,
+  'sep': 9, 'sept': 9, 'september': 9,
+  'oct': 10, 'october': 10,
+  'nov': 11, 'november': 11,
+  'dec': 12, 'december': 12,
 };
 
-/// `13 JUL 2026` · `13 July 2026`. 연도를 `20xx`로 묶어 `74110 peaberry` 같은
-/// 줄이 날짜로 잡히지 않게 한다. `JUL 13 2026`(미국식 순서)은 관측된 적이
-/// 없어 넣지 않는다.
+/// `13 JUL 2026` · `13 July 2026`. 구분자는 `[ \t]`로 같은 줄 안으로 제한한다 —
+/// Dart 정규식의 `\s`는 줄바꿈도 삼켜서, 제한이 없으면 라벨 없는 날짜 도장처럼
+/// `_matchDate`가 카드 전체를 이어붙인 문자열에 도는 경우 서로 무관한 세 줄
+/// (일·월이름·연도)이 하나의 날짜로 조립된다. `74110 peaberry`가 날짜로 안
+/// 잡히는 건 연도 제한이 아니라 일 그룹의 모양 때문이다 — `\b(\d{1,2})` 뒤에
+/// 공백이 바로 와야 하는데 `74110`은 5자리라 1~2자리만 떼어도 다음 글자가
+/// 여전히 숫자다. `20xx` 제한은 이와 별개로 범위 밖 4자리 숫자가 우연히 이
+/// 모양과 겹치는 걸 추가로 막는 독립적인 안전장치다. `JUL 13 2026`(미국식
+/// 순서)은 관측된 적이 없어 넣지 않는다.
 final RegExp _englishMonthDate = RegExp(
-  r'\b(\d{1,2})\s+([A-Za-z]{3,})\s+(20\d{2})\b',
+  r'\b(\d{1,2})[ \t]+([A-Za-z]{3,})[ \t]+(20\d{2})\b',
 );
 
 final RegExp _noteLabel = RegExp(
@@ -520,8 +539,7 @@ DateTime? _dateIn(String s) {
 
   final english = _englishMonthDate.firstMatch(s);
   if (english != null) {
-    final month =
-        _englishMonths[english.group(2)!.toLowerCase().substring(0, 3)];
+    final month = _englishMonths[english.group(2)!.toLowerCase()];
     final day = int.parse(english.group(1)!);
     if (month != null && day >= 1 && day <= 31) {
       return DateTime(int.parse(english.group(3)!), month, day);

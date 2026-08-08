@@ -512,6 +512,7 @@ void main() {
       expect(parseOcrText('13 JUL 2026').roastDate, DateTime(2026, 7, 13));
       expect(parseOcrText('13 July 2026').roastDate, DateTime(2026, 7, 13));
       expect(parseOcrText('1 Mar 2026').roastDate, DateTime(2026, 3, 1));
+      expect(parseOcrText('5 Sept 2026').roastDate, DateTime(2026, 9, 5));
     });
 
     test('숫자와 단어가 붙어 있어도 날짜로 오인하지 않는다', () {
@@ -527,6 +528,25 @@ void main() {
     test('기존 숫자 형식은 그대로 동작한다', () {
       expect(parseOcrText('로스팅: 2026.07.10').roastDate, DateTime(2026, 7, 10));
       expect(parseOcrText('로스팅: 26.07.02').roastDate, DateTime(2026, 7, 2));
+    });
+
+    test('여러 줄에 흩어진 숫자·단어·연도를 날짜로 조립하지 않는다', () {
+      // Dart의 `\s`는 줄바꿈을 먹는다. `_matchDate`의 폴백이 카드 전체를
+      // 이어붙인 문자열에 돌기 때문에, 구분자를 줄 안으로 묶지 않으면 서로
+      // 무관한 세 줄이 하나의 날짜로 조립된다.
+      expect(parseOcrText('Lot 12\nMarcala\n2024 harvest').roastDate, isNull);
+    });
+
+    test('월 이름처럼 시작하는 다른 단어를 월로 읽지 않는다', () {
+      // Marcala는 온두라스 산지, Decaf는 흔한 표기다. 앞 세 글자만 보면
+      // 각각 3월·12월이 된다.
+      expect(parseOcrText('13 Marcala 2026').roastDate, isNull);
+      expect(parseOcrText('3 Decaf 2026').roastDate, isNull);
+    });
+
+    test('날짜 범위를 벗어난 일자는 날짜가 아니다', () {
+      expect(parseOcrText('99 JUL 2026').roastDate, isNull);
+      expect(parseOcrText('0 JUL 2026').roastDate, isNull);
     });
   });
 }

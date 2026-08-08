@@ -971,5 +971,16 @@ void main() {
       final brazil = components.where((c) => c.country == 'Brazil');
       expect(brazil.map((c) => c.ratioPercent), everyElement(isNull));
     });
+
+    test('앞 구간에 비율이 둘이면 국가에 가까운 쪽을 쓴다', () {
+      final components = parseOcrComponents(const [
+        OcrLine('20% roast level, 45% ecuador meridiano, washed',
+            left: 100, top: 100, right: 900, bottom: 160),
+        OcrLine('30% roast level, 55% brazil cerrado, natural',
+            left: 100, top: 300, right: 900, bottom: 360),
+      ]);
+
+      expect(components.map((c) => c.ratioPercent), [45, 55]);
+    });
   });
 }

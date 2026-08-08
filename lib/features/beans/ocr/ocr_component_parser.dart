@@ -389,9 +389,14 @@ List<_CountryMention> _countryMentions(List<OcrLine> lines) {
       // 줄의 첫 번째 국가에만 적용한다 — 두 번째부터는 "앞 구간"이 직전 국가의
       // "뒤 구간"과 같은 span이라, 허용하면 앞 성분의 비율을 그대로 훔친다.
       if (ratioMatch == null && i == 0) {
-        ratioMatch = ratioPattern.firstMatch(
+        // 앞 구간에서는 **마지막** 매치를 쓴다 — 국가에 가장 가까운 비율이 그
+        // 성분의 것이다. 뒤 구간은 국가 바로 뒤에서 시작하므로 첫 매치가 곧
+        // 가장 가까운 것이지만, 앞 구간은 방향이 반대다.
+        for (final candidate in ratioPattern.allMatches(
           line.text.substring(0, match.offset),
-        );
+        )) {
+          ratioMatch = candidate;
+        }
       }
       final mention = _CountryMention(
         lineIndex: lineIndex,

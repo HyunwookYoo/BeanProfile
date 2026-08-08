@@ -506,4 +506,27 @@ void main() {
       );
     });
   });
+
+  group('영문 월 이름 날짜', () {
+    test('약어와 전체 이름을 모두 읽는다', () {
+      expect(parseOcrText('13 JUL 2026').roastDate, DateTime(2026, 7, 13));
+      expect(parseOcrText('13 July 2026').roastDate, DateTime(2026, 7, 13));
+      expect(parseOcrText('1 Mar 2026').roastDate, DateTime(2026, 3, 1));
+    });
+
+    test('숫자와 단어가 붙어 있어도 날짜로 오인하지 않는다', () {
+      // 이 카드의 `74110 peaberry`가 날짜로 잡히면 안 된다.
+      expect(
+        parseOcrText('45% ethiopia gute mini, 74110 peaberry, washed').roastDate,
+        isNull,
+      );
+      expect(parseOcrText('13 XYZ 2026').roastDate, isNull);
+      expect(parseOcrText('99 JUL 2026').roastDate, isNull);
+    });
+
+    test('기존 숫자 형식은 그대로 동작한다', () {
+      expect(parseOcrText('로스팅: 2026.07.10').roastDate, DateTime(2026, 7, 10));
+      expect(parseOcrText('로스팅: 26.07.02').roastDate, DateTime(2026, 7, 2));
+    });
+  });
 }

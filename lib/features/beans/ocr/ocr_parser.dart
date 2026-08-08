@@ -21,6 +21,18 @@ final List<RegExp> _datePatterns = [
   RegExp(r'(\d{2})[.\-/](\d{1,2})[.\-/](\d{1,2})'),        // 26.07.02
 ];
 
+const _englishMonths = <String, int>{
+  'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6,
+  'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12,
+};
+
+/// `13 JUL 2026` · `13 July 2026`. 연도를 `20xx`로 묶어 `74110 peaberry` 같은
+/// 줄이 날짜로 잡히지 않게 한다. `JUL 13 2026`(미국식 순서)은 관측된 적이
+/// 없어 넣지 않는다.
+final RegExp _englishMonthDate = RegExp(
+  r'\b(\d{1,2})\s+([A-Za-z]{3,})\s+(20\d{2})\b',
+);
+
 final RegExp _noteLabel = RegExp(
   r'^(cup\s*notes?|tasting\s*notes?|notes?|컵\s*노트|노트|향미)\s*[:：]\s*(.+)$',
   caseSensitive: false,
@@ -504,6 +516,16 @@ DateTime? _dateIn(String s) {
     final day = int.parse(m.group(3)!);
     if (month < 1 || month > 12 || day < 1 || day > 31) continue;
     return DateTime(year, month, day);
+  }
+
+  final english = _englishMonthDate.firstMatch(s);
+  if (english != null) {
+    final month =
+        _englishMonths[english.group(2)!.toLowerCase().substring(0, 3)];
+    final day = int.parse(english.group(1)!);
+    if (month != null && day >= 1 && day <= 31) {
+      return DateTime(int.parse(english.group(3)!), month, day);
+    }
   }
   return null;
 }

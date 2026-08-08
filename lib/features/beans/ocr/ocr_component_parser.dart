@@ -382,9 +382,17 @@ List<_CountryMention> _countryMentions(List<OcrLine> lines) {
       final end = i + 1 < matches.length
           ? matches[i + 1].offset
           : line.text.length;
-      final ratioMatch = ratioPattern.firstMatch(
+      var ratioMatch = ratioPattern.firstMatch(
         line.text.substring(match.offset + match.length, end),
       );
+      // 비율을 국가 앞에 적는 카드(`45% ecuador …`)를 위해 앞 구간도 본다.
+      // 줄의 첫 번째 국가에만 적용한다 — 두 번째부터는 "앞 구간"이 직전 국가의
+      // "뒤 구간"과 같은 span이라, 허용하면 앞 성분의 비율을 그대로 훔친다.
+      if (ratioMatch == null && i == 0) {
+        ratioMatch = ratioPattern.firstMatch(
+          line.text.substring(0, match.offset),
+        );
+      }
       final mention = _CountryMention(
         lineIndex: lineIndex,
         textOffset: match.offset,

@@ -951,5 +951,25 @@ void main() {
 
       expect(components, hasLength(1));
     });
+
+    test('국가 앞에 적힌 비율을 읽는다', () {
+      final components = parseOcrComponents(hwachaeLines);
+
+      // Panama는 null로 남는다 — OCR이 `10%`를 `109%`로 읽어 단어 경계가
+      // 깨졌다. 추측해 채우면 조용히 틀린 값이 저장된다(설계 §3).
+      expect(components.map((c) => c.ratioPercent), [null, 45, 45]);
+    });
+
+    test('두 번째 국가는 앞 성분의 비율을 훔치지 않는다', () {
+      // Brazil의 "앞 구간"은 Ethiopia의 "뒤 구간"과 같은 span이다.
+      final components = parseOcrComponents(const [
+        OcrLine('Ethiopia 60% Brazil',
+            left: 100, top: 100, right: 900, bottom: 160),
+        OcrLine('Natural', left: 100, top: 200, right: 400, bottom: 260),
+      ]);
+
+      final brazil = components.where((c) => c.country == 'Brazil');
+      expect(brazil.map((c) => c.ratioPercent), everyElement(isNull));
+    });
   });
 }

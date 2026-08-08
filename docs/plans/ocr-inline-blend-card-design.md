@@ -141,7 +141,14 @@ components=(Panama/null/anaerobic)
 | ecuador | `45% meridiano, typica mejorado, washed` | 비율 `45%` + 가공 `washed` |
 | ethiopia | `45% gute mini, 74110 peaberry, washed` | 비율 `45%` + 가공 `washed` |
 
-`_anchorsRepeat`가 먼저 걸러주므로(같은 열 + 같은 국가 앵커 텍스트) 무관한 두 줄이 이 갈래로 붙지는 않는다. 실측 짝짓기:
+`_anchorsRepeat`가 먼저 걸러주지만 **그것만으로는 무관한 두 줄이 붙는 걸 못 막는다** — 요구하는 것이 같은 열과 줄머리 국가뿐이고, 산문도 그 둘을 쉽게 만족한다. 실제로 막아주는 건 가공 키워드를 **단어 경계로** 세는 것이다. `indexOf`로 부분 문자열을 세면 `naturally`가 `natural`로, `honeyed`가 `honey`로 잡혀 아래 두 줄이 그대로 블렌드가 된다(구현 후 리뷰가 측정):
+
+```
+Ethiopia Yirgacheffe naturally sweet and floral
+Colombia Huila honeyed body with cocoa
+```
+
+실측 짝짓기:
 
 | 짝 | left 차 | 임계 | 판정 |
 |---|---|---|---|
@@ -221,6 +228,7 @@ UI·스키마·백업·프로바이더 변경 없음. 마이그레이션 없음.
 - **`_anchorsRepeat` 같은 열 임계.** §3에서 기각 — 실제로 막고 있는 것이 없다. 다만 취약점으로 남는다: 이 카드에서 panama↔ecuador는 4픽셀 차로 탈락하고 panama↔ethiopia가 대신 짝을 맺어주고 있어, 세 번째 줄이 없거나 높이가 달랐다면 panama가 고아가 됐을 것이다.
 - **성분 `region`의 "모르면 null" 규칙.** 직전 설계 §8의 후속이며 이번 카드에서도 재발할 수 있다. §5의 미검증 항목이 확인되면 그때 판단한다.
 - **사진에 찍힌 주변 물체.** 키보드 `Alt 한/영`이 OCR돼 칩으로 남고 제목 판정의 세로 범위를 넓힌다. 파서로 일반해를 만들 수 없다 — 카드만 채워 찍는 촬영 쪽 문제다.
+- **`.`을 지우면서 딸려온 넓히기.** §4.1은 `info.`의 마침표만 노렸지만, `_anchorPrefixNoise`에 `.`이 들어가면 번호 목록 `1. Ethiopia Guji washed`와 날짜 접두 `2026.07.10 Ethiopia washed`도 앵커가 된다(둘 다 접두가 숫자·마침표·공백뿐이라 통째로 지워진다). 원하던 방향의 넓히기라 되돌리지 않지만 **의도한 범위 밖이고 지금 테스트가 없다** — 이 두 모양이 실카드에서 나오면 그때 픽스처로 고정한다.
 
 ## 9. 완료 기준 (DoD)
 

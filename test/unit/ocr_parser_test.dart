@@ -550,6 +550,11 @@ void main() {
       expect(parseOcrText('99 JUL 2026').roastDate, isNull);
       expect(parseOcrText('0 JUL 2026').roastDate, isNull);
     });
+
+    test('20xx 밖의 연도는 날짜가 아니다', () {
+      // 연도를 `20\d{2}`로 좁힌 것이 실제로 걸러내는지 재는 유일한 테스트다.
+      expect(parseOcrText('13 JUL 1926').roastDate, isNull);
+    });
   });
 
   group('HWACHAE 실기기 픽스처 — 카드 전체', () {
@@ -563,17 +568,53 @@ void main() {
       );
       expect(d.components.map((c) => c.ratioPercent), [null, 45, 45]);
       expect(d.roastDate, DateTime(2026, 7, 13));
-      // process는 실측값을 그대로 고정한다 — 이 카드엔 가공 라벨이 없고, 세
-      // 성분 모두 소유된 후보 줄에도 가공 키워드가 없어 셋 다 null이다.
+    });
+
+    test('알려진 결함: 가공이 성분 줄에 적혀 있는데도 셋 다 null이다', () {
+      final d = parseOcr(hwachaeLines);
+
+      // 값은 카드에 있다 — 세 성분 줄이 각각 `anaerobic`·`washed`·`washed`를
+      // 달고 있고, `_hasInlineComponentData`는 **바로 그 키워드**를 성분 3개를
+      // 인정하는 증거로 쓴다(panama는 `anaerobic` 없이는 인정조차 안 된다).
+      //
+      // 못 채우는 건 `_componentFor`가 그 값을 계산해 놓고 버리기 때문이다.
+      // 실측: 세 성분 모두 `sequentialProcess`가 anaerobic/washed/washed로
+      // 제대로 나오는데(panama 구간 = `' blackmoon, geisha, anaerobic n'`),
+      // `useSequentialFields = hasLocalSection || !unlabeled.hasLayout`가
+      // `_repeatedLayout`이 성립하는 순간 false가 되어 통째로 버려진다.
+      // "이 줄의 가공 키워드는 이 성분의 것"이라고 인정해 놓고 값으로는 못
+      // 쓰겠다는 내부 모순이다.
+      //
+      // 여기서 고치지 않는다 — 복구는 넓히기이고, 늦은 넓히기가 이 프로젝트의
+      // 알려진 실패 방식이다. 다음 브랜치로 미룬다.
       expect(d.components.map((c) => c.process), [null, null, null]);
-      // region도 실측값을 그대로 고정한다 — 카드에 지역 라벨이 아예 없다.
-      // panama·ecuador는 세로 거리로 붙는 소유 후보 줄이 없어 null로 남고,
-      // ethiopia는 라벨 없는 값 줄을 가장 가까운 성분에 붙이는 표-폴백이
-      // 컵노트 조각 `avour berry bomb, tropicalfruits,`(라벨 `flavour.`을
-      // OCR이 `avour`로 뭉갠 잔여물)를 지역으로 오채움한다. 지역명이 아니지만
-      // "더 낫게" 보이도록 여기서 고치지 않는다 — 직전 브랜치가 미룬 "모르면
-      // null" 후속(직전 설계 §8)과 같은 문제이고, 휴리스틱을 덧대면 그 결정을
-      // 뒤엎게 된다.
+    });
+
+    test('알려진 결함: 표-폴백이 컵노트 조각을 Ethiopia 지역으로 오채움한다', () {
+      final d = parseOcr(hwachaeLines);
+
+      // 카드에 지역 라벨이 아예 없다. panama·ecuador는 소유 후보 줄이 하나도
+      // 없어 null로 남고(실측 0개), ethiopia만 3개를 가진다 — 그중 첫 줄인
+      // 컵노트 조각 `avour berry bomb, tropicalfruits,`(라벨 `flavour.`를
+      // OCR이 `avour`로 뭉갠 잔여물)가 지역으로 들어간다.
+      //
+      // 이게 통과하는 여백이 얼마나 얇은지 기록해 둔다:
+      // · `_isUnlabeledTableCandidate`의 세로 창은 `maxBottom + 4 * maxHeight`
+      //   = 1598 + 4×77 = 1906. 이 조각의 bottom은 1828로 78px 안쪽이다.
+      // · 두 번째 컵노트 줄(`igtlk tea, plun sorbet`, bottom 1915)은 9px 차로
+      //   창을 벗어난다.
+      // · `_unlabeledRegion`은 5단어부터 버린다. `avour berry bomb
+      //   tropicalfruits`는 정확히 4단어다.
+      // 9픽셀과 한 단어, 두 우연이 여백의 전부다.
+      //
+      // 그리고 이 둘 중 하나만 조여도 null이 되지는 않는다 — 다음 후보가
+      // `Designed for`(2단어, bottom 1593)라 그게 대신 지역이 된다. 창이나
+      // 단어 수를 손보는 것으로는 못 고친다는 뜻이다.
+      //
+      // 값을 고정해 두는 건 드리프트 방어이자, 고쳐졌을 때 이 테스트가 빨개져
+      // 눈에 띄게 하기 위해서다. 여기서 휴리스틱을 덧대 "더 낫게" 보이게 하지
+      // 않는다 — 직전 브랜치가 미룬 "모르면 null" 후속(직전 설계 §8)과 같은
+      // 문제이고, 그 결정과 함께 처리한다.
       expect(
         d.components.map((c) => c.region),
         [null, null, 'avour berry bomb tropicalfruits'],

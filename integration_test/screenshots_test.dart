@@ -32,14 +32,31 @@ void main() {
     app.main();
     await tester.pumpAndSettle();
 
+    // 캡처 전에 프레임을 더 돌린다. takeScreenshot이 읽는 네이티브 표면은
+    // pumpAndSettle이 돌려놓은 프레임보다 한 박자 뒤처져 있어, 3차 촬영에서
+    // 두 장이 "거의 다 끝난" 화면으로 찍혔다.
+    //  - 03: 화면 전환의 마지막 한 프레임이 남아 이전 화면 조각이 왼쪽 5px에
+    //        세로 전체(2868행)로 걸렸다. ease-out 곡선의 꼬리라 눈에는 잘 안
+    //        띄지만 픽셀로는 x=0..4가 통째로 전경이었다.
+    //  - 04: 탭 십자선이 다섯 개 남았다. LiveTestWidgetsFlutterBinding(=
+    //        IntegrationTestWidgetsFlutterBinding의 부모)이 포인터 위치를
+    //        색깔 십자선으로 그리고 프레임이 돌 때 지우는데, ④가 탭 사이에
+    //        pump를 안 해 다섯 개가 그대로 쌓였다.
+    Future<void> shoot(String name) async {
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pump(const Duration(milliseconds: 200));
+      await binding.takeScreenshot(name);
+    }
+
     // ① 원두 목록
-    await binding.takeScreenshot('01_beans');
+    await shoot('01_beans');
 
     // ② 취향 대시보드 — 탭 전환만 쓴다. 뒤로가기를 쓰지 않으면 화면 스택
     //    상태에 의존하지 않아 순서가 바뀌어도 깨지지 않는다.
     await tester.tap(find.byIcon(Icons.insights_outlined));
     await tester.pumpAndSettle();
-    await binding.takeScreenshot('02_taste');
+    await shoot('02_taste');
 
     // ③ 원두 상세 — 시딩이 createdAt을 명시해 주인공 원두가 목록 맨 위에 오지만,
     //    레이아웃에 기대지 않도록 탭 전에 화면 안으로 끌어온다. 2차 촬영에서
@@ -51,23 +68,31 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(hero);
     await tester.pumpAndSettle();
-    await binding.takeScreenshot('03_detail');
+    await shoot('03_detail');
 
     // ④ 시음 입력 — 강도 4축·별점·코멘트를 모두 채운다. 빈 폼은 하단이 통째로
     //    비어 스토어 스크린샷으로 설득력이 없었다.
     await tester.tap(find.byKey(const Key('add-tasting')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('intensity-산미-5')));
-    await tester.tap(find.byKey(const Key('intensity-단맛-4')));
-    await tester.tap(find.byKey(const Key('intensity-바디-3')));
-    await tester.tap(find.byKey(const Key('intensity-쓴맛-2')));
-    await tester.tap(find.byKey(const Key('star-5')));
+    // 탭마다 프레임을 돌린다 — 십자선은 프레임이 돌아야 지워지므로, 연속으로
+    // 때리면 다섯 개가 한 화면에 쌓인다(3차 촬영에서 실제로 그렇게 찍혔다).
+    for (final key in const [
+      'intensity-산미-5',
+      'intensity-단맛-4',
+      'intensity-바디-3',
+      'intensity-쓴맛-2',
+      'star-5',
+    ]) {
+      await tester.tap(find.byKey(Key(key)));
+      await tester.pumpAndSettle();
+    }
     await tester.enterText(
         find.byKey(const Key('tasting-comment')), '자몽 같은 산미에 꽃향이 길게 남는다.');
-    // 입력 후 포커스를 놓아 커서·키보드가 화면을 가리지 않게 한다.
+    // 입력 후 포커스를 놓아 커서·키보드가 화면을 가리지 않게 한다. unfocus가
+    // 반드시 먼저다 — 포커스가 남은 채 pumpAndSettle을 부르면 커서 깜빡임이
+    // 프레임을 계속 예약해 settle되지 않는다(shoot이 pumpAndSettle로 시작한다).
     FocusManager.instance.primaryFocus?.unfocus();
-    await tester.pumpAndSettle();
-    await binding.takeScreenshot('04_tasting');
+    await shoot('04_tasting');
   });
 }
 

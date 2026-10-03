@@ -1,0 +1,13 @@
+{
+  "id": "tacet_guji_hambella",
+  "notes": "인라인 라벨(고도·품종·가공) + 라벨 옆 세로 2줄 값(지역) + 라벨 아래 값(Cup Note·Roast Point) 혼합, 2열. 한글 제목의 `에디오피아`는 카드 오타(R1). 지역은 두 줄을 이은 전체만 정답 — 첫 줄만은 wrong. 로스터리는 하단 푸터.",
+  "name": ["에디오피아 구지 함벨라 단세 세이사", "Ethiopia Guji Hambella Danse Saysa"],
+  "roaster": "Tacet Coffee Roasters",
+  "roastDate": null,
+  "roastLevel": "light",
+  "type": "single",
+  "cupNotes": ["베르가못", "자두", "블루베리", "살구"],
+  "components": [
+    {"country": "Ethiopia", "region": "Oromia, West Guji Hambella Wamena, Danse Saysa", "process": "natural", "ratioPercent": null}
+  ]
+}

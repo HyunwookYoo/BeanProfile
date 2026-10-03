@@ -1,0 +1,13 @@
+{
+  "id": "ocr_card_orig",
+  "notes": "테스트용 2열 카드(assets/test/ocr_card_orig.png). 콜론 없음, 제목 위 이브로우가 로스터리.",
+  "name": "콜롬비아 핑크버번 내추럴",
+  "roaster": "베이스캠프 로스터스",
+  "roastDate": "2026-07-05",
+  "roastLevel": "medium",
+  "type": "single",
+  "cupNotes": ["딸기", "복숭아", "레드와인"],
+  "components": [
+    {"country": "Colombia", "region": "후일라", "process": "natural", "ratioPercent": null}
+  ]
+}

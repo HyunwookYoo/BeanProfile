@@ -1,0 +1,13 @@
+{
+  "id": "ocr_card_ko",
+  "notes": "테스트용 콜론 카드(assets/test/ocr_card_ko.png). 모든 필드에 라벨이 있다.",
+  "name": "예가체프 코체레",
+  "roaster": "아우어사이드",
+  "roastDate": "2026-07-10",
+  "roastLevel": "lightMedium",
+  "type": "single",
+  "cupNotes": ["블루베리", "자스민", "홍차"],
+  "components": [
+    {"country": "Ethiopia", "region": "예가체프 코체레", "process": "washed", "ratioPercent": null}
+  ]
+}

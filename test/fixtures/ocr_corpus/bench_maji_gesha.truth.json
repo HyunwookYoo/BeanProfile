@@ -1,0 +1,13 @@
+{
+  "id": "bench_maji_gesha",
+  "notes": "주황 띠 위 흰 글씨 2줄 제목 + 주황 산문 + 콜론 없는 2열 격자 두 벌. 컵노트는 두 줄에 걸친다. 지역 라벨이 없고 지역은 제목·산문에만 있다(R3). 로스터리 표기 없음(QR만). 산문의 `2019년`·`1,000헥타르`는 날짜가 아니다.",
+  "name": "에티오피아 벤치마지 게샤",
+  "roaster": null,
+  "roastDate": null,
+  "roastLevel": "light",
+  "type": "single",
+  "cupNotes": ["오렌지블라썸", "자스민", "살구", "베르가못", "녹차"],
+  "components": [
+    {"country": "Ethiopia", "region": [null, "벤치마지"], "process": "washed", "ratioPercent": null}
+  ]
+}

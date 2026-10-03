@@ -1,0 +1,13 @@
+{
+  "id": "archers_sidama",
+  "notes": "라벨이 전혀 없는 삼각 카드, 야외에서 손에 들고 찍음(배경에 바닥 타일·원통). 제품명이 한·영 각 2줄. 지역·가공은 제품명 속에만 있다(R3) — 비워도 정답. `74158`은 품종 번호로 날짜가 아니다.",
+  "name": ["에티오피아 시다마 벤사 하마쇼 코코세 74158 내추럴", "Ethiopia Sidama Bensa Hamasho Kokose 74158 Natural"],
+  "roaster": "ARCHERS",
+  "roastDate": null,
+  "roastLevel": null,
+  "type": "single",
+  "cupNotes": [],
+  "components": [
+    {"country": "Ethiopia", "region": [null, "Sidama Bensa Hamasho", "시다마 벤사 하마쇼", "Sidama", "시다마"], "process": [null, "natural"], "ratioPercent": null}
+  ]
+}

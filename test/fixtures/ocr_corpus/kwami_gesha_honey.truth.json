@@ -1,0 +1,13 @@
+{
+  "id": "kwami_gesha_honey",
+  "notes": "슬래시로 짝지은 라벨 줄(`생산지역 / 고도`, `품종 / 가공방식`) 아래 값 줄(`Benchi Maji / 1,830m - 2,000m`, `Gesha / Honey`). 컵노트는 라벨 없이 슬래시 구분. 로스터리 표기 없음 — 하단 산문의 `세웅지씨`는 생두 회사, `KWAMI`는 생두 브랜드다.",
+  "name": "Ethiopia - KWAMI Gesha Honey",
+  "roaster": null,
+  "roastDate": null,
+  "roastLevel": null,
+  "type": "single",
+  "cupNotes": ["자스민", "사과", "귤"],
+  "components": [
+    {"country": "Ethiopia", "region": "Benchi Maji", "process": "honey", "ratioPercent": null}
+  ]
+}

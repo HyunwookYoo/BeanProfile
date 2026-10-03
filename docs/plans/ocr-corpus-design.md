@@ -259,3 +259,104 @@ RED_CASCARA  cupNotes[자스민]       correct → missing
 5. `flutter test test/unit/ocr_corpus_test.dart`가 현재 점수를 리포트하고 베이스라인을 고정
 6. 첫 점수 리포트가 문서에 기록됨 — 파서 문제 대 OCR 문제 비율 포함
 7. 기존 377 tests 그대로 green, `flutter analyze` 0
+
+## 부록 A — 첫 채점 (2026-10-04, Android 에뮬레이터 ML Kit)
+
+베이스라인을 처음 쓸 때(`--dart-define=UPDATE_OCR_BASELINE=true`) 출력된 리포트 전문이다. 채점 대상은 `main`(`2ef2f36`)의 파서 그대로다 — 이 브랜치는 `lib/`을 건드리지 않았다.
+
+```
+OCR 코퍼스 채점 — 11장, 칸 155개
+
+카드별
+  archers_sidama  정답 5 (채움 2 / 비움 3)  빈칸 2  틀림 5
+  bench_maji_gesha  정답 9 (채움 5 / 비움 4)  빈칸 4  틀림 2
+  costa_rica_copey_52  정답 7 (채움 3 / 비움 4)  빈칸 5  틀림 1
+  ethiopia_worka  정답 7 (채움 3 / 비움 4)  빈칸 5  틀림 1
+  hwachae  정답 10 (채움 7 / 비움 3)  빈칸 9  틀림 2
+  kwami_gesha_honey  정답 6 (채움 2 / 비움 4)  빈칸 6  틀림 0
+  ocr_card_ko  정답 11 (채움 10 / 비움 1)  빈칸 1  틀림 0
+  ocr_card_orig  정답 11 (채움 10 / 비움 1)  빈칸 1  틀림 0
+  red_cascara  정답 16 (채움 14 / 비움 2)  빈칸 2  틀림 4
+  sol_de_la_manana  정답 5 (채움 2 / 비움 3)  빈칸 2  틀림 2
+  tacet_guji_hambella  정답 5 (채움 3 / 비움 2)  빈칸 5  틀림 4
+합계  정답 92 (채움 61 / 비움 31)  빈칸 42  틀림 21
+
+빈칸·틀림 63칸의 원인 (근사 — 설계 §4.2)
+  파서 40칸 — OCR이 읽은 값을 못 뽑았거나 엉뚱한 칸에 넣었다
+  OCR 6칸 — 정답 단어가 OCR 텍스트에 없다
+  미분류 17칸 — 열거형·국가·날짜·비율
+
+빈칸·틀림 목록
+  archers_sidama  name  missing  [파서]
+  archers_sidama  roaster  missing  [파서]
+  archers_sidama  type  wrong: blend  [미분류]
+  archers_sidama  components[0].region  wrong: 코코세 74158  [파서]
+  archers_sidama  components[1].country  wrong: Ethiopia  [미분류]
+  archers_sidama  components[1].region  wrong: Kokose 74158  [파서]
+  archers_sidama  components[1].process  wrong: natural  [미분류]
+  bench_maji_gesha  name  wrong: 벤치마지 게샤  [파서]
+  bench_maji_gesha  type  missing  [미분류]
+  bench_maji_gesha  cupNotes[살구]  missing  [파서]
+  bench_maji_gesha  cupNotes[베르가못]  missing  [파서]
+  bench_maji_gesha  cupNotes[녹차]  missing  [파서]
+  bench_maji_gesha  cupNotes[+살구.]  wrong: 살구.  [파서]
+  costa_rica_copey_52  name  wrong: Costa Rica Hacienda Copey  [파서]
+  costa_rica_copey_52  type  missing  [미분류]
+  costa_rica_copey_52  cupNotes[럼 레이즌]  missing  [파서]
+  costa_rica_copey_52  cupNotes[포도 사탕]  missing  [파서]
+  costa_rica_copey_52  cupNotes[자두]  missing  [파서]
+  costa_rica_copey_52  cupNotes[카카오닙스]  missing  [파서]
+  ethiopia_worka  type  missing  [미분류]
+  ethiopia_worka  cupNotes[요거트]  missing  [파서]
+  ethiopia_worka  cupNotes[황도]  missing  [파서]
+  ethiopia_worka  cupNotes[허니콤]  missing  [파서]
+  ethiopia_worka  cupNotes[패션프루트]  missing  [파서]
+  ethiopia_worka  components[0].process  wrong: other  [미분류]
+  hwachae  name  missing  [파서]
+  hwachae  roaster  wrong: a Cotee Roastery  [OCR]
+  hwachae  cupNotes[berry bomb]  missing  [파서]
+  hwachae  cupNotes[tropical fruits]  missing  [파서]
+  hwachae  cupNotes[light milk tea]  missing  [OCR]
+  hwachae  cupNotes[plum sorbet]  missing  [OCR]
+  hwachae  components[0].process  missing  [미분류]
+  hwachae  components[0].ratioPercent  missing  [미분류]
+  hwachae  components[1].process  missing  [미분류]
+  hwachae  components[2].region  wrong: avour berry bomb tropicalfruits  [파서]
+  hwachae  components[2].process  missing  [미분류]
+  kwami_gesha_honey  name  missing  [파서]
+  kwami_gesha_honey  type  missing  [미분류]
+  kwami_gesha_honey  cupNotes[자스민]  missing  [파서]
+  kwami_gesha_honey  cupNotes[사과]  missing  [파서]
+  kwami_gesha_honey  cupNotes[귤]  missing  [파서]
+  kwami_gesha_honey  components[0].region  missing  [파서]
+  ocr_card_ko  type  missing  [미분류]
+  ocr_card_orig  type  missing  [미분류]
+  red_cascara  cupNotes[Citrus finish]  missing  [OCR]
+  red_cascara  cupNotes[+Citrus fnish]  wrong: Citrus fnish  [파서]
+  red_cascara  components[0].region  wrong: bio control 70940%  [파서]
+  red_cascara  components[0].ratioPercent  missing  [미분류]
+  red_cascara  components[1].region  wrong: GI -  [파서]
+  red_cascara  components[2].region  wrong: Papayo  [파서]
+  sol_de_la_manana  name  wrong: 볼리비아 커피를 다시 살리고자 Agricafe의 Rodriguez 가족들이 시작한  [파서]
+  sol_de_la_manana  roaster  wrong: 이NAME OF FARM: Sol de La Maiana  [파서]
+  sol_de_la_manana  type  missing  [미분류]
+  sol_de_la_manana  components[0].region  missing  [파서]
+  tacet_guji_hambella  name  wrong: 시 Hombeia Wamena, Danse Saysa 가공 Natural  [파서]
+  tacet_guji_hambella  roaster  wrong: 품종 Heirtoom  [파서]
+  tacet_guji_hambella  type  missing  [미분류]
+  tacet_guji_hambella  cupNotes[베르가못]  missing  [OCR]
+  tacet_guji_hambella  cupNotes[자두]  missing  [파서]
+  tacet_guji_hambella  cupNotes[블루베리]  missing  [파서]
+  tacet_guji_hambella  cupNotes[살구]  missing  [파서]
+  tacet_guji_hambella  cupNotes[+Roast Point]  wrong: Roast Point  [파서]
+  tacet_guji_hambella  components[0].region  wrong: Oronia. West Gui  [OCR]
+```
+
+관찰:
+
+- **파서 대 OCR** — 문자열 칸(제품명·로스터리·지역·컵노트)의 빈칸·틀림 중 파서 40칸, OCR 6칸이다. 파서 쪽이 더 크다. 열거형·국가·날짜·비율 17칸은 구분하지 않았다(미분류).
+- **`region` 오채움** — `.region` 칸의 wrong은 7칸, 4장이다. archers_sidama 2칸(`components[0]`·`components[1]`), hwachae 1칸(`components[2]`), red_cascara 3칸(`components[0]`·`components[1]`·`components[2]`), tacet_guji_hambella 1칸(`components[0]`). 7칸 중 6칸이 `[파서]`, 1칸(tacet_guji_hambella)이 `[OCR]`이다.
+- **가장 많이 빈 필드** — `cupNotes` 23칸(노트 하나가 한 칸, 7장, `[파서]` 19칸·`[OCR]` 4칸). 그다음이 `type` 8칸이다. `type`은 싱글 카드 9장 모두에서 빈칸·틀림이고(missing 8, wrong 1 — archers_sidama `wrong: blend`) 블렌드 2장(red_cascara·hwachae)의 `type`은 목록에 없으니, 싱글 카드의 유형 칸은 대부분 missing으로 시작할 것이라는 §4.3의 계획 단계 측정과 맞는다.
+- **이중 계산** — OCR 오독 하나가 두 칸으로 센다. 오독된 정답 노트는 `missing [OCR]`이 되고, 오독된 글자가 컵노트로 뽑히면 정답이 없는 칸을 채운 것이라 `wrong [파서]`가 된다. 목록에서 보이는 이 쌍은 1개다 — red_cascara `cupNotes[Citrus finish]`(`[OCR]`) + `cupNotes[+Citrus fnish]`(`[파서]`). 그러므로 파서 40칸에는 OCR 오독에서 온 1칸이 들어 있다. 같은 두 칸 모양이 파서 쪽에 1쌍 더 있다 — bench_maji_gesha `cupNotes[살구]` + `cupNotes[+살구.]`(둘 다 `[파서]`, 점이 붙은 `살구.`가 정답 `살구`와 달라서 두 칸이 된다).
+- **품질 분기는 시험되지 않는다** — 새로 덤프한 9장은 모두 `quality: []`이고 이관한 2장은 `quality`를 기록하지 않았다(`null` → 빈 보고서로 재생). 11장 전부 품질 이슈가 없는 카드라서 `lowContrast`로 보정 패스를 타는 분기와 `shouldWarnQuality`가 참이 되는 경우는 이 코퍼스에 없다. 약한 OCR(`isWeakOcr`)은 품질 이슈 없이도 보정 패스를 부르므로 그 분기는 여전히 재생된다(보정본이 기록된 9장).
+- **Android ML Kit 기준** — 픽스처는 Android 에뮬레이터 ML Kit 출력이다. 새로 덤프한 9장은 `emulator-5554`(AVD `flutter_emulator`, x86_64, Android 16)이고, 이관한 2장도 각 설계 문서(`ocr-bilingual-blend-card-design.md` §2.1, `ocr-inline-blend-card-design.md` §2)에 에뮬레이터 실측으로 적혀 있다. 사용자 앱은 iOS라 같은 사진도 줄 나눔·좌표가 다를 수 있다(§5) — 이 점수는 "Android ML Kit 기준 파서 점수"로 읽는다.

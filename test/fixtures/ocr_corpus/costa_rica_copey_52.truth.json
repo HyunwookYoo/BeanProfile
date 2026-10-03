@@ -1,0 +1,13 @@
+{
+  "id": "costa_rica_copey_52",
+  "notes": "영문 3줄 굵은 제목 + 한글 2줄. 한 줄에 콜론 쌍 두 개(`농장: … 고도: …`, `로트: … 품종: …`). 컵노트는 라벨 없이 마침표 구분. 로스터리 표기 없음. 산문의 `120시간`·`19일간`은 날짜가 아니다. `Anaerobic Natural`은 둘에 걸친다(R5).",
+  "name": ["Costa Rica Hacienda Copey Don Kazu Red Catuai Anaerobic Natural #52", "코스타 리카 하시엔다 코페이 돈 카주 레드 카투아이 무산소 내추럴 #52"],
+  "roaster": null,
+  "roastDate": null,
+  "roastLevel": null,
+  "type": "single",
+  "cupNotes": ["럼 레이즌", "포도 사탕", "자두", "카카오닙스"],
+  "components": [
+    {"country": "Costa Rica", "region": "Copey, Dota", "process": ["anaerobic", "natural"], "ratioPercent": null}
+  ]
+}

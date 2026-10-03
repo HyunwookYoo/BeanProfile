@@ -1,0 +1,13 @@
+{
+  "id": "sol_de_la_manana",
+  "notes": "영문 대문자 불릿 라벨 + 한글 산문. 제품명 표기가 없어 농장명(`NAME OF FARM`)을 받되 비워도 정답. 국가는 산문(`볼리비아 커피를…`)에만 있다. `Coco Natural`은 내추럴 변형 시그니처 가공이라 natural·other 둘 다 받는다(R5). FLAVOR는 산문이라 컵노트 목록이 없다(R7) — 산문에서 묘사어를 뽑으면 wrong.",
+  "name": [null, "Sol de La Mañana"],
+  "roaster": null,
+  "roastDate": null,
+  "roastLevel": null,
+  "type": "single",
+  "cupNotes": [],
+  "components": [
+    {"country": "Bolivia", "region": "Caranavi", "process": ["natural", "other"], "ratioPercent": null}
+  ]
+}

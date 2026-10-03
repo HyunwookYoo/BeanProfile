@@ -1,0 +1,13 @@
+{
+  "id": "ethiopia_worka",
+  "notes": "한글 콜론 라벨 + 해시태그 컵노트. 로스터리 표기 없음. 제목 아래 한글 줄은 더 긴 한글 제품명이라 함께 받는다. `High Rost`(카드 오타)는 일본식 8단계의 High — 앱 enum에 꼭 맞는 게 없어 비우거나 medium을 받는다(R5). 지역은 한·영 병기(R2).",
+  "name": ["Ethiopia Worka", "에티오피아 웨스트 알시 넨세보 워르카"],
+  "roaster": null,
+  "roastDate": null,
+  "roastLevel": [null, "medium"],
+  "type": "single",
+  "cupNotes": ["요거트", "황도", "허니콤", "패션프루트"],
+  "components": [
+    {"country": "Ethiopia", "region": ["웨스트 알씨 West arsi", "웨스트 알씨", "West arsi"], "process": "natural", "ratioPercent": null}
+  ]
+}

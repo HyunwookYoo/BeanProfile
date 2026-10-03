@@ -281,4 +281,81 @@ void main() {
       },
     );
   });
+
+  group('원인 구분 (근사 — 설계 §4.2)', () {
+    final ocrText = normalize(
+        'Oromia, West Guji Hambella Wamena, Danse Saysa Tacet Coffee Roasters');
+
+    test('정답 단어가 OCR에 다 있으면 파서 문제', () {
+      const cell =
+          Cell('roaster', Verdict.missing, null, ['Tacet Coffee Roasters']);
+      expect(causeOf(cell, ocrText), Cause.parser);
+    });
+
+    test('한 값이 두 줄로 쪼개지고 순서가 바뀌어도 단어로 본다', () {
+      final text = normalize('Hambella Wamena, Danse Saysa\nOromia, West Guji');
+      const cell = Cell('components[0].region', Verdict.wrong,
+          'Oromia, West Guji', ['Oromia, West Guji Hambella Wamena, Danse Saysa']);
+      expect(causeOf(cell, text), Cause.parser);
+    });
+
+    test('정답 단어가 OCR에 없으면 OCR 문제', () {
+      const cell = Cell('roaster', Verdict.wrong, 'a Cotee Roastery',
+          ['One Half Coffee Roastery']);
+      expect(causeOf(cell, normalize('a Cotee Roastery Roasted in Malaysia')),
+          Cause.ocr);
+    });
+
+    test('정답이 없는 칸을 채웠으면 파서 문제', () {
+      const cell = Cell('cupNotes[+열대과일]', Verdict.wrong, '열대과일', []);
+      expect(causeOf(cell, ocrText), Cause.parser);
+    });
+
+    test('열거형·국가·날짜·비율은 가리지 않는다', () {
+      for (final key in [
+        'type',
+        'roastLevel',
+        'roastDate',
+        'components[0].country',
+        'components[0].process',
+        'components[0].ratioPercent',
+      ]) {
+        expect(causeOf(Cell(key, Verdict.missing, null, const ['x']), ocrText),
+            Cause.unclassified,
+            reason: key);
+      }
+    });
+  });
+
+  test('리포트는 카드별·합계 개수, 원인별 개수, 문제 칸 목록을 낸다', () async {
+    final card = CorpusCard(
+      fixture(original: strong, quality: []),
+      Truth.fromJson({
+        'id': 'f',
+        'name': '테스트 원두',
+        'roaster': '없는 로스터',
+        'roastDate': null,
+        'roastLevel': 'medium',
+        'type': 'single',
+        'cupNotes': <Object?>[],
+        'components': [
+          {'country': 'Ethiopia', 'region': null, 'process': 'washed', 'ratioPercent': null},
+        ],
+      }),
+    );
+    final scored = {
+      'f': scoreDraft(card.truth, await replayPipeline(card.fixture)),
+    };
+    final report = corpusReport([card], scored);
+    // 채움 정답 4(name·roastLevel·country·process), 비움 정답 3(roastDate·
+    // region·ratioPercent), 빈칸 2(roaster·type — strong은 유형이 ambiguous).
+    expect(report, contains('1장, 칸 9개'));
+    expect(report, contains('  f  정답 7 (채움 4 / 비움 3)  빈칸 2  틀림 0'));
+    expect(report, contains('합계  정답 7 (채움 4 / 비움 3)  빈칸 2  틀림 0'));
+    expect(report, contains('  파서 0칸'));
+    expect(report, contains('  OCR 1칸'));
+    expect(report, contains('  미분류 1칸'));
+    expect(report, contains('  f  roaster  missing  [OCR]'));
+    expect(report, contains('  f  type  missing  [미분류]'));
+  });
 }

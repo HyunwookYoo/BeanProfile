@@ -1,0 +1,26 @@
+{
+  "id": "red_cascara",
+  "source": "test/helpers.dart redCascaraLines — 2026-08-04 Android 에뮬레이터 ML Kit(korean) ORIGINAL 패스. 원본 사진 없음",
+  "quality": null,
+  "original": [
+    {"text": "블렌딩:", "l": 876, "t": 2453, "r": 1095, "b": 2520, "conf": null},
+    {"text": "노트:", "l": 839, "t": 3349, "r": 1046, "b": 3413, "conf": null},
+    {"text": "Blending Info", "l": 876, "t": 2559, "r": 1218, "b": 2617, "conf": null},
+    {"text": "Notes", "l": 875, "t": 3451, "r": 1034, "b": 3501, "conf": null},
+    {"text": "UNSPECIALTY BLEND", "l": 1191, "t": 191, "r": 2160, "b": 260, "conf": null},
+    {"text": "RED CASCARA", "l": 1137, "t": 511, "r": 2303, "b": 610, "conf": null},
+    {"text": "로스터기:", "l": 873, "t": 3708, "r": 1159, "b": 3781, "conf": null},
+    {"text": "Roaster", "l": 864, "t": 3820, "r": 1073, "b": 3874, "conf": null},
+    {"text": "레드 카스카라", "l": 1312, "t": 773, "r": 2127, "b": 895, "conf": null},
+    {"text": "Thailand Phupanna coffee", "l": 1329, "t": 2465, "r": 2096, "b": 2536, "conf": null},
+    {"text": "bio control Natural 70940%", "l": 1352, "t": 2563, "r": 2236, "b": 2622, "conf": null},
+    {"text": "Ethiopia Sidama Bensa Keramo Ako", "l": 1327, "t": 2745, "r": 2394, "b": 2807, "conf": null},
+    {"text": "GI Natural- 40%", "l": 1366, "t": 2836, "r": 1846, "b": 2901, "conf": null},
+    {"text": "Colombia Inmaculada Fellow Farnms", "l": 1327, "t": 3017, "r": 2393, "b": 3078, "conf": null},
+    {"text": "Papayo Natural 20%", "l": 1345, "t": 3102, "r": 1973, "b": 3176, "conf": null},
+    {"text": "Raspberrie, Sapphire Grape,", "l": 1328, "t": 3351, "r": 2318, "b": 3443, "conf": null},
+    {"text": "Complexity, Citrus fnish", "l": 1328, "t": 3450, "r": 2197, "b": 3527, "conf": null},
+    {"text": "Stronghold S7X Ver.2", "l": 1326, "t": 3704, "r": 2065, "b": 3780, "conf": null}
+  ],
+  "enhanced": null
+}

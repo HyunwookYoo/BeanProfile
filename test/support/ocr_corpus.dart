@@ -214,3 +214,87 @@ List<String> diffBaseline(Baseline before, Baseline after) {
   }
   return lines;
 }
+
+/// 빈칸·틀림 칸의 원인(근사, 설계 §4.2).
+enum Cause { parser, ocr, unclassified }
+
+const _causeLabels = {
+  Cause.parser: '파서',
+  Cause.ocr: 'OCR',
+  Cause.unclassified: '미분류',
+};
+
+/// 빈칸·틀림 칸이 파서 탓인지 OCR 탓인지 가린다. 문자열 칸만 본다 —
+/// 열거형·국가·날짜·비율은 카드 표기와 앱 표기가 달라(`에티오피아` ↔ `Ethiopia`)
+/// 텍스트로 찾을 수 없다.
+Cause causeOf(Cell cell, String normalizedOcrText) {
+  final key = cell.key;
+  final textual = key == 'name' ||
+      key == 'roaster' ||
+      key.startsWith('cupNotes[') ||
+      key.endsWith('.region');
+  if (!textual) return Cause.unclassified;
+  // 정답이 없는 칸을 채웠다 — OCR은 무언가를 읽었고 파서가 엉뚱한 칸에 넣었다.
+  if (cell.expected.isEmpty) return Cause.parser;
+  // 줄이 아니라 단어로 본다. ML Kit은 한 값을 두 줄로 쪼개거나 순서를 바꿔 낸다.
+  final seen = cell.expected.any((value) => value
+      .split(RegExp(r'\s+'))
+      .where((word) => word.isNotEmpty)
+      .every((word) => normalizedOcrText.contains(normalize(word))));
+  return seen ? Cause.parser : Cause.ocr;
+}
+
+/// 사람이 읽는 채점 요약. 베이스라인을 갱신할 때 출력한다.
+String corpusReport(List<CorpusCard> cards, Map<String, List<Cell>> scored) {
+  final rows = <String>[];
+  final problems = <String>[];
+  final causes = {for (final cause in Cause.values) cause: 0};
+  var filled = 0, empty = 0, missing = 0, wrong = 0;
+  for (final card in cards) {
+    final lines = [...card.fixture.original, ...?card.fixture.enhanced];
+    final ocrText = normalize(lines.map((line) => line.text).join(' '));
+    var f = 0, e = 0, m = 0, w = 0;
+    for (final cell in scored[card.id]!) {
+      switch (cell.verdict) {
+        case Verdict.correct:
+          if (cell.actual == null) {
+            e++;
+          } else {
+            f++;
+          }
+          continue;
+        case Verdict.missing:
+          m++;
+        case Verdict.wrong:
+          w++;
+      }
+      final cause = causeOf(cell, ocrText);
+      causes[cause] = causes[cause]! + 1;
+      problems.add('  ${card.id}  ${cell.key}  ${cell.encoded}  '
+          '[${_causeLabels[cause]}]');
+    }
+    rows.add('  ${card.id}  ${_counts(f, e, m, w)}');
+    filled += f;
+    empty += e;
+    missing += m;
+    wrong += w;
+  }
+  return [
+    'OCR 코퍼스 채점 — ${cards.length}장, 칸 ${filled + empty + missing + wrong}개',
+    '',
+    '카드별',
+    ...rows,
+    '합계  ${_counts(filled, empty, missing, wrong)}',
+    '',
+    '빈칸·틀림 ${missing + wrong}칸의 원인 (근사 — 설계 §4.2)',
+    '  파서 ${causes[Cause.parser]}칸 — OCR이 읽은 값을 못 뽑았거나 엉뚱한 칸에 넣었다',
+    '  OCR ${causes[Cause.ocr]}칸 — 정답 단어가 OCR 텍스트에 없다',
+    '  미분류 ${causes[Cause.unclassified]}칸 — 열거형·국가·날짜·비율',
+    '',
+    '빈칸·틀림 목록',
+    ...problems,
+  ].join('\n');
+}
+
+String _counts(int filled, int empty, int missing, int wrong) =>
+    '정답 ${filled + empty} (채움 $filled / 비움 $empty)  빈칸 $missing  틀림 $wrong';

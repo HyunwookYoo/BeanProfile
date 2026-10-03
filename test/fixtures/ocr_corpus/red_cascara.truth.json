@@ -1,0 +1,15 @@
+{
+  "id": "red_cascara",
+  "notes": "원본 사진 없음 — ocr-bilingual-blend-card-design.md §2.2·§2.3의 판독 기록과 좌표에서 복원(설계 §5 예외). OCR 오독은 두 군데뿐이라 기록됐다: `Citrus finish`→`fnish`, `Natural 709 - 40%`→`70940%`. 그래서 Thailand 비율 40, `Raspberrie`는 카드 표기 그대로. 카드에 지역 라벨이 없다 — 국가 뒤 말 중 지역 경로는 Ethiopia의 `Sidama Bensa Keramo Ako`뿐이고(R3), `Phupanna coffee`·`Inmaculada Fellow Farms`는 생산자 이름이라 받지 않는다. `로스터기: Stronghold S7X Ver.2`는 로스팅 기계다.",
+  "name": ["레드 카스카라", "RED CASCARA"],
+  "roaster": "UNSPECIALTY",
+  "roastDate": null,
+  "roastLevel": null,
+  "type": "blend",
+  "cupNotes": ["Raspberrie", "Sapphire Grape", "Complexity", "Citrus finish"],
+  "components": [
+    {"country": "Thailand", "region": null, "process": "natural", "ratioPercent": 40},
+    {"country": "Ethiopia", "region": [null, "Sidama Bensa Keramo Ako", "Sidama"], "process": "natural", "ratioPercent": 40},
+    {"country": "Colombia", "region": null, "process": "natural", "ratioPercent": 20}
+  ]
+}

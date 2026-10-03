@@ -211,7 +211,7 @@ void main() {
     test('노트 공백·대소문자 차이는 같은 값으로 본다', () {
       final cells = score(
         truth(cupNotes: ['Peach Tea']),
-        const OcrDraft(cupNotes: ['peachtea']),
+        const OcrDraft(cupNotes: ['PEACH  tea']),
       );
       expect(cells['cupNotes[Peach Tea]']!.verdict, Verdict.correct);
       expect(cells['cupNotes[Peach Tea]']!.expected, ['Peach Tea']);
@@ -377,6 +377,10 @@ void main() {
       expect(() => Truth.fromJson({...valid(), 'type': null}),
           throwsFormatException);
       expect(() => Truth.fromJson({...valid(), 'type': []}),
+          throwsFormatException);
+      expect(() => Truth.fromJson({...valid(), 'type': [null, 'single']}),
+          throwsFormatException);
+      expect(() => Truth.fromJson({...valid(), 'type': ['single', 'blend']}),
           throwsFormatException);
     });
 

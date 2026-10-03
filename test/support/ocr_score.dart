@@ -205,9 +205,9 @@ class Truth {
   }
 
   static Accept _validateType(Accept typeAccept) {
-    // type must be exactly 'single' or 'blend', never null or empty
-    if (typeAccept.allowsEmpty || typeAccept.raw.isEmpty) {
-      throw FormatException('type: 반드시 \'single\' 또는 \'blend\'여야 한다 — null과 빈 목록은 불가');
+    // ambiguous 유형이 정답으로 올라가면 안 되므로 null을 받지 않고, 타입 칸이 틀릴 수 있도록 정확히 하나여야 한다.
+    if (typeAccept.allowsEmpty || typeAccept.raw.isEmpty || typeAccept.raw.length != 1) {
+      throw FormatException('type: 반드시 정확히 하나의 \'single\' 또는 \'blend\'여야 한다 — null·빈 목록·다중값 불가');
     }
     return typeAccept;
   }

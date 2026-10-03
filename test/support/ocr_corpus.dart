@@ -243,9 +243,8 @@ Cause causeOf(Cell cell, String normalizedOcrText) {
       .split(RegExp(r'\s+'))
       .where((word) => word.isNotEmpty)
       .every((word) {
-        // 정답과 OCR 모두 문자·숫자만 남겨 구두점 차이를 무시한다.
-        // "Stronghold S7X Ver.2"와 "Stronghold S7X Ver.2"가 다르게 보이지만
-        // 숫자는 유지하고 문자도 유지한다. 같은 정규식으로 양쪽 다 정제한다.
+        // 정답 단어만 정제하면 OCR 쪽에 남은 구두점(`Ver.2` ⊄ `ver2`) 때문에
+        // 같은 문자열도 OCR 문제로 잡힌다 — 양쪽에 같은 정규식을 쓴다.
         final cleaned = normalize(word).replaceAll(strip, '');
         return text.contains(cleaned);
       }));

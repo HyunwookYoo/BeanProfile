@@ -75,6 +75,12 @@ class Accept {
       List<Object?> list => list,
       _ => <Object?>[json],
     };
+    // `[]`는 "없다"가 아니다 — 없다는 `null`이다. 받아줄 값이 하나도 없어 비워도
+    // 채워도 영원히 correct가 못 되는데, `cupNotes: []`·`components: []`가 "없음"을
+    // 뜻하는 같은 파일 안이라 `region: []`는 나기 쉬운 실수다.
+    if (items.isEmpty) {
+      throw FormatException('$field: 빈 목록은 쓸 수 없다 — 카드에 없는 값은 null이다');
+    }
     final raw = <String>[];
     var allowsEmpty = false;
     for (final item in items) {
@@ -86,6 +92,11 @@ class Accept {
         throw FormatException('$field: 문자열·정수·null만 쓸 수 있다 — $item');
       }
       final text = '$item';
+      // 빈 값을 받으려면 목록에 null을 쓴다. 정규화하면 비는 문자열은 파서가 낸
+      // 값과 맞을 일이 없어 그 칸이 영원히 missing으로 굳는다.
+      if (normalize(text).isEmpty) {
+        throw FormatException('$field: 빈 문자열은 쓸 수 없다 — 비워도 되면 목록에 null을 쓴다');
+      }
       if (valid != null && !valid(text)) {
         throw FormatException('$field: 쓸 수 없는 값 "$text"');
       }
@@ -111,6 +122,7 @@ class ComponentTruth {
 
   factory ComponentTruth.fromJson(Map<String, Object?> json, String at) {
     requireKeys(json, const {'country', 'region', 'process', 'ratioPercent'}, at);
+    _requirePercents(json['ratioPercent'], '$at.ratioPercent');
     return ComponentTruth._(
       Accept.fromJson(json['country'], field: '$at.country'),
       Accept.fromJson(json['region'], field: '$at.region'),
@@ -121,6 +133,18 @@ class ComponentTruth {
       ),
       Accept.fromJson(json['ratioPercent'], field: '$at.ratioPercent'),
     );
+  }
+
+  /// 비율은 0–100 정수만 받는다. 초안의 `ratioPercent`가 `int`라 `"40%"`나 `400`은
+  /// 어떤 실제 값과도 맞을 수 없는데, 그대로 읽히면 그 칸이 영원히 wrong으로
+  /// 굳는다. 목록 안의 null("비워도 된다")은 그대로 둔다.
+  static void _requirePercents(Object? json, String field) {
+    for (final item in json is List ? json : [json]) {
+      if (item == null) continue;
+      if (item is! int || item < 0 || item > 100) {
+        throw FormatException('$field: 0–100 정수만 쓸 수 있다 — $item');
+      }
+    }
   }
 }
 
@@ -165,6 +189,10 @@ class Truth {
     final cupNotes = [for (final note in json['cupNotes']! as List) note as String];
     final seen = <String>{};
     for (final note in cupNotes) {
+      // 빈 노트는 칸 이름이 `cupNotes[]`가 돼 영원히 missing이다 — 지우거나 채운다.
+      if (normalize(note).isEmpty) {
+        throw FormatException('truth.cupNotes: 빈 노트 "$note"');
+      }
       if (!seen.add(normalize(note))) {
         throw FormatException('truth.cupNotes: 중복 "$note"');
       }

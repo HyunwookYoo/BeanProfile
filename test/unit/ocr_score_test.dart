@@ -397,5 +397,75 @@ void main() {
       expect(() => Truth.fromJson({...valid(), 'name': true}),
           throwsFormatException);
     });
+
+    // 아래 다섯은 오타가 "영원히 맞출 수 없는 칸"으로 조용히 로드되는 경우다.
+    // `cupNotes: []`·`components: []`가 "없음"이라 `region: []`도 쓰기 쉽다.
+    test('빈 목록은 "없음"이 아니다 — 없는 값은 null', () {
+      expect(() => Truth.fromJson({...valid(), 'name': []}),
+          throwsFormatException);
+      expect(
+          () => Truth.fromJson({
+                ...valid(),
+                'components': [comp(country: 'Ethiopia', region: [])],
+              }),
+          throwsFormatException);
+    });
+
+    test('빈 문자열·공백뿐인 값 불가', () {
+      expect(() => Truth.fromJson({...valid(), 'name': ''}),
+          throwsFormatException);
+      expect(() => Truth.fromJson({...valid(), 'name': '  '}),
+          throwsFormatException);
+      expect(() => Truth.fromJson({...valid(), 'name': ['Ethiopia', '']}),
+          throwsFormatException);
+    });
+
+    test('빈 컵노트 불가', () {
+      expect(() => Truth.fromJson({...valid(), 'cupNotes': ['']}),
+          throwsFormatException);
+      expect(() => Truth.fromJson({...valid(), 'cupNotes': ['자스민', ' ']}),
+          throwsFormatException);
+    });
+
+    test('비율은 정수만 — 문자열은 숫자만 있어도 불가', () {
+      for (final ratio in <Object>['40%', '40']) {
+        expect(
+            () => Truth.fromJson({
+                  ...valid(),
+                  'components': [comp(country: 'Ethiopia', ratioPercent: ratio)],
+                }),
+            throwsFormatException,
+            reason: '$ratio');
+      }
+    });
+
+    test('비율은 0–100만 — 범위 밖 정수는 불가', () {
+      for (final ratio in [400, 101, -1]) {
+        expect(
+            () => Truth.fromJson({
+                  ...valid(),
+                  'components': [comp(country: 'Ethiopia', ratioPercent: ratio)],
+                }),
+            throwsFormatException,
+            reason: '$ratio');
+      }
+    });
+
+    test('목록 안의 null과 비율 경계값 0·100은 그대로 통과 — 새 검사가 과하게 막지 않는다', () {
+      expect(
+          () => Truth.fromJson({
+                ...valid(),
+                'name': [null],
+                'components': [
+                  comp(
+                      country: 'Ethiopia',
+                      region: [null],
+                      ratioPercent: [null, 40]),
+                  comp(country: 'Kenya', ratioPercent: 0),
+                  comp(country: 'Brazil', ratioPercent: 100),
+                ],
+              }),
+          returnsNormally);
+    });
   });
 }

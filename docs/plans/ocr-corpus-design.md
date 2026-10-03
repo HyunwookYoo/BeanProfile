@@ -3,7 +3,7 @@
 | 항목 | 내용 |
 |---|---|
 | 작성일 | 2026-08-12 |
-| 상태 | 설계 승인(브레인스토밍 2026-08-12) → 구현 계획 작성(2026-10-03, [`ocr-corpus-plan.md`](./ocr-corpus-plan.md)) |
+| 상태 | 설계 승인(브레인스토밍 2026-08-12) → 구현 계획 작성(2026-10-03, [`ocr-corpus-plan.md`](./ocr-corpus-plan.md)) → 구현 완료 — `ocr-corpus` 브랜치(2026-10-04), 병합 대기 |
 | 선행 | 인라인 블렌드 행 카드 `v1.0.2` ([design](./ocr-inline-blend-card-design.md)) |
 | 상위 문서 | [`design.md`](../design.md) · [`testing.md`](../testing.md) |
 | 계기 | 사용자 제안 — "샘플 카드 20장을 주면 general한 판별 로직을 만들 수 있나" |
@@ -122,7 +122,7 @@ test/unit/ocr_corpus_test.dart              ← 채점 + 회귀 게이트
 
 정답표는 사진을 읽어 초안을 만들고 사용자가 검수한다. 판단이 갈리는 칸(지역인지 농장인지, 비율이 없는 건지 못 읽은 건지)만 목록으로 올린다.
 
-**구분은 문자열 칸(제품명·로스터리·지역·컵노트)에 한한다.** 정답 값의 단어가 전부 OCR 텍스트(원본+보정본)에 있으면 파서 문제, 하나라도 없으면 OCR 문제로 센다. 줄 단위가 아니라 단어 단위로 보는 건 ML Kit이 한 값을 두 줄로 쪼개거나 순서를 바꿔 내기 때문이다. 열거형·국가·날짜·비율은 카드 표기와 앱 표기가 달라(`에티오피아` ↔ `Ethiopia`, `내추럴` ↔ `natural`) 구분하지 않는다. 근사치다 — 짧은 단어가 엉뚱한 줄에 우연히 있으면 파서 문제로 잘못 센다.
+**구분은 문자열 칸(제품명·로스터리·지역·컵노트)에 한한다.** 정답 값의 단어가 전부 OCR 텍스트(원본+보정본)에 있으면 파서 문제, 하나라도 없으면 OCR 문제로 센다. 줄 단위가 아니라 단어 단위로 보는 건 ML Kit이 한 값을 두 줄로 쪼개거나 순서를 바꿔 내기 때문이다. 단어를 맞춰 볼 때는 정답 단어와 OCR 텍스트 양쪽에서 문자·숫자가 아닌 글자(구두점·하이픈)를 지우고 비교한다 — 한쪽만 지우면 OCR 쪽에 남은 구두점(`Ver.2` ⊄ `ver2`) 때문에 같은 문자열도 OCR 문제로 잡힌다. 열거형·국가·날짜·비율은 카드 표기와 앱 표기가 달라(`에티오피아` ↔ `Ethiopia`, `내추럴` ↔ `natural`) 구분하지 않는다. 근사치다 — 짧은 단어가 엉뚱한 줄에 우연히 있으면 파서 문제로 잘못 센다.
 
 정답표 작성 규칙:
 
@@ -358,5 +358,5 @@ OCR 코퍼스 채점 — 11장, 칸 155개
 - **`region` 오채움** — `.region` 칸의 wrong은 7칸, 4장이다. archers_sidama 2칸(`components[0]`·`components[1]`), hwachae 1칸(`components[2]`), red_cascara 3칸(`components[0]`·`components[1]`·`components[2]`), tacet_guji_hambella 1칸(`components[0]`). 7칸 중 6칸이 `[파서]`, 1칸(tacet_guji_hambella)이 `[OCR]`이다.
 - **가장 많이 빈 필드** — `cupNotes` 23칸(노트 하나가 한 칸, 7장, `[파서]` 19칸·`[OCR]` 4칸). 그다음이 `type` 8칸이다. `type`은 싱글 카드 9장 모두에서 빈칸·틀림이고(missing 8, wrong 1 — archers_sidama `wrong: blend`) 블렌드 2장(red_cascara·hwachae)의 `type`은 목록에 없으니, 싱글 카드의 유형 칸은 대부분 missing으로 시작할 것이라는 §4.3의 계획 단계 측정과 맞는다.
 - **이중 계산** — OCR 오독 하나가 두 칸으로 센다. 오독된 정답 노트는 `missing [OCR]`이 되고, 오독된 글자가 컵노트로 뽑히면 정답이 없는 칸을 채운 것이라 `wrong [파서]`가 된다. 목록에서 보이는 이 쌍은 1개다 — red_cascara `cupNotes[Citrus finish]`(`[OCR]`) + `cupNotes[+Citrus fnish]`(`[파서]`). 그러므로 파서 40칸에는 OCR 오독에서 온 1칸이 들어 있다. 같은 두 칸 모양이 파서 쪽에 1쌍 더 있다 — bench_maji_gesha `cupNotes[살구]` + `cupNotes[+살구.]`(둘 다 `[파서]`, 점이 붙은 `살구.`가 정답 `살구`와 달라서 두 칸이 된다).
-- **품질 분기는 시험되지 않는다** — 새로 덤프한 9장은 모두 `quality: []`이고 이관한 2장은 `quality`를 기록하지 않았다(`null` → 빈 보고서로 재생). 11장 전부 품질 이슈가 없는 카드라서 `lowContrast`로 보정 패스를 타는 분기와 `shouldWarnQuality`가 참이 되는 경우는 이 코퍼스에 없다. 약한 OCR(`isWeakOcr`)은 품질 이슈 없이도 보정 패스를 부르므로 그 분기는 여전히 재생된다(보정본이 기록된 9장).
+- **품질 분기는 시험되지 않는다** — 새로 덤프한 9장은 분석기가 이슈를 보고하지 않았고(분석기는 디코드 실패에도 빈 보고서를 낸다) 이관 2장은 품질 기록이 없다. `lowContrast`·`shouldWarnQuality`는 이 코퍼스에서 참이 되지 않는다. 보정본과 후보를 비교하는 경로는 4장(archers_sidama·kwami_gesha_honey·sol_de_la_manana·tacet_guji_hambella)에서만 돈다. 이관 2장은 언제나 `parseOcr(원본)`으로 재생되므로(hwachae는 보정 실패 경로) red_cascara에서는 후보 비교가 일어나지 않는다.
 - **Android ML Kit 기준** — 픽스처는 Android 에뮬레이터 ML Kit 출력이다. 새로 덤프한 9장은 `emulator-5554`(AVD `flutter_emulator`, x86_64, Android 16)이고, 이관한 2장도 각 설계 문서(`ocr-bilingual-blend-card-design.md` §2.1, `ocr-inline-blend-card-design.md` §2)에 에뮬레이터 실측으로 적혀 있다. 사용자 앱은 iOS라 같은 사진도 줄 나눔·좌표가 다를 수 있다(§5) — 이 점수는 "Android ML Kit 기준 파서 점수"로 읽는다.

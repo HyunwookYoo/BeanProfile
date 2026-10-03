@@ -61,6 +61,7 @@ void main() {
           score(truth(name: 'HWACHAE BLEND'), const OcrDraft(name: 'Alt 한/영'));
       expect(cells['name']!.verdict, Verdict.wrong);
       expect(cells['name']!.encoded, 'wrong: Alt 한/영');
+      expect(cells['name']!.expected, ['HWACHAE BLEND']);
     });
 
     test('정답 없음 + 비우면 correct', () {
@@ -78,8 +79,9 @@ void main() {
   group('정답 목록', () {
     test('목록 중 아무 값이나 correct, 목록 밖은 wrong', () {
       final t = truth(name: ['Ethiopia Worka', '에티오피아 웨스트 알시 넨세보 워르카']);
-      expect(score(t, const OcrDraft(name: '에티오피아 웨스트 알시 넨세보 워르카'))['name']!
-          .verdict, Verdict.correct);
+      final cells1 = score(t, const OcrDraft(name: '에티오피아 웨스트 알시 넨세보 워르카'));
+      expect(cells1['name']!.verdict, Verdict.correct);
+      expect(cells1['name']!.expected, ['Ethiopia Worka', '에티오피아 웨스트 알시 넨세보 워르카']);
       expect(score(t, const OcrDraft(name: 'Ethiopia Worka'))['name']!.verdict,
           Verdict.correct);
       expect(score(t, const OcrDraft(name: '#요거트 #황도'))['name']!.verdict,
@@ -197,11 +199,23 @@ void main() {
         const OcrDraft(cupNotes: ['사과', '#자스민', '녹차']),
       );
       expect(cells['cupNotes[사과]']!.verdict, Verdict.correct);
+      expect(cells['cupNotes[사과]']!.expected, ['사과']);
       expect(cells['cupNotes[자스민]']!.verdict, Verdict.missing);
       expect(cells['cupNotes[귤]']!.verdict, Verdict.missing);
       expect(cells['cupNotes[+#자스민]']!.verdict, Verdict.wrong);
+      expect(cells['cupNotes[+#자스민]']!.expected, isEmpty);
       expect(cells['cupNotes[+녹차]']!.verdict, Verdict.wrong);
       expect(cells.keys.where((key) => key.startsWith('cupNotes')), hasLength(5));
+    });
+
+    test('노트 공백·대소문자 차이는 같은 값으로 본다', () {
+      final cells = score(
+        truth(cupNotes: ['Peach Tea']),
+        const OcrDraft(cupNotes: ['peachtea']),
+      );
+      expect(cells['cupNotes[Peach Tea]']!.verdict, Verdict.correct);
+      expect(cells['cupNotes[Peach Tea]']!.expected, ['Peach Tea']);
+      expect(cells.keys.where((key) => key.startsWith('cupNotes[+')), isEmpty);
     });
   });
 
@@ -228,11 +242,17 @@ void main() {
         const OcrDraft(components: [
           OcrComponentDraft(country: 'Ethiopia'),
           OcrComponentDraft(country: 'Ethiopia', ratioPercent: 100),
+          OcrComponentDraft(region: 'Designed for'),
+          OcrComponentDraft(process: Process.washed),
         ]),
       );
       expect(cells['components[1].country']!.encoded, 'wrong: Ethiopia');
       expect(cells['components[1].ratioPercent']!.encoded, 'wrong: 100');
       expect(cells.containsKey('components[1].region'), isFalse);
+      expect(cells['components[2].region']!.encoded, 'wrong: Designed for');
+      expect(cells.containsKey('components[2].country'), isFalse);
+      expect(cells['components[3].process']!.encoded, 'wrong: washed');
+      expect(cells.containsKey('components[3].country'), isFalse);
     });
 
     test('정답보다 많은 성분이 비어 있으면 칸이 하나도 없다', () {
@@ -296,6 +316,38 @@ void main() {
       expect(() => Truth.fromJson(valid()..remove('type')), throwsFormatException);
     });
 
+    test('성분 모르는 키', () {
+      expect(
+          () => Truth.fromJson({
+                ...valid(),
+                'components': [
+                  {
+                    'country': 'Ethiopia',
+                    'region': null,
+                    'process': null,
+                    'ratioPercent': null,
+                    'ratiopercent': 50,
+                  }
+                ],
+              }),
+          throwsFormatException);
+    });
+
+    test('성분 빠진 키', () {
+      expect(
+          () => Truth.fromJson({
+                ...valid(),
+                'components': [
+                  {
+                    'country': 'Ethiopia',
+                    'region': null,
+                    'process': null,
+                  }
+                ],
+              }),
+          throwsFormatException);
+    });
+
     test('열거형 오타', () {
       expect(() => Truth.fromJson({...valid(), 'roastLevel': 'lightmedium'}),
           throwsFormatException);
@@ -311,6 +363,20 @@ void main() {
 
     test('날짜 형식', () {
       expect(() => Truth.fromJson({...valid(), 'roastDate': '2026-7-13'}),
+          throwsFormatException);
+    });
+
+    test('날짜 불가능한 값', () {
+      expect(() => Truth.fromJson({...valid(), 'roastDate': '2026-02-30'}),
+          throwsFormatException);
+      expect(() => Truth.fromJson({...valid(), 'roastDate': '2026-13-45'}),
+          throwsFormatException);
+    });
+
+    test('type null이나 빈 목록 불가', () {
+      expect(() => Truth.fromJson({...valid(), 'type': null}),
+          throwsFormatException);
+      expect(() => Truth.fromJson({...valid(), 'type': []}),
           throwsFormatException);
     });
 

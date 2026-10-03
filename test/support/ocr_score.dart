@@ -176,18 +176,23 @@ class Truth {
       roastDate: Accept.fromJson(
         json['roastDate'],
         field: 'roastDate',
-        valid: RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch,
+        valid: (text) {
+          if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(text)) return false;
+          final parsed = DateTime.tryParse(text);
+          if (parsed == null) return false;
+          return parsed.toIso8601String().startsWith(text);
+        },
       ),
       roastLevel: Accept.fromJson(
         json['roastLevel'],
         field: 'roastLevel',
         valid: {for (final level in RoastLevel.values) level.name}.contains,
       ),
-      type: Accept.fromJson(
+      type: _validateType(Accept.fromJson(
         json['type'],
         field: 'type',
         valid: const {'single', 'blend'}.contains,
-      ),
+      )),
       cupNotes: cupNotes,
       components: [
         for (final (i, component) in (json['components']! as List).indexed)
@@ -197,6 +202,14 @@ class Truth {
           ),
       ],
     );
+  }
+
+  static Accept _validateType(Accept typeAccept) {
+    // type must be exactly 'single' or 'blend', never null or empty
+    if (typeAccept.allowsEmpty || typeAccept.raw.isEmpty) {
+      throw FormatException('type: 반드시 \'single\' 또는 \'blend\'여야 한다 — null과 빈 목록은 불가');
+    }
+    return typeAccept;
   }
 }
 

@@ -25,7 +25,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
@@ -44,7 +44,7 @@ jobs:
     needs: test
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
@@ -73,14 +73,14 @@ jobs:
           zip -qq -r -9 "$GITHUB_WORKSPACE/beanprofile-${GITHUB_REF_NAME}.ipa" Payload
       - name: Upload diagnostic .ipa
         if: github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: beanprofile-diagnostic-${{ inputs.build_name }}-${{ github.run_number }}
           path: beanprofile-${{ github.ref_name }}.ipa
           retention-days: 7
       - name: Publish GitHub Release (+.ipa 자산)
         if: github.event_name == 'push'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: BeanProfile ${{ github.ref_name }}
           tag_name: ${{ github.ref_name }}
@@ -117,7 +117,7 @@ jobs:
     if: needs.appstore-gate.outputs.ready == 'true'
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
@@ -126,7 +126,7 @@ jobs:
       - run: flutter pub get
 
       - name: 배포 인증서 가져오기
-        uses: apple-actions/import-codesign-certs@v3
+        uses: apple-actions/import-codesign-certs@v6
         with:
           p12-file-base64: ${{ secrets.IOS_DIST_CERT_P12_BASE64 }}
           p12-password: ${{ secrets.IOS_DIST_CERT_PASSWORD }}

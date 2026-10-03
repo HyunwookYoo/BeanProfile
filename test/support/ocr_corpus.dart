@@ -237,16 +237,17 @@ Cause causeOf(Cell cell, String normalizedOcrText) {
   // 정답이 없는 칸을 채웠다 — OCR은 무언가를 읽었고 파서가 엉뚱한 칸에 넣었다.
   if (cell.expected.isEmpty) return Cause.parser;
   // 줄이 아니라 단어로 본다. ML Kit은 한 값을 두 줄로 쪼개거나 순서를 바꿔 낸다.
+  final strip = RegExp(r'[^\p{L}\p{N}]', unicode: true);
+  final text = normalizedOcrText.replaceAll(strip, '');
   final seen = cell.expected.any((value) => value
       .split(RegExp(r'\s+'))
       .where((word) => word.isNotEmpty)
       .every((word) {
-        // 구두점을 제거해 정확한 단어 일치를 본다.
-        // "Oromia, West Guji"의 "Oromia,"는 정규화 후에도 쉼표가 남아
-        // "Oromia West Guji"와 매칭 실패하기 때문이다.
-        final cleaned =
-            normalize(word).replaceAll(RegExp(r'[^\p{L}\p{N}]', unicode: true), '');
-        return normalizedOcrText.contains(cleaned);
+        // 정답과 OCR 모두 문자·숫자만 남겨 구두점 차이를 무시한다.
+        // "Stronghold S7X Ver.2"와 "Stronghold S7X Ver.2"가 다르게 보이지만
+        // 숫자는 유지하고 문자도 유지한다. 같은 정규식으로 양쪽 다 정제한다.
+        final cleaned = normalize(word).replaceAll(strip, '');
+        return text.contains(cleaned);
       }));
   return seen ? Cause.parser : Cause.ocr;
 }

@@ -331,6 +331,24 @@ void main() {
           ['Oromia, West Guji']);
       expect(causeOf(cell, normalize('Oromia West Guji')), Cause.parser);
     });
+
+    test('OCR 텍스트도 구두점을 제거한 후 일치를 본다', () {
+      const cell = Cell('cupNotes[x]', Verdict.missing, null,
+          ['Stronghold S7X Ver.2']);
+      expect(causeOf(cell, normalize('Stronghold S7X Ver.2')), Cause.parser);
+    });
+
+    test('하이픈도 구두점처럼 무시한다', () {
+      const cell = Cell('components[0].region', Verdict.missing, null,
+          ['Oromia - West Guji']);
+      expect(causeOf(cell, normalize('Oromia West Guji')), Cause.parser);
+    });
+
+    test('숫자는 보존되어 같은 단어가 아니다', () {
+      const cell =
+          Cell('cupNotes[x]', Verdict.missing, null, ['Grade 1']);
+      expect(causeOf(cell, normalize('Grade 2')), Cause.ocr);
+    });
   });
 
   test('리포트는 카드별·합계 개수, 원인별 개수, 문제 칸 목록을 낸다', () async {

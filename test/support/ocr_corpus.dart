@@ -240,7 +240,14 @@ Cause causeOf(Cell cell, String normalizedOcrText) {
   final seen = cell.expected.any((value) => value
       .split(RegExp(r'\s+'))
       .where((word) => word.isNotEmpty)
-      .every((word) => normalizedOcrText.contains(normalize(word))));
+      .every((word) {
+        // 구두점을 제거해 정확한 단어 일치를 본다.
+        // "Oromia, West Guji"의 "Oromia,"는 정규화 후에도 쉼표가 남아
+        // "Oromia West Guji"와 매칭 실패하기 때문이다.
+        final cleaned =
+            normalize(word).replaceAll(RegExp(r'[^\p{L}\p{N}]', unicode: true), '');
+        return normalizedOcrText.contains(cleaned);
+      }));
   return seen ? Cause.parser : Cause.ocr;
 }
 

@@ -325,6 +325,12 @@ void main() {
             reason: key);
       }
     });
+
+    test('정답의 구두점은 무시한다', () {
+      const cell = Cell('components[0].region', Verdict.missing, null,
+          ['Oromia, West Guji']);
+      expect(causeOf(cell, normalize('Oromia West Guji')), Cause.parser);
+    });
   });
 
   test('리포트는 카드별·합계 개수, 원인별 개수, 문제 칸 목록을 낸다', () async {
@@ -357,5 +363,46 @@ void main() {
     expect(report, contains('  미분류 1칸'));
     expect(report, contains('  f  roaster  missing  [OCR]'));
     expect(report, contains('  f  type  missing  [미분류]'));
+  });
+
+  group('원인 구분 — 보강', () {
+    test('제품명 칸도 단어로 가린다', () {
+      const cell = Cell('name', Verdict.missing, null, ['HWACHAE BLEND']);
+      expect(causeOf(cell, normalize('HWACHAE BLEND Designed for')), Cause.parser);
+      expect(causeOf(cell, normalize('Designed for')), Cause.ocr);
+    });
+    test('받아주는 값이 여럿이면 하나만 읽혀도 파서 문제다', () {
+      const cell = Cell('name', Verdict.missing, null, ['레드 카스카라', 'RED CASCARA']);
+      expect(causeOf(cell, normalize('레드 카스카라')), Cause.parser);
+      expect(causeOf(cell, normalize('RED CASCARA')), Cause.parser);
+      expect(causeOf(cell, normalize('다른 글자')), Cause.ocr);
+    });
+  });
+  Truth truthOf(Map<String, Object?> over) => Truth.fromJson({
+        'id': 'f', 'name': '테스트 원두', 'roaster': null, 'roastDate': null,
+        'roastLevel': 'medium', 'type': 'single', 'cupNotes': <Object?>[],
+        'components': <Object?>[], ...over,
+      });
+  test('리포트는 보정본 텍스트도 OCR 텍스트로 본다', () async {
+    final card = CorpusCard(
+      fixture(original: strong, enhanced: strongPlusRoaster, quality: []),
+      truthOf({'roaster': '보정 로스터'}),
+    );
+    final scored = {'f': scoreDraft(card.truth, await replayPipeline(card.fixture))};
+    expect(corpusReport([card], scored), contains('  f  roaster  missing  [파서]'));
+  });
+  test('틀린 칸과 파서 원인도 리포트에 센다', () async {
+    final card = CorpusCard(
+      fixture(original: strong, quality: []),
+      truthOf({'name': null, 'components': [
+        {'country': 'Ethiopia', 'region': null, 'process': 'washed', 'ratioPercent': null},
+      ]}),
+    );
+    final scored = {'f': scoreDraft(card.truth, await replayPipeline(card.fixture))};
+    final report = corpusReport([card], scored);
+    expect(report, contains('  f  정답 7 (채움 3 / 비움 4)  빈칸 1  틀림 1'));
+    expect(report, contains('합계  정답 7 (채움 3 / 비움 4)  빈칸 1  틀림 1'));
+    expect(report, contains('  파서 1칸'));
+    expect(report, contains('  f  name  wrong: 테스트 원두  [파서]'));
   });
 }

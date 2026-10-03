@@ -70,38 +70,89 @@ const _enhancedPath = 'corpus/enhanced';
 
 /// 기록된 ML Kit 출력으로 실제 [DefaultOcrPipeline]을 돌린다. seam 세 개만
 /// 바꾸므로 분기·후보 선택·병합이 기기와 같은 코드로 돈다.
-Future<OcrDraft> replayPipeline(CorpusFixture fixture) async {
-  final pipeline = DefaultOcrPipeline(
-    ocr: _ReplayOcr(fixture),
-    qualityAnalyzer: _ReplayQuality(ImageQualityReport(fixture.quality ?? const {})),
-    preprocessor: _ReplayPreprocessor(hasEnhanced: fixture.enhanced != null),
+Future<OcrDraft> replayPipeline(CorpusFixture fixture) =>
+    withReplaySeams(fixture, (ocr, qualityAnalyzer, preprocessor) async {
+      final pipeline = DefaultOcrPipeline(
+        ocr: ocr,
+        qualityAnalyzer: qualityAnalyzer,
+        preprocessor: preprocessor,
+      );
+      return (await pipeline.analyze(_originalPath)).draft;
+    });
+
+/// 재생 seam 세 개를 [run]에 넘기고, 끝난 뒤 기록에 없는 이미지를 한 번이라도
+/// 요청했으면 실패한다. 기록된 이미지는 원본·보정본 둘뿐이라 seam은 그 밖의 요청을
+/// 거절하지만, 파이프라인은 품질 분석과 보정 구간의 예외를 삼켜 폴백으로 바꾼다 —
+/// 거절만으로는 "보정 실패로 원본만 고른" 그럴듯하지만 틀린 베이스라인이 조용히
+/// 굳는다. 그래서 요청을 장부에 남겼다가 마지막에 한 번 더 막는다. 파이프라인에
+/// 새 이미지(크롭·회전·세 번째 패스)가 생겼다는 신호이니 픽스처를 새로 뽑아야 한다.
+/// 테스트가 파이프라인 대신 그런 요청을 흉내 내는 본문을 넣을 수 있게 공개한다.
+Future<OcrDraft> withReplaySeams(
+  CorpusFixture fixture,
+  Future<OcrDraft> Function(
+    OcrService ocr,
+    ImageQualityAnalyzer qualityAnalyzer,
+    OcrImagePreprocessor preprocessor,
+  ) run,
+) async {
+  final unrecorded = <String>[];
+  final draft = await run(
+    _ReplayOcr(fixture, unrecorded),
+    _ReplayQuality(ImageQualityReport(fixture.quality ?? const {}), unrecorded),
+    _ReplayPreprocessor(
+      hasEnhanced: fixture.enhanced != null,
+      unrecorded: unrecorded,
+    ),
   );
-  return (await pipeline.analyze(_originalPath)).draft;
+  if (unrecorded.isNotEmpty) {
+    throw StateError('기록에 없는 이미지를 요청했다: ${unrecorded.join(', ')} — '
+        '파이프라인이 새 이미지를 읽기 시작했다. 픽스처를 다시 뽑는다');
+  }
+  return draft;
+}
+
+StateError _refuse(List<String> unrecorded, String imagePath) {
+  unrecorded.add(imagePath);
+  return StateError('기록에 없는 이미지: $imagePath');
 }
 
 class _ReplayOcr implements OcrService {
-  _ReplayOcr(this.fixture);
+  _ReplayOcr(this.fixture, this.unrecorded);
   final CorpusFixture fixture;
+  final List<String> unrecorded;
 
   @override
-  Future<List<OcrLine>> recognize(String imagePath) async =>
-      imagePath == _enhancedPath ? fixture.enhanced! : fixture.original;
+  Future<List<OcrLine>> recognize(String imagePath) async {
+    if (imagePath == _originalPath) return fixture.original;
+    if (imagePath == _enhancedPath) return fixture.enhanced!;
+    throw _refuse(unrecorded, imagePath);
+  }
 }
 
 class _ReplayQuality implements ImageQualityAnalyzer {
-  _ReplayQuality(this.report);
+  _ReplayQuality(this.report, this.unrecorded);
   final ImageQualityReport report;
+  final List<String> unrecorded;
 
   @override
-  Future<ImageQualityReport> analyze(String imagePath) async => report;
+  Future<ImageQualityReport> analyze(String imagePath) async {
+    // 품질 기록은 원본 한 장분이라 다른 이미지에는 쓸 수 없다.
+    if (imagePath != _originalPath) throw _refuse(unrecorded, imagePath);
+    return report;
+  }
 }
 
 class _ReplayPreprocessor implements OcrImagePreprocessor {
-  _ReplayPreprocessor({required this.hasEnhanced});
+  _ReplayPreprocessor({required this.hasEnhanced, required this.unrecorded});
   final bool hasEnhanced;
+  final List<String> unrecorded;
 
   @override
   Future<String> enhance(String imagePath) async {
+    // 보정본 기록은 원본 한 장을 보정한 한 장뿐이다. 거절이 아래 "기록 없음"보다
+    // 먼저여야 한다 — 보정 패스가 없는 픽스처에서는 틀린 경로 요청이 정상적인
+    // 보정 실패로 보여 장부에 남지 않는다.
+    if (imagePath != _originalPath) throw _refuse(unrecorded, imagePath);
     // 기록이 없으면 보정 실패로 재생한다 — 파이프라인은 그때 원본 후보만으로 고른다.
     if (!hasEnhanced) throw StateError('보정 패스 기록 없음');
     return _enhancedPath;

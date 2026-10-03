@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:beanprofile/features/beans/ocr/ocr_draft.dart';
 import 'package:beanprofile/services/image_quality_analyzer.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -77,6 +78,48 @@ void main() {
       final draft = await replayPipeline(
           fixture(original: const [], enhanced: const [], quality: []));
       expect(draft.isEmpty, isTrue);
+    });
+  });
+
+  // 파이프라인에 새 이미지(크롭·회전·세 번째 패스)가 생기면 원본 기록을 대신
+  // 먹이지 말고 실패해야 한다. 실제 파이프라인은 품질 분석과 보정 구간의 예외를
+  // 삼키므로, 안쪽 expectLater가 그 삼킴을 흉내 낸다 — seam이 거절하고(안쪽),
+  // 거절이 삼켜져도 재생은 실패한다(바깥). 보정 패스가 있는 픽스처를 쓴다: 없으면
+  // 보정 쪽 거절의 throw만 지워도 "기록 없음" StateError가 그 자리를 채워 안쪽
+  // 단언이 통과한다(실측: 변이가 살아남는다).
+  group('기록에 없는 이미지는 원본을 대신 먹이지 않고 실패한다', () {
+    final f = fixture(original: strong, enhanced: strongPlusRoaster, quality: []);
+
+    test('OCR', () async {
+      await expectLater(
+        withReplaySeams(f, (ocr, qualityAnalyzer, preprocessor) async {
+          await expectLater(ocr.recognize('corpus/crop'), throwsStateError);
+          return const OcrDraft();
+        }),
+        throwsStateError,
+      );
+    });
+
+    test('품질 분석', () async {
+      await expectLater(
+        withReplaySeams(f, (ocr, qualityAnalyzer, preprocessor) async {
+          await expectLater(
+              qualityAnalyzer.analyze('corpus/crop'), throwsStateError);
+          return const OcrDraft();
+        }),
+        throwsStateError,
+      );
+    });
+
+    test('보정', () async {
+      await expectLater(
+        withReplaySeams(f, (ocr, qualityAnalyzer, preprocessor) async {
+          await expectLater(
+              preprocessor.enhance('corpus/crop'), throwsStateError);
+          return const OcrDraft();
+        }),
+        throwsStateError,
+      );
     });
   });
 

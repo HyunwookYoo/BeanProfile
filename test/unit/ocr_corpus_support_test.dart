@@ -4,6 +4,7 @@ import 'package:beanprofile/services/image_quality_analyzer.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/ocr_corpus.dart';
+import '../support/ocr_score.dart';
 
 // 같은 높이·같은 열의 콜론 라벨 줄 — 타이포그래피 경로를 타지 않고 라벨로만 읽힌다.
 Map<String, Object?> _row(String text, int index) => {
@@ -119,6 +120,11 @@ void main() {
         '{"id": "a", "source": "s", "quality": [], "original": [], "enhanced": null}';
     const truth = '{"id": "a", "name": null, "roaster": null, "roastDate": null, '
         '"roastLevel": null, "type": "single", "cupNotes": [], "components": []}';
+    String ocr_(String id) =>
+        '{"id": "$id", "source": "s", "quality": [], "original": [], "enhanced": null}';
+    String truth_(String id) =>
+        '{"id": "$id", "name": null, "roaster": null, "roastDate": null, '
+        '"roastLevel": null, "type": "single", "cupNotes": [], "components": []}';
 
     test('픽스처와 정답표를 id로 짝짓고 다른 파일은 무시한다', () {
       write('a.ocr.json', ocr);
@@ -141,6 +147,42 @@ void main() {
 
     test('폴더가 없으면 0장으로 조용히 넘어가지 않고 실패한다', () {
       expect(() => loadCorpus(Directory('${dir.path}/없음')), throwsStateError);
+    });
+
+    test('정답표만 있고 픽스처가 없으면 실패한다', () {
+      write('a.truth.json', truth_('a'));
+      expect(() => loadCorpus(dir), throwsStateError);
+    });
+
+    test('정답표 id가 파일 이름과 다르면 실패한다', () {
+      write('b.ocr.json', ocr_('b'));
+      write('b.truth.json', truth_('a'));
+      expect(() => loadCorpus(dir), throwsFormatException);
+    });
+
+    test('문법이 깨진 JSON은 파일 경로와 함께 FormatException', () {
+      write('a.ocr.json', '{not json');
+      write('a.truth.json', truth_('a'));
+      expect(
+        () => loadCorpus(dir),
+        throwsA(isA<FormatException>()
+            .having((e) => e.message, 'message', contains('a.ocr.json'))),
+      );
+    });
+
+    test('모양이 틀린 JSON도 FormatException', () {
+      write(
+          'a.ocr.json',
+          '{"id": "a", "source": "s", "quality": ["lowcontrast"], '
+              '"original": [], "enhanced": null}');
+      write('a.truth.json', truth_('a'));
+      expect(() => loadCorpus(dir), throwsFormatException);
+    });
+
+    test('최상위가 객체가 아니어도 FormatException', () {
+      write('a.ocr.json', '[]');
+      write('a.truth.json', truth_('a'));
+      expect(() => loadCorpus(dir), throwsFormatException);
     });
   });
 
@@ -197,5 +239,46 @@ void main() {
         isEmpty,
       );
     });
+  });
+
+  test('줄 순서를 그대로 둔다 — 정렬·역순 모두 잡는다', () {
+    final f = CorpusFixture.fromJson({
+      'id': 'x',
+      'source': 's',
+      'quality': null,
+      'original': [
+        {'text': 'second-above', 'l': 0, 't': 100, 'r': 10, 'b': 110, 'conf': null},
+        {'text': 'first-below', 'l': 0, 't': 200, 'r': 10, 'b': 210, 'conf': null},
+        {'text': 'third-top', 'l': 0, 't': 0, 'r': 10, 'b': 10, 'conf': null},
+      ],
+      'enhanced': [
+        {'text': 'e-second', 'l': 0, 't': 100, 'r': 10, 'b': 110, 'conf': null},
+        {'text': 'e-first', 'l': 0, 't': 200, 'r': 10, 'b': 210, 'conf': null},
+        {'text': 'e-third', 'l': 0, 't': 0, 'r': 10, 'b': 10, 'conf': null},
+      ],
+    });
+    expect(f.original.map((line) => line.text),
+        ['second-above', 'first-below', 'third-top']);
+    expect(f.enhanced!.map((line) => line.text),
+        ['e-second', 'e-first', 'e-third']);
+  });
+
+  test('toBaseline은 카드 → 칸 → 인코딩된 판정으로 옮긴다', () {
+    expect(
+      toBaseline({
+        'a': [
+          const Cell('name', Verdict.correct, 'X', ['X']),
+          const Cell('roaster', Verdict.wrong, 'Y', ['Z']),
+          const Cell('roastDate', Verdict.missing, null, ['2026-01-01']),
+        ],
+      }),
+      {
+        'a': {
+          'name': 'correct',
+          'roaster': 'wrong: Y',
+          'roastDate': 'missing',
+        },
+      },
+    );
   });
 }

@@ -167,7 +167,7 @@ T _read<T>(File file, T Function(Map<String, Object?> json) parse) {
   try {
     return parse(jsonDecode(file.readAsStringSync()) as Map<String, Object?>);
   } on FormatException catch (error) {
-    throw FormatException('${file.path}: ${error.message}');
+    throw FormatException('${file.path}: ${error.message}', error.source, error.offset);
   } catch (error) {
     throw FormatException('${file.path}: $error');
   }

@@ -47,7 +47,7 @@ class ImagePickerPhotoService implements PhotoService {
     final jpegDest = '${photos.path}/$stamp.jpg';
     try {
       final decoded = await img.decodeImageFile(tempPath);
-      if (decoded == null) return _copyOriginal(tempPath, photos, stamp);
+      if (decoded == null) return await _copyOriginal(tempPath, photos, stamp);
       final oriented = img.bakeOrientation(decoded);
       await _writeEncodedImage(
           jpegDest, img.encodeJpg(oriented, quality: 85));

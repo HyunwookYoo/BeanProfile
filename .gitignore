@@ -29,6 +29,10 @@ sqlite3.dll
 screenshots/
 ios/ExportOptions.plist
 
+# OCR 코퍼스 원본 사진 — 로컬 전용 (samples/README.md 참고)
+# 저장소는 공개라 실카드 사진을 올리지 않는다. 좌표 픽스처만 커밋한다.
+samples/cards/
+
 # 서명 비밀 — 절대 커밋 금지 (GitHub Secrets로 관리 — docs/deployment.md 참고)
 *.jks
 *.keystore

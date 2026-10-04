@@ -232,9 +232,12 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      # Flutter를 로컬 개발 버전(3.44.6)에 고정한다 — stable(3.47+)은 Gradle 8.14 미만을 거부하는데
+      # 이 프로젝트는 8.12다(업그레이드는 별도 정비 작업, 설계 §7). R8 빌드와 스모크를 검증한 버전과 같게 맞춘다.
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: '3.44.6'
       - run: flutter pub get
       # 에뮬레이터가 부팅하기 전에 빌드해 둔다 — 빌드와 에뮬레이터가 CPU·메모리를 다투지 않게.
       - name: 스모크 APK 빌드
@@ -268,9 +271,11 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      # android-smoke와 같은 이유로 Flutter를 3.44.6에 고정한다.
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: '3.44.6'
       - run: flutter pub get
 
       # 키스토어는 작업 트리 밖(러너 임시 폴더)에 풀고, Gradle이 읽는 key.properties만 android/에 둔다.

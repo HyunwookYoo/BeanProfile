@@ -14,12 +14,12 @@
 | **개발 머신이 Windows** (맥 없음) | 로컬 iOS 빌드 **불가**. Xcode·시뮬레이터·핫리로드·브레이크포인트 전부 없음 |
 | **Apple Developer Program 가입** ($99/년) | 유료 멤버십이라 App Store Connect API 사용 가능 → **iOS 자동 배포가 성립** |
 | **GitHub 저장소 public** | macOS 러너 **무제한 무료** (private이면 10배 과금 → 실질 200분/월) |
-| **스토어 출시 안 함** | Play Store/App Store 심사 없음. 사이드로드 APK + TestFlight 내부 테스트 |
+| **스토어 배포 범위** | Android는 Play **내부 테스트**(심사 없음, 본인 기기). iOS는 TestFlight + AltStore 사이드로드. Play 프로덕션은 개인 계정의 테스터 12명 × 14일 요건 때문에 별도 작업(`plans/android-play-release-design.md` §7) |
 
 여기서 핵심 인식 하나:
 
 > **안드로이드에게 CI는 "편의"지만, iOS에게 CI는 "유일한 방법"이다.**
-> 안드로이드는 Windows에서 `flutter build apk` 후 USB로 넣으면 그만이다.
+> 안드로이드는 Windows에서도 빌드된다(단, Play로 설치한 폰에는 로컬 빌드를 넣지 않는다 — §6-A).
 > iOS는 맥이 없으면 아이폰에 앱을 넣을 수단 자체가 없다. **CI의 macOS 러너가 곧 빌린 맥이다.**
 
 그래서 이 파이프라인이 안 뚫리면 iOS는 존재하지 않는다. 이게 M0를 최우선에 두는 이유다(§7).
@@ -29,20 +29,23 @@
 ## 2. 파이프라인 구조
 
 ```
-git tag v0.0.1 && git push origin v0.0.1
+git tag v1.0.3 && git push origin v1.0.3
         │
         ▼
-   test (ubuntu) ─── analyze + flutter test    ← 게이트
+   test (ubuntu) ─── analyze + flutter test       ← 게이트
         │ 통과해야만
-        ├──────────────────┬──────────────────┐
-        ▼                  ▼
-   android (ubuntu)    ios (macos)             ← 병렬 · 서로 독립
-   APK 빌드             IPA 빌드
-   → GitHub Release    → TestFlight
+        ├── ios (macos) ─────────────────────── 미서명 .ipa → GitHub Release (AltStore)
+        ├── appstore-gate ── appstore (macos) ── 서명 .ipa → TestFlight
+        ├── android-gate ──┐
+        └── android-smoke ─┴─ android (ubuntu) ─ 서명 .aab → Play 내부 테스트
+              (에뮬레이터 release 스모크 — 실패하면 android가 돌지 않는다)
 ```
 
 - **테스트 게이트를 앞에 둔다.** 태그가 가리키는 커밋의 테스트가 통과했다는 보장이 없다. Linux 잡이라 공짜고 ~3분이다. 깨진 빌드를 폰에 올리는 것보다 압도적으로 싸다.
-- **Android/iOS는 병렬이고 독립이다.** iOS 서명이 터져도 Android APK는 정상 릴리스된다. 초반에 iOS를 뚫는 동안 이게 실질적으로 도움이 된다.
+- **세 경로는 병렬이고 독립이다.** iOS 서명이 터져도 Android AAB는 정상 업로드되고, 그 반대도 같다.
+- **`android-smoke`가 Play로 가는 문을 지킨다.** 에뮬레이터에서 release 빌드를 돌려 보고(§6-H) 실패하면 `android`가 아예 돌지 않는다 — 업로드도 아티팩트도 없다.
+- **게이트 잡이 시크릿 유무를 출력으로 넘긴다.** `secrets`는 잡 수준 `if`에서 못 읽기 때문이다. 시크릿이 없으면 그 경로만 건너뛰고 `::notice::`를 남긴다 — 셋업 도중에 태그를 밀어도 나머지 경로는 돈다.
+- **Android 잡은 Flutter를 3.44.6에 고정한다.** stable(3.47 이상)은 Gradle 8.14 미만을 거부하는데 이 프로젝트는 8.12다(2026-10-05 CI 실측). R8 빌드와 스모크를 로컬에서 검증한 버전과 같게 맞춘 것이다. `test`·iOS 잡은 stable 그대로다. **Flutter를 올리기 전에(로컬·CI 모두) Gradle·AGP·Kotlin 정비가 먼저다** — 정비가 끝나면 이 고정을 푼다.
 
 ### 버저닝
 
@@ -77,21 +80,101 @@ git tag v0.0.1 && git push origin v0.0.1
 일반 `v*` 태그 실행은 같은 플래그를 `false`로 고정하고 기존 GitHub Release만 만든다.
 진단 IPA를 일반 릴리스 자산으로 게시하지 않는다.
 
+같은 수동 실행이 Android AAB도 만든다. 진단 기능은 **꺼진 채로**(Play로 갈 수 있는 빌드이므로) `beanprofile-aab-<실행 번호>` 아티팩트로 남는다. 첫 Play 업로드(§3-4)가 이 경로를 쓴다.
+
 ---
 
-## 3. 1회성 셋업 — Android (~10분)
+## 3. 1회성 셋업 — Android / Google Play
 
-> 이 문서의 셸 명령은 **Git Bash**(Git for Windows 동봉) 기준이다. `keytool`은 JDK, `base64`/`openssl`은 Git Bash에 들어 있다. PowerShell에는 `base64`가 없으므로 Git Bash에서 실행할 것.
+> 이 문서의 셸 명령은 **Git Bash**(Git for Windows 동봉) 기준이다. `base64`는 Git Bash에 들어 있고, `keytool`은 PATH에 없으므로 Android Studio 내장 JDK의 것을 경로째 쓴다.
+
+순서가 중요하다. **첫 AAB는 Play Console에서 손으로 올린다** — Play Developer API는 업로드가 한 번도 없는 앱에 올리지 못한다. **서비스 계정 시크릿은 맨 마지막에 넣는다** — 그 시크릿이 들어가는 순간부터 태그가 자동 업로드를 시도하는데, 앱이 아직 '초안'이면 `Only releases with status draft may be created on draft app`으로 거부된다.
+
+### 3-1. Play Console 개인 계정
+
+play.google.com/console에서 **개인** 계정으로 가입한다(등록비 $25). 신원 확인이 끝나야 앱을 만들 수 있다(수일). Play Console 앱으로 Android 기기 접근 확인을 요구할 수 있다.
+
+### 3-2. 앱 만들기
+
+앱 이름 `BeanProfile` · 기본 언어 한국어 · 앱 · 무료. 패키지 이름은 첫 AAB가 정한다 — `com.hyunwook.beanprofile`(영구값, §4 하단).
+
+### 3-3. 업로드 키 → 시크릿 3개
+
+키는 **저장소 밖**에 만든다. `.gitignore`가 `*.p12`를 막지만 거기에 기대지 않는다.
 
 ```bash
-keytool -genkey -v -keystore beanprofile.jks -storetype JKS \
-  -keyalg RSA -keysize 2048 -validity 10000 -alias beanprofile
-base64 -w 0 beanprofile.jks > beanprofile.jks.base64   # → Secret에 붙여넣기
+KEYTOOL="C:/Program Files/Android/Android Studio/jbr/bin/keytool.exe"
+mkdir -p ~/beanprofile-keys && cd ~/beanprofile-keys
+"$KEYTOOL" -genkeypair -v -keystore upload-keystore.p12 -storetype PKCS12 \
+  -keyalg RSA -keysize 2048 -validity 10000 -alias upload \
+  -dname "CN=BeanProfile Upload"
+# 비밀번호를 두 번 묻는다. PKCS12는 키 비밀번호가 저장소 비밀번호와 같다.
 ```
 
-`android/app/build.gradle`(또는 최신 Flutter가 생성하는 `.kts`)에 Flutter 공식 문서의 서명 설정을 넣어 `key.properties`를 읽게 한다. CI가 그 파일을 런타임에 만들어준다.
+비밀번호에 `\`와 앞뒤 공백을 쓰지 않는다 — CI가 만드는 `key.properties`는 Java properties 형식이라 `\`를 이스케이프로 읽고 값 앞의 공백을 버린다.
 
-**키스토어와 비밀번호는 최소 2곳에 백업한다. 이유는 §6.**
+시크릿 세 개를 등록한다. 비밀번호는 `gh`가 프롬프트로 받으므로 셸 기록에 남지 않는다.
+
+```bash
+cd ~/beanprofile-keys
+base64 -w 0 upload-keystore.p12 | gh secret set ANDROID_UPLOAD_KEYSTORE_BASE64 -R HyunwookYoo/BeanProfile
+gh secret set ANDROID_UPLOAD_KEYSTORE_PASSWORD -R HyunwookYoo/BeanProfile
+gh secret set ANDROID_UPLOAD_KEY_ALIAS -R HyunwookYoo/BeanProfile --body upload
+```
+
+`upload-keystore.p12`와 비밀번호를 **최소 2곳**에 백업한다(비밀번호 관리자 + 외장/클라우드). 잃어도 기록은 무사하지만(§6-A) Play 지원팀의 업로드 키 재설정(수일)을 기다리는 동안 업데이트가 멈춘다.
+
+### 3-4. 첫 AAB — 수동 실행 → Console 내부 테스트
+
+`build_name`에는 다음 태그로 낼 버전을 넣는다. 아티팩트의 AAB는 에뮬레이터 스모크(§6-H)와 서명 검사를 통과한 것이다. 같은 폴더에 R8 매핑 파일(`mapping.txt`)도 함께 내려받아진다 — 크래시 스택을 풀 때 쓴다.
+
+> ⚠️ **로컬에서 만든 AAB를 올리지 않는다.** 처음 올린 AAB에 서명한 키가 그대로 업로드 키로 등록된다. 로컬 빌드는 `key.properties`가 없으면 debug 키로 서명되고, Play는 debug 서명을 받지 않는다.
+
+```bash
+cd /c/BeanProfile
+gh workflow run release.yml --ref main -f build_name=1.0.3
+gh run list --workflow release.yml --limit 1        # 실행 ID 확인
+gh run watch <실행 ID> --exit-status
+gh run download <실행 ID> --pattern 'beanprofile-aab-*' --dir build/play-first-upload
+find build/play-first-upload -name '*.aab'
+```
+
+1. Play Console → 테스트 및 출시 → 테스트 → **내부 테스트** → 새 버전 만들기
+2. 앱 서명 키 선택이 나오면 **Google에서 생성한 키**(기본값)를 고른다 — Play 앱 서명
+3. 위에서 찾은 `app-release.aab`를 올린다 → 출시 노트 → 다음 → 저장 → **내부 테스트로 출시 시작**
+4. 테스터 탭 → 이메일 목록 만들기 → 폰에 로그인된 본인 Google 계정 추가 → 저장
+5. 테스터 탭의 **참여 링크**를 폰에서 열어 테스터로 참여 → Play 스토어에서 설치
+
+### 3-5. 앱 콘텐츠 선언
+
+Play Console → 정책 및 프로그램 → 앱 콘텐츠. 대시보드의 '앱 설정' 할 일이 남아 있으면 앱이 '초안'에서 벗어나지 못한다.
+
+| 항목 | 답 |
+|---|---|
+| 개인정보처리방침 | `https://hyunwookyoo.github.io/BeanProfile/privacy.html` |
+| 광고 | 광고 없음 |
+| 앱 액세스 | 제한 없이 모든 기능 사용 가능(로그인 없음) |
+| 콘텐츠 등급 | IARC 설문 — 폭력·성적 콘텐츠·약물·도박·사용자 간 상호작용 전부 "아니요" |
+| 타겟층 | 13세 이상 연령대만 선택(13세 미만을 고르면 가족 정책 대상이 된다) |
+| 데이터 보안 | [`store-listing.md`](store-listing.md) 「Google Play 데이터 보안 (Data safety)」 표 그대로 |
+| 그 밖의 선언(정부 앱·금융 기능·건강 등) | 해당 없음 |
+
+### 3-6. 서비스 계정 → 시크릿 `PLAY_SERVICE_ACCOUNT_JSON` (마지막)
+
+1. Google Cloud Console → 새 프로젝트(예: `beanprofile-play`) → API 및 서비스 → 라이브러리 → **Google Play Android Developer API** 사용 설정
+2. IAM 및 관리자 → 서비스 계정 → 만들기(역할 부여 없이) → 만든 계정 → 키 → 키 추가 → **JSON** → 내려받기
+3. Play Console → 사용자 및 권한 → 새 사용자 초대 → 서비스 계정 이메일 → 앱 권한에 BeanProfile 추가 → **테스트 트랙에 앱 출시** 권한 → 초대
+4. 아래 명령으로 시크릿을 등록한 뒤 내려받은 JSON을 지운다 — GitHub Secret에만 남긴다. 다시 필요하면 키를 새로 만든다.
+
+```bash
+gh secret set PLAY_SERVICE_ACCOUNT_JSON -R HyunwookYoo/BeanProfile < ~/Downloads/<내려받은-키>.json
+```
+
+권한이 반영되기까지 시간이 걸릴 수 있다. 첫 태그가 권한 오류로 실패하면 몇 시간 뒤 **태그를 올려서** 다시 민다(re-run 금지 — §2 함정).
+
+### 3-7. 이후
+
+`v*` 태그 → `android-smoke`가 통과하면 `android` 잡이 내부 테스트에 바로 출시한다(`status: completed`). 폰의 Play 스토어가 업데이트를 받는다. 태그 실행이 `Only releases with status draft may be created on draft app`으로 실패하면 앱이 아직 '초안'이다 — 3-4의 출시가 끝났는지, 3-5의 할 일이 남았는지 확인하고 태그를 올려 다시 민다.
 
 ---
 
@@ -155,10 +238,10 @@ base64 -w 0 dist.p12 > dist.p12.base64
 
 | Secret | 내용 |
 |---|---|
-| `ANDROID_KEYSTORE_BASE64` | `.jks`의 base64 |
-| `ANDROID_KEYSTORE_PASSWORD` | 키스토어 비밀번호 |
-| `ANDROID_KEY_ALIAS` | 키 별칭 (`beanprofile`) |
-| `ANDROID_KEY_PASSWORD` | 키 비밀번호 |
+| `ANDROID_UPLOAD_KEYSTORE_BASE64` | 업로드 키 `upload-keystore.p12`의 base64 |
+| `ANDROID_UPLOAD_KEYSTORE_PASSWORD` | 키스토어 비밀번호(PKCS12라 키 비밀번호도 같다) |
+| `ANDROID_UPLOAD_KEY_ALIAS` | 키 별칭 (`upload`) |
+| `PLAY_SERVICE_ACCOUNT_JSON` | Play 서비스 계정 JSON 키 **내용 전체** |
 | `IOS_DIST_CERT_P12_BASE64` | `.p12`의 base64 |
 | `IOS_DIST_CERT_PASSWORD` | `.p12` export 시 지정한 암호 |
 | `IOS_PROVISIONING_PROFILE_BASE64` | `.mobileprovision`의 base64 |
@@ -182,15 +265,16 @@ android/key.properties
 
 ## 6. 운영 리스크 — 이 앱에 특유한 것
 
-### A. 키스토어가 곧 시음 기록이다 🔑
+### A. Play로 설치한 폰에 다른 서명의 빌드를 넣으면 기록이 지워진다 🔑
 
-안드로이드는 **서명이 다르면 기존 앱 위에 설치가 안 된다** → 삭제 후 재설치 → **삭제하는 순간 앱 데이터가 지워진다**. 그런데 이 앱은 설계상 **로컬 전용 + 클라우드 백업 없음**이고, JSON 내보내기는 **M5**(마지막)다.
+안드로이드는 **서명이 다른 빌드를 기존 앱 위에 설치하지 못한다.** 설치하려면 앱을 지워야 하고, **지우는 순간 로컬 전용 DB와 사진이 사라진다.**
 
-> **키스토어 분실 = 그때까지 쌓은 시음 기록 전부 소실. 복구 수단 없음.**
-> **M1~M4 동안에는 백업 수단이 아예 없다.**
+Play 앱 서명(2026-10 도입) 이후 폰의 앱은 **Google이 보관하는 앱 서명 키**로 서명돼 있어서 위험의 모양이 바뀌었다.
 
-- **필수(지금):** `.jks` + 비밀번호를 **최소 2곳**에 백업(비밀번호 관리자 + 외장/클라우드). 이거 하나로 실질 리스크가 거의 사라진다.
-- **재판단(M2):** M5의 JSON export 앞당기기. **지금 결정하지 않는다** — M2에서 시음 기록이 실제로 쌓이기 시작할 때 다시 본다. 지금 당기면 스코프 크리프다.
+- **업로드 키를 잃어도 기록은 무사하다.** Play 지원팀에 업로드 키 재설정을 요청하면 되고(수일), 그동안 업데이트만 멈춘다. 그래도 키 파일과 비밀번호는 2곳에 백업한다(§3-3).
+- **진짜 위험은 로컬 빌드다.** Windows에서 만든 빌드는 `key.properties`가 없으면 debug 키로 서명된다. 그걸 Play 설치본이 있는 폰에 넣으면 — `flutter install`은 **항상 기존 앱을 먼저 지우고**, `flutter run`은 설치가 거부되면 **묻지 않고 지운 뒤 다시 깐다**(`Uninstalling old version...`). 시음 기록이 경고 없이 사라진다. release 스모크 APK(§6-H)도 같은 applicationId라 같은 위험이 있어서, 스모크 스크립트는 에뮬레이터가 아니면 설치를 거부한다.
+
+> **Play로 설치한 폰에는 `flutter run`·`flutter install`을 하지 않는다.** 개발·검증은 에뮬레이터에서 한다. 폰을 꼭 써야 하면 먼저 설정 → 백업 내보내기로 JSON을 받아 둔다(M5).
 
 ### B. TestFlight는 90일마다 만료된다 ⏳
 
@@ -294,6 +378,21 @@ PROVISIONING_PROFILE_SPECIFIER = "BeanProfile App Store";
 
 여기서만 프로파일 **이름**을 하드코딩한다(§8의 ExportOptions는 여전히 UUID를 런타임에 읽는다). 이름이 어긋나면 `No profiles for ... were found`가 그 이름을 그대로 찍어주므로 진단이 즉시 되기 때문이다. **프로파일을 재발급할 때 이름을 같게 유지하면** 이 줄을 고칠 일이 없다.
 
+### H. release 빌드는 에뮬레이터 스모크로만 자동 검증된다 🧪
+
+Play로 가는 건 R8을 거친 release 빌드다. `flutter drive`는 release 모드를 거부하고 profile 빌드는 R8을 돌리지 않아서, 기존 통합 테스트(`ocr_probe_test` 등)로는 이 빌드를 볼 수 없다. 그래서 진입점만 바꾼 release APK(`integration_test/release_smoke.dart`)를 에뮬레이터에서 돌린다 — Gradle·R8 설정은 배포 빌드와 같다. 번들 테스트 카드 5장을 실제 ML Kit으로 읽고 drift를 백그라운드 isolate로 열어 쓰고 읽는다.
+
+- **CI** — `android-smoke` 잡이 태그·수동 실행마다 돈다. 실패하면 `android` 잡이 돌지 않아 Play 업로드도 아티팩트도 없다. 에뮬레이터 부팅이 흔들려 실패했다면 그 실행의 **실패한 잡만 다시 실행**해도 된다 — Android 쪽은 아무것도 올리지 않았으므로 그 `versionCode`는 처음 쓰이고, 이미 성공한 iOS 잡은 다시 돌지 않는다.
+- **로컬** — 에뮬레이터(`flutter_emulator`)를 띄운 뒤 아래를 돌린다. 스크립트는 **에뮬레이터가 아니면 설치를 거부한다**(§6-A). 스모크 APK는 applicationId가 같아 에뮬레이터의 개발용 앱을 덮어쓴다 — 다음 `flutter run`이 되돌린다.
+
+```bash
+flutter build apk --release --target-platform android-x64 \
+  -t integration_test/release_smoke.dart --dart-define=ENABLE_OCR_DIAGNOSTICS=false
+python scripts/release_smoke.py
+```
+
+카드 5장의 기대값은 `integration_test/support/bundled_card_checks.dart` 한 곳에 있다. 파서를 고쳐 이 카드들의 결과가 바뀌면 거기만 고친다 — debug 프로브와 release 스모크가 함께 따라간다. 검사를 더하거나 빼면 `integration_test/release_smoke.dart`의 검사 목록과 `scripts/release_smoke.py`의 `CHECKS`를 함께 고친다 — 판정은 고정된 여섯 이름이 모두 PASS이고 `DONE 6/6`일 때만 통과한다(남은 로그 줄이나 빠진 검사로는 통과하지 못하게). 카메라·사진 선택기·화면 흐름은 자동화하지 않는다(폰에서 확인).
+
 ---
 
 ## 7. 로드맵 편입 — M0 신설
@@ -317,6 +416,8 @@ PROVISIONING_PROFILE_SPECIFIER = "BeanProfile App Store";
 ---
 
 ## 8. `release.yml` 참고 구현
+
+> 📜 **역사 기록이다.** 실제 파이프라인은 `.github/workflows/release.yml`이고 구조는 §2에 있다. 아래의 Android APK → GitHub Release 잡은 만들지 않았고, Android는 Play 내부 테스트 경로(§3)로 대체됐다.
 
 > **아직 저장소에 넣지 않는다.** `android/`·`ios/` 디렉터리가 없어서(=`flutter create` 미실행) 지금 넣으면 죽은 코드다. **M0에서 실물로 만든다.**
 > 아래는 검증된 참고 구현이며, 패키지·액션 최신 API에 맞춰 사소한 조정이 필요할 수 있다(M1 계획서와 같은 규약).
@@ -469,7 +570,7 @@ jobs:
 - [ ] `flutter analyze && flutter test` 로컬 초록불
 - [ ] 커밋 & 푸시 (main)
 - [ ] `git tag vX.Y.Z && git push origin vX.Y.Z`
-- [ ] Actions에서 `test` → `android`/`ios` 초록불 확인
-- [ ] 안드로이드: GitHub Release에서 APK 받아 설치
+- [ ] Actions에서 `test` → `ios`·`appstore`·`android-smoke`·`android` 초록불 확인
+- [ ] 안드로이드: 폰의 Play 스토어에서 업데이트 확인(내부 테스트, 수 분). **폰에 로컬 빌드를 넣지 않는다**(§6-A)
 - [ ] iOS: TestFlight 앱에서 업데이트 확인 (업로드 후 처리에 5~15분)
 - [ ] 실패 시 **re-run 하지 말고** 태그를 올려서 다시 푸시 (§2 함정)

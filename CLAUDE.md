@@ -27,7 +27,7 @@ Render any doc to themed HTML (the app's cupping-lab theme, light/dark) with **`
 
 Testing convention (3 layers, shared `test/helpers.dart`, Windows sqlite3 setup, GitHub Actions CI at `.github/workflows/test.yml`) lives in **`docs/testing.md`**; every milestone follows it.
 
-Deployment convention (`v*` tag push → Android APK via GitHub Release + iOS via TestFlight) lives in **`docs/deployment.md`**; it also holds the one-time Android/Apple signing setup runbook.
+Deployment convention (`v*` tag push → Android AAB to Play internal testing, gated by an emulator release smoke + iOS via TestFlight, plus an unsigned `.ipa` on GitHub Release for AltStore) lives in **`docs/deployment.md`**; it also holds the one-time Google Play/Apple setup runbook.
 
 ## Deployment constraints (approved 2026-07-15)
 
@@ -35,7 +35,8 @@ Deployment convention (`v*` tag push → Android APK via GitHub Release + iOS vi
 - **Apple Developer Program ($99/yr) is a hard gate** for iOS: free Apple IDs expire profiles in 7 days and have no App Store Connect API, so tag-push automation cannot work without it.
 - **GitHub repo must stay public** — macOS runners are free for public repos; private would cap iOS at ~10 builds/month (10× minute multiplier).
 - **Bundle ID `com.hyunwook.beanprofile` is permanent.** Changing it later orphans app data on both platforms.
-- **The Android keystore guards the user's data.** Signature mismatch forces uninstall → wipes the local-only DB. Back it up in ≥2 places.
+- **Never install a local build on the phone that has the Play build.** Play App Signing means the installed app carries Google's app-signing key; a local build (or the release smoke APK) is debug-signed, `flutter install` always uninstalls first, and `flutter run` silently uninstalls on signature mismatch → wipes the local-only DB. Develop and smoke-test on the emulator. Losing the upload key only pauses updates (Play support reset) — still back it up in ≥2 places.
+- **Android CI jobs pin Flutter 3.44.6.** Flutter stable ≥3.47 rejects this project's Gradle 8.12 (measured 2026-10-05); upgrade Gradle/AGP/Kotlin before bumping Flutter, locally or in CI, then drop the pin in `.github/workflows/release.yml`.
 - **TestFlight builds expire in 90 days** — a permanent ~quarterly tag-push tax after development ends. Certs need annual renewal.
 
 ## Status

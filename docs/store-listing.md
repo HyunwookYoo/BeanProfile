@@ -70,7 +70,7 @@ BeanProfile
 
 ■ 기록은 기기 안에만 남습니다
 
-계정을 만들 필요가 없고, 로그인 화면도 없습니다. 서버로 보내는 데이터가 없으며 광고나 분석 도구를 쓰지 않습니다. 비행기 안에서도, 지하에서도 그대로 동작합니다.
+계정을 만들 필요가 없고, 로그인 화면도 없습니다. 사진과 기록은 기기 밖으로 나가지 않으며 광고도 없습니다. 비행기 안에서도, 지하에서도 그대로 동작합니다.
 
 기기를 바꾸거나 백업이 필요할 때는 설정에서 기록 전체를 파일 하나로 내보낼 수 있습니다. 사진도 함께 담기며, 같은 파일로 되돌릴 수 있습니다.
 
@@ -155,9 +155,38 @@ BeanProfile의 첫 버전입니다.
 
 ## 개인정보 보호 (App Privacy)
 
-**"이 앱은 데이터를 수집하지 않습니다"** 를 선택한다.
+**"예, 이 앱에서 데이터를 수집합니다"** 를 고르고 아래 네 유형을 신고한다. 개발자는 아무것도 받지 않지만, 문자 인식에 쓰는 Google ML Kit이 진단 데이터를 Google로 보내고, Apple은 앱에 들어간 SDK가 보내는 데이터도 앱의 수집으로 본다. 무엇을 보내는지는 [`privacy.md`](privacy.md)의 「Google ML Kit이 보내는 진단 정보」에 있다.
 
-사진과 입력 내용이 기기를 벗어나지 않고, 개발자가 접근할 수 없으므로 Apple 기준의 "수집"에 해당하지 않는다. 카메라·사진 접근 권한은 있으나 그 자체는 수집이 아니다.
+| 데이터 유형 | 목적 | 사용자에게 연결됨 | 추적 |
+|---|---|---|---|
+| 식별자 › 기기 ID (Identifiers › Device ID) | 분석 | 아니요 | 아니요 |
+| 사용 데이터 › 제품 상호 작용 (Usage Data › Product Interaction) | 분석 | 아니요 | 아니요 |
+| 진단 › 성능 데이터 (Diagnostics › Performance Data) | 분석 | 아니요 | 아니요 |
+| 진단 › 기타 진단 데이터 (Diagnostics › Other Diagnostic Data) | 분석 | 아니요 | 아니요 |
+
+Google의 [ML Kit iOS 데이터 공개 안내](https://developers.google.com/ml-kit/ios-data-disclosure)는 보내는 데이터만 나열하고 Apple 범주는 정해주지 않는다(2026-10-04 원문 확인). 위 매핑은 우리 판단이다 — 설치 단위 식별자는 기기 ID, 지연 시간은 성능 데이터, 기기·앱 정보와 API 설정·오류 코드는 기타 진단 데이터, 기능 이벤트(초기화·인식)는 제품 상호 작용. **애매하면 넓게 신고한다** — 적게 신고한 라벨은 정책 위반이지만 넓게 신고한 라벨은 아니다. 사진과 입력 내용은 여전히 기기를 벗어나지 않으므로 사진·사용자 콘텐츠 유형은 신고하지 않는다.
+
+라벨은 App Store Connect → 앱 개인정보 보호에서 **새 버전 제출 없이** 고칠 수 있다.
+
+## Google Play 데이터 보안 (Data safety)
+
+Play Console → 정책 및 프로그램 → 앱 콘텐츠 → 데이터 보안. 근거는 바로 위 App Store 라벨과 같고, 범주도 같은 원칙으로 맞췄다 — 두 스토어가 같은 사실을 같은 넓이로 신고한다. 출처: [ML Kit Android 데이터 공개 안내](https://developers.google.com/ml-kit/android-data-disclosure)(전송 중 HTTPS 암호화, 제3자 이전 없음).
+
+| 질문 | 답 |
+|---|---|
+| 앱에서 필수 사용자 데이터 유형을 수집하거나 공유하나요? | 예 |
+| 앱에서 수집하는 모든 사용자 데이터가 전송 중에 암호화되나요? | 예 — ML Kit은 HTTPS로 보내고, 앱 자체는 아무것도 보내지 않는다 |
+| 사용자가 데이터 삭제를 요청할 방법을 제공하나요? | 아니요 — 개발자가 받는 데이터가 없다 |
+
+수집하는 데이터 유형 — 세 유형 모두 답이 같다.
+
+| 데이터 유형 | 수집 / 공유 | 일시적으로 처리 | 수집 필수 여부 | 목적 |
+|---|---|---|---|---|
+| 기기 또는 기타 ID (Device or other IDs) | 수집함 / 공유 안 함 | 아니요 | 필수(사용자가 끌 수 없음) | 분석 |
+| 앱 활동 › 앱 상호작용 (App interactions) | 수집함 / 공유 안 함 | 아니요 | 필수 | 분석 |
+| 앱 정보 및 성능 › 진단 (Diagnostics) | 수집함 / 공유 안 함 | 아니요 | 필수 | 분석 |
+
+사진·기록·인식된 글자는 기기를 벗어나지 않으므로 사진 및 동영상, 파일 및 문서 같은 유형은 신고하지 않는다.
 
 ## 심사 메모 (App Review Notes)
 
@@ -170,5 +199,5 @@ Text recognition runs on-device (ML Kit). To try it: tap + on the bean list, cho
 
 The taste dashboard (second tab) fills in once at least one tasting is recorded.
 
-No data leaves the device. There is no server, no analytics, and no third-party tracking.
+Photos, records, and recognized text never leave the device. There is no account, no developer-run server, no advertising, and no tracking. Google ML Kit itself sends technical diagnostics (device and app information, performance metrics) to Google; this is declared in the app's privacy label.
 ```

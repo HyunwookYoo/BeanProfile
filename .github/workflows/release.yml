@@ -194,6 +194,9 @@ jobs:
   android-gate:
     needs: test
     runs-on: ubuntu-latest
+    # 쓰기 권한이 필요 없다 — 워크플로 전체의 contents: write를 물려받지 않는다.
+    permissions:
+      contents: read
     outputs:
       sign_ready: ${{ steps.check.outputs.sign_ready }}
       play_ready: ${{ steps.check.outputs.play_ready }}
@@ -205,17 +208,21 @@ jobs:
           KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
           PLAY_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
         run: |
+          sign_ready=false
           if [ -n "$KEYSTORE_B64" ] && [ -n "$KEYSTORE_PASSWORD" ] && [ -n "$KEY_ALIAS" ]; then
-            echo "sign_ready=true" >> "$GITHUB_OUTPUT"
+            sign_ready=true
           else
-            echo "sign_ready=false" >> "$GITHUB_OUTPUT"
             echo "::notice::Android 업로드 키 시크릿이 없어 AAB 빌드를 건너뜁니다(docs/deployment.md §3-3)."
           fi
+          echo "sign_ready=$sign_ready" >> "$GITHUB_OUTPUT"
           if [ -n "$PLAY_JSON" ]; then
             echo "play_ready=true" >> "$GITHUB_OUTPUT"
-          else
+          elif [ "$sign_ready" = true ]; then
             echo "play_ready=false" >> "$GITHUB_OUTPUT"
             echo "::notice::Play 서비스 계정 시크릿이 없어 자동 업로드를 건너뜁니다. AAB는 실행 아티팩트로 남깁니다(docs/deployment.md §3-6)."
+          else
+            echo "play_ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Play 서비스 계정 시크릿도 없습니다 — 업로드 키(§3-3)를 먼저, 서비스 계정(§3-6)은 마지막에 등록합니다(docs/deployment.md)."
           fi
 
   # release 스모크 — 진입점만 바꾼 release APK를 에뮬레이터에서 돌려 R8을 거친 빌드의
@@ -224,6 +231,11 @@ jobs:
   android-smoke:
     needs: test
     runs-on: ubuntu-latest
+    # 쓰기 권한이 필요 없다 — 워크플로 전체의 contents: write를 물려받지 않는다.
+    permissions:
+      contents: read
+    # 부팅(600초)과 판정(300초)은 스스로 끝나지만 SDK·이미지 내려받기는 아니다 — 6시간 기본값 대신.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       # 러너 이미지의 기본 JDK가 바뀌어도 빌드가 흔들리지 않게 고정한다.
@@ -264,6 +276,10 @@ jobs:
     needs: [test, android-gate, android-smoke]
     if: needs.android-gate.outputs.sign_ready == 'true'
     runs-on: ubuntu-latest
+    # 업로드 키와 Play 서비스 계정을 다루는 잡이라 저장소 쓰기 토큰을 곁에 두지 않는다
+    # (contents: write는 ios 잡의 GitHub Release용이다).
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v5
       # android-smoke와 같은 이유로 JDK를 고정한다.

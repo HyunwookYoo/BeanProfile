@@ -29,6 +29,17 @@ PACKAGE = "com.hyunwook.beanprofile"
 ACTIVITY = f"{PACKAGE}/.MainActivity"
 MARKER = "BEANPROFILE_SMOKE"
 DEFAULT_APK = "build/app/outputs/flutter-apk/app-release.apk"
+# integration_test/release_smoke.dart의 checks 맵과 같은 목록이다. 판정이 "무엇이 돌았는지"까지 봐야
+# 검사가 빠지거나 logcat에서 밀려나도 조용히 통과하지 않으므로, 검사를 더하거나 빼거나 이름을 바꿀 때는
+# 이 목록과 진입점의 맵을 함께 고친다.
+CHECKS = (
+    "ocr_card_ko",
+    "ocr_card_orig",
+    "ocr_blend_en",
+    "ocr_dark_blend_en",
+    "ocr_bad_quality_en",
+    "sqlite",
+)
 
 
 def find_adb():
@@ -100,6 +111,58 @@ def word(line, index):
     return parts[index] if len(parts) > index else ""
 
 
+def evaluate(lines):
+    """BEANPROFILE_SMOKE 줄만으로 판정한다(adb도 I/O도 없다). (통과 여부, 사유 목록)을 돌려준다.
+
+    증거가 모자라면 통과가 아니다. FATAL이 없고, CHECKS의 이름마다 `CHECK <이름> PASS`가 정확히
+    한 줄이고, 목록에 없는 이름이나 PASS·FAIL이 아닌 판정이 없고, DONE이 정확히 한 줄이며 점수가
+    CHECKS 개수의 n/n일 때만 통과한다.
+    """
+    reasons = []
+    verdicts = {}  # 이름 -> 그 이름으로 나온 CHECK 판정 낱말들
+    unexpected = []
+    scores = []
+    for line in lines:
+        kind = word(line, 1)
+        if kind == "FATAL":
+            reasons.append(f"앱이 FATAL을 남겼다: {line.partition('FATAL')[2].strip()}")
+        elif kind == "CHECK":
+            name = word(line, 2)
+            if name in CHECKS:
+                verdicts.setdefault(name, []).append(word(line, 3))
+            else:
+                unexpected.append(name or "(이름 없음)")
+        elif kind == "DONE":
+            scores.append(word(line, 2))
+
+    missing, repeated, failed, odd = [], [], [], []
+    for name in CHECKS:
+        found = verdicts.get(name, [])
+        if not found:
+            missing.append(name)
+        if len(found) > 1:
+            repeated.append(name)
+        if "FAIL" in found:
+            failed.append(name)
+        odd += [f"{name}={verdict or '(없음)'}" for verdict in found if verdict not in ("PASS", "FAIL")]
+    for label, names in (
+        ("빠진 검사", missing),
+        ("두 번 이상 나온 검사", repeated),
+        ("실패한 검사", failed),
+        ("PASS·FAIL이 아닌 판정", odd),
+        ("목록에 없는 검사", unexpected),
+    ):
+        if names:
+            reasons.append(f"{label}: {', '.join(names)}")
+
+    expected = f"{len(CHECKS)}/{len(CHECKS)}"
+    if len(scores) != 1:
+        reasons.append(f"DONE 줄이 {len(scores)}개다 — 정확히 1개여야 한다")
+    elif scores[0] != expected:
+        reasons.append(f"DONE 점수가 다르다: {scores[0] or '(없음)'} (기대 {expected})")
+    return not reasons, reasons
+
+
 def main(argv):
     parser = argparse.ArgumentParser(description="release 스모크 APK를 에뮬레이터에서 돌려 판정한다")
     parser.add_argument("--apk", default=DEFAULT_APK)
@@ -163,14 +226,13 @@ def main(argv):
 
     for line in lines:
         print(line)
-    done = next((line for line in lines if word(line, 1) == "DONE"), None)
-    failed = [line for line in lines if word(line, 1) == "FATAL" or word(line, 3) == "FAIL"]
-    score = word(done, 2) if done else ""
-    passed, _, total = score.partition("/")
-    if failed or done is None or passed != total:
+    passed, reasons = evaluate(lines)
+    if not passed:
         print("::error::release 스모크 실패")
+        for reason in reasons:
+            print(f"  - {reason}")
         return 1
-    print(f"release 스모크 통과 — {score}")
+    print(f"release 스모크 통과 — {len(CHECKS)}/{len(CHECKS)}")
     return 0
 
 

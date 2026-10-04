@@ -193,6 +193,9 @@ App Store 개인정보 라벨은 **사용자가 App Store Connect에서 직접 �
 - **Android 16 edge-to-edge 시각 점검** — 내부 테스트 설치 후 화면을 보고 문제가 있으면 별도 수정
 - **UI 흐름 자동화**(카메라·사진 선택기·화면 이동) — §4.6 한계. 시스템 UI라 깨지기 쉽다
 - **debug 통합 테스트(`ocr_probe_test` 등)를 CI에서 돌리기** — 릴리스 게이트는 release 스모크가 맡는다
+- **Android 백업 가져오기 경로**(SAF·`ACTION_OPEN_DOCUMENT`) — 지금 Android의 가져오기는 앱 자신의 문서 폴더만 봐서 재설치 뒤 복원이 안 된다(최종 리뷰 2026-10-05). 그전까지는 `deployment.md` §6-A의 "Play 설치 폰에 로컬 빌드 금지"가 유일한 방어다
+- **debug 빌드에 `applicationIdSuffix ".dev"`** — `flutter run`이 Play 앱을 덮어쓰지 않고 나란히 깔리게 해 §6-A의 위험을 규칙이 아니라 구조로 막는다
+- **`md2html.py --all`이 `privacy.html`을 조각으로 다시 만든다** — 스토어가 링크하는 공개 페이지라 늘 `--standalone`이어야 한다. 렌더러가 이 파일만은 항상 standalone으로 만들도록 고치는 정비
 
 ## 8. 파일 영향
 

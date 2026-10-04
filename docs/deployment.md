@@ -111,7 +111,7 @@ mkdir -p ~/beanprofile-keys && cd ~/beanprofile-keys
 # 비밀번호를 두 번 묻는다. PKCS12는 키 비밀번호가 저장소 비밀번호와 같다.
 ```
 
-비밀번호에 `\`와 앞뒤 공백을 쓰지 않는다 — CI가 만드는 `key.properties`는 Java properties 형식이라 `\`를 이스케이프로 읽고 값 앞의 공백을 버린다.
+비밀번호는 ASCII 문자(영문·숫자·기호)로만 만들고 `\`와 앞뒤 공백은 쓰지 않는다 — CI가 만드는 `key.properties`는 Java properties 형식이라 ISO-8859-1로 읽혀 한글 같은 문자는 깨지고, `\`는 이스케이프로 읽히며, 값 앞의 공백은 버려진다. 어긋나면 서명 단계에서 비밀번호 오류로 멈춘다(debug 키로 새지는 않는다).
 
 시크릿 세 개를 등록한다. 비밀번호는 `gh`가 프롬프트로 받으므로 셸 기록에 남지 않는다.
 
@@ -133,7 +133,7 @@ gh secret set ANDROID_UPLOAD_KEY_ALIAS -R HyunwookYoo/BeanProfile --body upload
 ```bash
 cd /c/BeanProfile
 gh workflow run release.yml --ref main -f build_name=1.0.3
-gh run list --workflow release.yml --limit 1        # 실행 ID 확인
+gh run list --workflow release.yml --event workflow_dispatch --limit 1 --json databaseId,status,createdAt   # 방금 만든 실행인지 createdAt·status로 확인(나타나기까지 몇 초 걸린다)
 gh run watch <실행 ID> --exit-status
 gh run download <실행 ID> --pattern 'beanprofile-aab-*' --dir build/play-first-upload
 find build/play-first-upload -name '*.aab'
@@ -153,6 +153,7 @@ Play Console → 정책 및 프로그램 → 앱 콘텐츠. 대시보드의 '앱
 |---|---|
 | 개인정보처리방침 | `https://hyunwookyoo.github.io/BeanProfile/privacy.html` |
 | 광고 | 광고 없음 |
+| 광고 ID(Advertising ID) | 사용 안 함 — 합쳐진 매니페스트에 `com.google.android.gms.permission.AD_ID` 권한이 없다 |
 | 앱 액세스 | 제한 없이 모든 기능 사용 가능(로그인 없음) |
 | 콘텐츠 등급 | IARC 설문 — 폭력·성적 콘텐츠·약물·도박·사용자 간 상호작용 전부 "아니요" |
 | 타겟층 | 13세 이상 연령대만 선택(13세 미만을 고르면 가족 정책 대상이 된다) |
@@ -274,7 +275,7 @@ Play 앱 서명(2026-10 도입) 이후 폰의 앱은 **Google이 보관하는 �
 - **업로드 키를 잃어도 기록은 무사하다.** Play 지원팀에 업로드 키 재설정을 요청하면 되고(수일), 그동안 업데이트만 멈춘다. 그래도 키 파일과 비밀번호는 2곳에 백업한다(§3-3).
 - **진짜 위험은 로컬 빌드다.** Windows에서 만든 빌드는 `key.properties`가 없으면 debug 키로 서명된다. 그걸 Play 설치본이 있는 폰에 넣으면 — `flutter install`은 **항상 기존 앱을 먼저 지우고**, `flutter run`은 설치가 거부되면 **묻지 않고 지운 뒤 다시 깐다**(`Uninstalling old version...`). 시음 기록이 경고 없이 사라진다. release 스모크 APK(§6-H)도 같은 applicationId라 같은 위험이 있어서, 스모크 스크립트는 에뮬레이터가 아니면 설치를 거부한다.
 
-> **Play로 설치한 폰에는 `flutter run`·`flutter install`을 하지 않는다.** 개발·검증은 에뮬레이터에서 한다. 폰을 꼭 써야 하면 먼저 설정 → 백업 내보내기로 JSON을 받아 둔다(M5).
+> **Play로 설치한 폰에는 `flutter run`·`flutter install`을 하지 않는다 — 예외 없이.** 개발·검증은 에뮬레이터에서 한다. 백업 내보내기는 이 사고를 되돌려 주지 못한다: Android의 가져오기는 앱 자신의 문서 폴더(내보낼 때 파일을 쓰는 곳)만 보는데, 앱을 지우면 그 폴더도 함께 지워지고 Play 빌드에는 바깥 파일을 그 폴더에 넣을 길이 없다. 그래서 **Android에서는 재설치 뒤 백업 복원이 지금은 불가능하다**(iOS는 Files 앱으로 된다). Android 가져오기 경로는 후속 작업이다(설계 §7).
 
 ### B. TestFlight는 90일마다 만료된다 ⏳
 

@@ -3,10 +3,10 @@
 | 항목 | 내용 |
 |---|---|
 | 작성일 | 2026-10-04 |
-| 상태 | 설계 승인(브레인스토밍 2026-10-04) → 구현 계획 대기 |
+| 상태 | 설계 승인(브레인스토밍 2026-10-04) → 구현 계획 [`android-play-release-plan.md`](./android-play-release-plan.md) |
 | 계기 | 사용자 — "android쪽도 출시를 해봐야 할 것 같아" |
 | 상위 문서 | [`deployment.md`](../deployment.md) · [`store-listing.md`](../store-listing.md) · [`privacy.md`](../privacy.md) |
-| 영향 범위 | Android 빌드 설정 · `release.yml` · 개인정보 고지 문서 · 배포 문서. **Dart 코드 무수정** |
+| 영향 범위 | Android 빌드 설정 · `release.yml` · release 스모크(테스트 전용 진입점 · 판정 스크립트) · 개인정보 고지 문서 · 배포 문서. **앱 Dart 코드(`lib/`) 무수정** |
 
 ---
 
@@ -85,13 +85,15 @@ GitHub Secrets (4개):
 ### 4.3 CI — `android-gate` + `android` 잡
 
 ```
-test ──┬── ios ─────────────────────── (미서명 .ipa → GitHub Release)
-       ├── appstore-gate ── appstore ── (서명 .ipa → TestFlight)
-       └── android-gate ─── android ─── (서명 .aab → Play 내부 테스트)
+test ──┬── ios ─────────────────────────── (미서명 .ipa → GitHub Release)
+       ├── appstore-gate ── appstore ────── (서명 .ipa → TestFlight)
+       ├── android-gate ──┐
+       └── android-smoke ─┴── android ───── (서명 .aab → Play 내부 테스트)
 ```
 
 - **`android-gate`** — 시크릿 유무를 출력으로 넘긴다(`secrets`는 잡 수준 `if`에서 못 읽는다 — `appstore-gate`와 같은 이유). 출력 두 개: `sign_ready`(키스토어 3개 존재), `play_ready`(서비스 계정 존재). 태그·수동 실행 모두에서 돈다.
-- **`android`** — `sign_ready`일 때만. iOS 잡들과 병렬·독립이다.
+- **`android-smoke`** — 에뮬레이터에서 release 스모크(§4.6). 업로드 키가 필요 없어 시크릿과 무관하게 태그·수동 실행마다 돈다.
+- **`android`** — `android-smoke` 성공 + `sign_ready`일 때만. 스모크가 실패하면 Play 업로드도 첫 업로드용 아티팩트도 생기지 않는다. iOS 잡들과 병렬·독립이다.
   1. 키스토어 복원 + `android/key.properties` 생성(러너 임시 파일, 로그에 비밀번호를 찍지 않는다)
   2. `flutter build appbundle --release --build-name --build-number --dart-define=APP_VERSION --dart-define=ENABLE_OCR_DIAGNOSTICS=false` — 진단 기능은 Play 빌드에 싣지 않는다(TestFlight와 같은 규칙)
   3. 서명 검사 — `keytool -printcert -jarfile`로 인증서를 읽어 `Android Debug`가 보이거나 인증서가 없으면 실패
@@ -123,10 +125,10 @@ Play 데이터 보안 양식 답(ML Kit Android 공개 문서 기준):
 | 필수 사용자 데이터를 수집·공유하는가 | 예(수집) |
 | 전송 중 암호화 | 예 |
 | 삭제 요청 수단 | 아니요 |
-| 수집 유형 | 앱 정보 및 성능 › 진단 · 기기 또는 기타 ID |
+| 수집 유형 | 앱 정보 및 성능 › 진단 · 기기 또는 기타 ID · 앱 활동 › 앱 상호작용 |
 | 각 유형 — 공유 / 일시 처리 / 필수 여부 / 목적 | 공유 안 함 / 아니요 / 필수 / 분석 |
 
-App Store 개인정보 라벨은 **사용자가 App Store Connect에서 직접 고친다**. 범주는 ML Kit iOS 공개 문서의 표를 따른다(식별자 · 진단 · 사용 데이터, 목적 분석). 라벨은 새 버전 없이 바로 고칠 수 있다. 스토어 설명 문구는 다음 버전 제출 때 함께 바뀐다.
+App Store 개인정보 라벨은 **사용자가 App Store Connect에서 직접 고친다**. ML Kit 공개 문서(iOS·Android)는 보내는 데이터만 나열하고 스토어 범주는 정해주지 않는다(2026-10-04 원문 확인). 매핑은 우리 판단이고 **애매하면 넓게 신고한다** — 식별자 › 기기 ID · 사용 데이터 › 제품 상호 작용 · 진단 › 성능 데이터·기타 진단 데이터, 목적 분석. 기능 이벤트(초기화·인식)를 사용 데이터로 보므로 Play에도 앱 상호작용을 신고한다(위 표). 라벨은 새 버전 없이 바로 고칠 수 있다. 스토어 설명 문구는 다음 버전 제출 때 함께 바뀐다.
 
 ### 4.5 1회성 셋업 안내서 (사용자)
 
@@ -140,6 +142,24 @@ App Store 개인정보 라벨은 **사용자가 App Store Connect에서 직접 �
 6. 서비스 계정 — Google Cloud 프로젝트 → Play Android Developer API 사용 설정 → 서비스 계정 + JSON 키 → Play Console 사용자로 초대(이 앱 출시 권한) → 시크릿 `PLAY_SERVICE_ACCOUNT_JSON`
 7. 이후 `v*` 태그 → 자동 업로드
 
+### 4.6 release 스모크 — 에뮬레이터 자동 검증 (2026-10-05 추가)
+
+사용자 요청 — "에뮬레이터로 테스트를 자동화에서 검증하는 것도". Play로 가는 건 R8을 거친 release 빌드인데, 기존 에뮬레이터 테스트로는 그 빌드를 볼 수 없다(실측).
+
+- `flutter drive`는 release 모드를 거부한다 — `drive_service.dart`: "Flutter Driver (non-web) does not support running in release mode".
+- profile 빌드는 `initWith(debug)`라 R8을 돌리지 않는다 — Flutter Gradle 플러그인은 release 빌드 타입만 축소한다(`FlutterPlugin.kt`).
+
+그래서 **진입점만 바꾼 release APK**를 에뮬레이터에서 돌린다. R8은 Java/Kotlin 바이트코드만 다루고 Dart 진입점은 `libapp.so`만 바꾸므로, 플러그인·ML Kit의 R8 결과는 배포 빌드와 같다.
+
+| 구성 | 역할 |
+|---|---|
+| `integration_test/release_smoke.dart` | 테스트 전용 진입점. 번들 테스트 카드 5장을 실제 ML Kit으로 읽어 기대값과 대조하고, drift를 배포 앱처럼 백그라운드 isolate + 파일 DB로 열어 쓰고 읽는다(앱의 실제 DB는 건드리지 않는다). 결과를 logcat에 `BEANPROFILE_SMOKE` 줄로 남긴다 |
+| `integration_test/support/bundled_card_checks.dart` | 카드 5장의 기대값 — `ocr_probe_test.dart`(debug)와 스모크(release)가 공유한다. 한쪽만 고쳐져 "release에서만 깨짐"을 못 가리는 일을 막는다 |
+| `scripts/release_smoke.py` | 설치 → 실행 → 결과·크래시·시간 초과 판정. **에뮬레이터가 아니면 거부한다** — 같은 applicationId라 Play 설치본이 있는 폰에서는 서명이 충돌하고, 그걸 풀려고 앱을 지우면 기록이 사라진다(§4.1) |
+| CI `android-smoke` 잡 | KVM 에뮬레이터(`reactivecircus/android-emulator-runner@v2`, node24 · API 36 x86_64)에서 스모크. `android` 잡의 `needs`에 들어간다(§4.3) |
+
+로컬에서도 같은 스크립트를 쓴다(AVD `flutter_emulator`, API 36 x86_64). 한계 — 카메라·사진 선택기·화면 흐름은 자동화하지 않는다. 온디바이스 확인(§6의 4)은 남지만 R8 문제는 그 전에 에뮬레이터에서 잡힌다.
+
 ## 5. 기각한 대안
 
 | 대안 | 기각 이유 |
@@ -150,15 +170,20 @@ App Store 개인정보 라벨은 **사용자가 App Store Connect에서 직접 �
 | 나머지 문자 체계 의존성 추가로 R8 해결 | 쓰지 않는 인식 모델로 앱이 수 MB씩 커진다 |
 | R8 끄기 | 앱이 커지고 Flutter 기본값을 거스른다. 문제는 경고 세 줄이다 |
 | 조직 계정(테스터 요건 면제) | D-U-N-S·법적 실체가 필요하다. 사용자가 고르지 않음 |
+| profile 빌드에 R8을 켜서 기존 `flutter drive` 테스트 재사용 | profile은 debuggable이라 R8이 다른 모드로 돈다 — 배포 빌드와 같다고 볼 수 없다. Flutter의 R8 규칙 파일도 손으로 끌어와야 한다 |
+| UI 자동화(Maestro·uiautomator) | 시스템 사진 선택기 화면이 깨지기 쉽고 새 도구가 필요하다 |
+| Firebase Test Lab | 계정·결제가 필요하다 |
+| 스모크를 로컬에서만 | 태그 전에 사람이 기억해야 한다. 사용자가 CI 게이트를 고름(2026-10-05) |
 
 ## 6. 검증 · 완료 기준(DoD)
 
-1. Windows에서 `flutter build appbundle --release` 성공(R8 규칙), `flutter analyze` 0, 기존 테스트 전부 green(Dart 무수정)
-2. `release.yml` 수동 실행 → `android` 잡이 서명 검사를 통과한 AAB 아티팩트를 남김(업로드 단계는 건너뜀)
-3. 사용자가 첫 AAB를 내부 테스트에 올리고 기기에 설치 → **release 빌드에서 카드 스캔 OCR이 동작**(온디바이스 DoD — R8이 적용된 빌드를 확인할 유일한 방법. release 빌드는 VM 서비스가 없어 `flutter drive`로 못 붙는다)
-4. 다음 `v*` 태그 → `android` 잡이 내부 테스트에 자동 업로드(`completed`), 같은 실행에서 iOS 두 경로도 성공 — 2026-10-04에 올린 태그 전용 액션 두 개(`action-gh-release@v3`·`import-codesign-certs@v6`)도 이때 처음 검증된다
-5. §4.4 문서 정정 반영, Play 데이터 보안 양식 작성, App Store 라벨 수정(사용자)
-6. `deployment.md`(§1 전제, §2 구조, §3 Android 셋업, §5 시크릿, §6-A 키 위험, §9 체크리스트)와 CLAUDE.md의 배포 규약 정정
+1. Windows에서 `flutter build appbundle --release` 성공(R8 규칙), `flutter analyze` 0, 기존 테스트 전부 green(`lib/` 무수정)
+2. **release 스모크** — 로컬 에뮬레이터에서 6/6 통과(카드 5장 + sqlite), 변이 3개(기대값 틀림 · 프로세스 종료 · 멈춤)는 전부 실패로 판정. 공유 기대값으로 옮긴 `ocr_probe_test`도 debug에서 통과
+3. `release.yml` 수동 실행 → `android-smoke` 통과 → `android` 잡이 서명 검사를 통과한 AAB 아티팩트를 남김(업로드 단계는 건너뜀)
+4. 사용자가 첫 AAB를 내부 테스트에 올리고 기기에 설치 → **release 빌드에서 카드 스캔 OCR이 동작**(온디바이스 확인 — 카메라·사진 선택기·화면 흐름까지 보는 유일한 방법. R8 문제는 2·3이 먼저 잡는다)
+5. 다음 `v*` 태그 → `android-smoke` 통과 후 `android` 잡이 내부 테스트에 자동 업로드(`completed`), 같은 실행에서 iOS 두 경로도 성공 — 2026-10-04에 올린 태그 전용 액션 두 개(`action-gh-release@v3`·`import-codesign-certs@v6`)도 이때 처음 검증된다
+6. §4.4 문서 정정 반영, Play 데이터 보안 양식 작성, App Store 라벨 수정(사용자)
+7. `deployment.md`(§1 전제, §2 구조, §3 Android 셋업, §5 시크릿, §6-A 키 위험, §6-H release 스모크, §9 체크리스트)와 CLAUDE.md의 배포 규약 정정
 
 ## 7. 스코프 밖
 
@@ -166,6 +191,8 @@ App Store 개인정보 라벨은 **사용자가 App Store Connect에서 직접 �
 - **Gradle 8.12 · AGP 8.9.1 · Kotlin 2.1.0 업그레이드** — 지금은 "곧 지원 중단" 경고뿐. 별도 정비 작업
 - **네이티브 디버그 기호 업로드** — Play가 경고만 한다
 - **Android 16 edge-to-edge 시각 점검** — 내부 테스트 설치 후 화면을 보고 문제가 있으면 별도 수정
+- **UI 흐름 자동화**(카메라·사진 선택기·화면 이동) — §4.6 한계. 시스템 UI라 깨지기 쉽다
+- **debug 통합 테스트(`ocr_probe_test` 등)를 CI에서 돌리기** — 릴리스 게이트는 release 스모크가 맡는다
 
 ## 8. 파일 영향
 
@@ -175,7 +202,11 @@ App Store 개인정보 라벨은 **사용자가 App Store Connect에서 직접 �
 | `android/app/build.gradle.kts` | `key.properties`가 있으면 release 서명, 없으면 debug |
 | `android/app/src/main/AndroidManifest.xml` | `android:label` → `BeanProfile` |
 | `.gitignore` | `android/key.properties`는 이미 있음, 업로드 키 확장자 `*.p12`도 이미 있음 — 확인만 |
-| `.github/workflows/release.yml` | `android-gate` · `android` 잡 추가, 머리 주석 갱신 |
+| `.github/workflows/release.yml` | `android-gate` · `android-smoke` · `android` 잡 추가, 머리 주석 갱신 |
+| `integration_test/release_smoke.dart` | 신규 — release 스모크 진입점(§4.6) |
+| `integration_test/support/bundled_card_checks.dart` | 신규 — 번들 카드 5장 기대값(debug 프로브와 공유) |
+| `integration_test/ocr_probe_test.dart` | 기대값을 공유 모듈로 옮김(출력 줄은 그대로) |
+| `scripts/release_smoke.py` | 신규 — 에뮬레이터 설치·실행·판정, 실기기 거부 |
 | `docs/privacy.md` / `.html` | §4.4 정정 |
 | `docs/store-listing.md` / `.html` | §4.4 정정 |
 | `docs/deployment.md` / `.html` | §6 항목 |

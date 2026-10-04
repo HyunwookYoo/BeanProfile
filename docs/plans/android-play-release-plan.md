@@ -1,0 +1,2281 @@
+# 🤖 BeanProfile — Android Play 출시 (내부 테스트) 구현 계획
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** `v*` 태그 하나로 업로드 키로 서명한 AAB가 Play 내부 테스트 트랙에 올라가게 한다. 올라가기 전에 R8을 거친 release 빌드를 에뮬레이터에서 자동으로 검증하고, ML Kit 진단 전송에 맞춰 개인정보 고지를 바로잡는다.
+
+**Architecture:** 앱 코드(`lib/`)는 한 줄도 바꾸지 않는 빌드·테스트·CI·문서 작업이다. Task 1이 Windows에서 release AAB를 만들 수 있게 하고(R8 규칙 · 조건부 업로드 키 서명 · 라벨) 결과물의 서명을 검사하는 스크립트를 더한다. Task 2가 **release 스모크**를 만든다 — 진입점만 테스트용으로 바꾼 release APK를 에뮬레이터에서 돌려 실제 ML Kit·파서·sqlite를 확인한다. Task 3이 `release.yml`에 `android-gate`·`android-smoke`·`android` 잡을 붙인다 — 스모크가 실패하면 Play로 가지 않는다. Task 4·5는 문서(개인정보·스토어 입력값·배포 규약)다. Task 6은 사용자가 Play Console에서 하는 1회성 셋업과 온디바이스 DoD를 controller가 확인하는 단계다.
+
+**Tech Stack:** Flutter 3.44.6(로컬) / stable(CI), Gradle Kotlin DSL(AGP 8.9.1 · Gradle 8.12 — 그대로), R8, drift, GitHub Actions, `reactivecircus/android-emulator-runner@v2`, `r0adkll/upload-google-play@v1`, JDK `keytool`(PKCS12), Python 3(로컬 검증에 PyYAML 6), `adb`, `gh` CLI.
+
+**Spec:** [`android-play-release-design.md`](./android-play-release-design.md) — 결정 5개(§3), 서명 설계와 debug 대체 경로(§4.1), R8 원인(§1·§4.2), 잡 구조(§4.3), 고지 정정 원칙(§4.4), **release 스모크(§4.6)**, 기각한 대안(§5)이 거기 있다.
+
+> **스펙 변경 2건 — 이 계획이 반영한다.**
+> 1. **스토어 범주 매핑(2026-10-04).** 스펙 §4.4는 "App Store 범주는 ML Kit iOS 공개 문서의 표를 따른다"고 했다. 두 공개 문서의 원문 HTML을 받아 확인하니 iOS·Android 모두 보내는 데이터만 나열하고 스토어 범주는 정해주지 않는다. 매핑은 우리 판단이고 **애매하면 넓게 신고한다** — 그래서 기능 이벤트(초기화·인식)를 두 스토어 모두 사용 데이터로 신고하고, Play에 `앱 활동 › 앱 상호작용`이 추가된다(Task 4).
+> 2. **release 스모크(2026-10-05, 사용자 요청).** 기존 에뮬레이터 테스트는 Play로 가는 빌드를 못 본다 — `flutter drive`는 release를 거부하고 profile 빌드는 R8을 돌리지 않는다(둘 다 Flutter 도구 코드로 확인). 사용자가 "CI 게이트 + 로컬"을 골랐다(스펙 §4.6, Task 2·3).
+
+## 파일 지도
+
+| 파일 | 태스크 | 책임 |
+|---|---|---|
+| `android/app/proguard-rules.pro` | 1 · 신규 | R8 `-dontwarn` 3줄 — ML Kit의 안 쓰는 문자 체계 |
+| `android/app/build.gradle.kts` | 1 | `android/key.properties`가 있으면 그 키로, 없으면 debug 키로 release 서명 |
+| `android/app/src/main/AndroidManifest.xml` | 1 | `android:label` → `BeanProfile` |
+| `scripts/verify_aab_signature.py` | 1 · 신규 | AAB 인증서 검사 — debug·무서명이면 exit 1 |
+| `integration_test/support/bundled_card_checks.dart` | 2 · 신규 | 번들 카드 5장 기대값 — debug 프로브와 release 스모크가 공유 |
+| `integration_test/ocr_probe_test.dart` | 2 | 기대값을 공유 모듈로 옮김(출력 줄은 그대로) |
+| `integration_test/release_smoke.dart` | 2 · 신규 | release 스모크 진입점 — 카드 5장 + sqlite, logcat 보고 |
+| `scripts/release_smoke.py` | 2 · 신규 | 에뮬레이터 설치·실행·판정, 실기기 거부 |
+| `.github/workflows/release.yml` | 3 | `android-gate`·`android-smoke`·`android` 잡, 머리 주석 |
+| `docs/privacy.md` / `.html` | 4 | ML Kit 진단 전송 고지 |
+| `docs/store-listing.md` / `.html` | 4 | 설명 문구 · App Store 라벨 · Play 데이터 보안 · 심사 메모 |
+| `docs/deployment.md` / `.html` | 5 | Play 셋업 안내(§3) · 구조 · 시크릿 · 위험(§6-A·§6-H) · 체크리스트 |
+| `CLAUDE.md` | 5 · 6 | 배포 규약 문장 · 배포 제약 · (DoD 후) 상태 |
+
+## Global Constraints
+
+- **`lib/`·`test/`·`pubspec.yaml`·`pubspec.lock` 무수정.** 브랜치 끝에서 `git diff --stat main -- lib/ test/ pubspec.yaml pubspec.lock`이 비어 있어야 한다. 기존 455개 테스트 green, `flutter analyze` 0(`integration_test/` 파일도 분석 대상이다).
+- **`integration_test/` 변경은 Task 2의 범위만** — 새 파일 둘, 그리고 `ocr_probe_test.dart`의 기대값을 공유 모듈 호출로 바꾸는 것. 프로브의 `print` 출력 줄은 그대로 둔다.
+- **새 의존성·도구 업그레이드 금지.** Gradle 8.12 · AGP 8.9.1 · Kotlin 2.1.0의 "곧 지원 중단" 경고는 스펙 §7에 따라 그대로 둔다.
+- **applicationId `com.hyunwook.beanprofile`은 영구값**이다. 건드리지 않는다.
+- **업로드 키·비밀번호·서비스 계정 JSON은 커밋하지도 출력하지도 않는다.** 워크플로에 `set -x`·`cat android/key.properties`·비밀번호 `echo`(파일 리다이렉트 제외)를 쓰지 않는다. 로컬 검증용 키는 **테스트 전용으로 새로 만들어 스크래치 디렉터리에만** 두고 태스크 끝에 지운다. 태스크가 끝날 때 `android/key.properties`는 없어야 한다.
+- **release 스모크는 에뮬레이터 전용이다.** 스모크 APK는 배포 앱과 applicationId가 같다. 실기기에 설치하지 않고, `scripts/release_smoke.py`도 실기기를 거부한다. 로컬 에뮬레이터는 AVD `flutter_emulator`(API 36 x86_64)이고, **쓰고 나면 끈다**(`adb -s emulator-5554 emu kill` — 사용자 요청 2026-10-04).
+- **Play로 갈 수 있는 빌드와 스모크 빌드는 `--dart-define=ENABLE_OCR_DIAGNOSTICS=false`.** 수동 실행이어도 같다 — iOS `ios` 잡(수동 실행이면 `true`)과 다른 점이다.
+- **버전** — `versionName` = 태그에서 `v`를 뗀 값(수동 실행은 `build_name` 입력), `versionCode` = `github.run_number`. `ios` 잡과 같은 셸 패턴을 복사한다.
+- **액션 버전** — `actions/checkout@v5` · `actions/setup-java@v5` · `subosito/flutter-action@v2` · `actions/upload-artifact@v6` · `reactivecircus/android-emulator-runner@v2` · `r0adkll/upload-google-play@v1`. 새로 쓰는 셋은 node24임을 확인했다(2026-10-04~05).
+- **수동 실행은 `/`가 없는 ref에서만.** `ios` 잡의 `.ipa` 파일명이 `${GITHUB_REF_NAME}`이라 `/`가 있으면 깨진다(2026-10-04 실측). 이 브랜치 이름 `android-play-release`는 안전하다.
+- **브랜치 `android-play-release`**(이미 있음 — 스펙 커밋 `c4eaa96`). `main` 병합은 최종 리뷰 뒤 사용자 선택으로.
+- **`git add`는 태스크에 적힌 경로만.** `-A`·`.` 금지. 루트의 `AGENTS.md`·`data/`는 untracked로 둔다.
+- **bash 블록 하나는 한 셸에서 통째로 실행한다.** 블록 안의 변수(`S`, `KEYTOOL`, `WF`)와 함수(`BUILD`)는 그 셸에서만 산다 — 줄을 나눠 다른 셸에서 돌리면 빈 값이 된다.
+- **Windows 셸은 Git Bash.** `keytool`은 PATH에 없다 — `KEYTOOL="C:/Program Files/Android/Android Studio/jbr/bin/keytool.exe"`. `adb`도 PATH에 없다 — `ADB="$LOCALAPPDATA/Android/Sdk/platform-tools/adb.exe"`(스크립트는 스스로 찾는다).
+- **스크래치 경로 `S`** — 이 세션의 스크래치 디렉터리 `C:/Users/hyunw/AppData/Local/Temp/claude/C--BeanProfile/b0fc6519-49e9-4f0e-9531-634e4e90b937/scratchpad` 아래 태스크별 하위 폴더(`android-t1`, `android-t2`, `android-t3`). **Windows 슬래시 형식**으로 쓴다 — Gradle(Java)은 `/c/Users/...` 형식을 못 읽는다. 저장소 안에 두지 않는다.
+- **문서 렌더** — `timeout 60 python scripts/md2html.py <md>`. md2html은 목록 안에 들여쓴 코드 펜스와 펜스 중첩에서 멈춘다(메모리 2.9GB 실측). 펜스는 항상 0열에서 열고 닫는다.
+- **`dart format`을 돌리지 않는다.**
+- **주석은 한국어, "무엇"이 아니라 "왜".** 기존 `release.yml`·`integration_test/` 주석의 어투를 따른다.
+- **커밋 메시지 끝 두 줄** — `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>` / `Claude-Session: https://claude.ai/code/session_01RSnfDi7WDeKq9sg1LWJLec`. 각 태스크의 커밋 명령에 들어 있다.
+- **push·태그·수동 실행은 계획에 적힌 지점에서만** — Task 3 Step 9(브랜치 push + 수동 실행 1회)와 Task 6뿐이다. 둘 다 controller가 한다. 구현 서브에이전트는 push하지 않는다.
+
+## Review Focus
+
+1. **Play로 설치한 폰에 로컬 빌드나 스모크 APK를 설치함** — `flutter install`은 **항상** 기존 앱을 먼저 지운다(`install.dart`의 `uninstall = true`). `flutter run`은 서명 불일치로 설치가 거부되면 **묻지 않고** 지운 뒤 다시 깐다(`android_device.dart`의 `installApp`, `Uninstalling old version...`). 로컬 전용 DB와 사진이 경고 없이 사라진다. → Task 2 Step 7(스크립트가 실기기 serial을 adb에 닿기 전에 거부), Task 5 Step 7의 grep(§6-A · §9 · CLAUDE.md).
+2. **debug 서명 AAB가 Play로 감** — `key.properties`가 없거나 깨지면 Gradle이 조용히 debug 키로 서명한다. 첫 업로드라면 더 나쁘다 — Android 공식 문서: *"The key you use to sign your first release becomes your upload key."* 서명 검사가 업로드·아티팩트보다 먼저 실패해야 한다. → Task 1 Step 6(debug 서명·무서명·없는 파일 → 전부 exit 1), Task 3 Step 1의 단계 순서 단언과 Step 5의 변이 확인.
+3. **R8이 런타임에 ML Kit·플러그인을 깨뜨림, 그리고 그걸 볼 스모크가 눈멂** — `-dontwarn`은 빌드 경고만 끈다. 스모크는 남은 logcat 줄로 거짓 통과하거나, 죽은 프로세스·멈춘 앱을 놓치면 안 된다. → Task 2 Step 8(release 스모크 6/6)과 Step 9(변이 셋: 기대값 틀림 · 프로세스 종료 · 멈춤 → 전부 exit 1), Task 3(CI 게이트 — 스모크 실패 시 `android` 미실행), Task 6 Step 5(기기에서 카메라·선택기 흐름까지).
+4. **워크플로가 만든 `key.properties`를 Gradle이 다르게 읽음** — 속성 이름 오타, 경로 형식. → Task 3 Step 6: 워크플로의 복원 스크립트를 그대로 꺼내 돌려 만든 `key.properties`로 빌드 → 서명 검사 exit 0.
+5. **시크릿 일부만 등록됨** — base64만 넣고 비밀번호를 빠뜨린 상태에서 빈 비밀번호로 빌드를 시도하지 말고 건너뛰어야 한다. 시크릿 이름 오타도 같은 증상(영원히 건너뜀)이다. → Task 3 Step 1의 게이트 조합 6가지와 시크릿 이름 단언.
+
+---
+
+## Task 1: 로컬 release AAB — R8 규칙 · 업로드 키 서명 · 라벨 · 서명 검사 스크립트
+
+**Files:**
+- Create: `android/app/proguard-rules.pro`
+- Modify: `android/app/build.gradle.kts` (아래 최종본으로 교체)
+- Modify: `android/app/src/main/AndroidManifest.xml:4` (`android:label`)
+- Create: `scripts/verify_aab_signature.py`
+
+**Interfaces:**
+- Consumes: 없음
+- Produces:
+  - `android/key.properties`(gitignore됨)의 키 4개 — `storeFile`(절대 경로) · `storePassword` · `keyPassword` · `keyAlias`. 파일이 있으면 release가 그 키로, 없으면 debug 키로 서명된다. Task 3의 CI 단계가 이 이름 그대로 파일을 만든다.
+  - `python scripts/verify_aab_signature.py <aab>` — exit 0: 인증서가 있고 `CN=Android Debug`가 아님(주체 DN을 출력). exit 1: 파일 없음 · keytool 없음 · 서명 없음 · debug 서명(`::error::` 한 줄). exit 2: 인자 개수 틀림. `keytool`은 `KEYTOOL` 환경 변수 → `PATH` → `JAVA_HOME/bin` 순으로 찾는다.
+  - release 빌드가 R8을 통과한다 — Task 2의 스모크 APK가 이 위에서 빌드된다.
+  - AAB 경로 `build/app/outputs/bundle/release/app-release.aab`, R8 매핑 `build/app/outputs/mapping/release/mapping.txt`.
+
+- [ ] **Step 1: 지금 release 빌드가 R8에서 죽는 것을 확인한다 (RED)**
+
+```bash
+cd /c/BeanProfile
+test ! -e android/key.properties && echo "no key.properties"
+flutter build appbundle --release 2>&1 | tail -20
+```
+
+Expected: `no key.properties`, 빌드 실패, 출력에 `ERROR: R8: Missing class com.google.mlkit.vision.text.chinese.ChineseTextRecognizerOptions$Builder`(데바나가리·일본어 줄도 함께). 다른 이유로 실패하면 멈추고 보고한다.
+
+- [ ] **Step 2: R8 규칙 파일을 만든다**
+
+`android/app/proguard-rules.pro`:
+
+```
+# google_mlkit_text_recognition 플러그인은 네 문자 체계(중국어·데바나가리·일본어·한국어)의
+# 옵션 클래스를 모두 참조하지만, 앱은 한국어 인식 모델만 의존성으로 넣는다(build.gradle.kts).
+# 나머지 셋은 classpath에 없어 R8이 "Missing class"로 release 빌드를 멈춘다.
+# 앱은 한국어 인식기만 만들므로(lib/services/ocr_service.dart) 런타임에 이 클래스들에 닿지 않는다.
+# 모델 의존성을 더하면 앱이 수 MB씩 커지므로 경고만 끈다(docs/plans/android-play-release-design.md §5).
+# Flutter Gradle 플러그인이 이 파일을 release 빌드의 R8 규칙에 자동으로 더한다.
+-dontwarn com.google.mlkit.vision.text.chinese.**
+-dontwarn com.google.mlkit.vision.text.devanagari.**
+-dontwarn com.google.mlkit.vision.text.japanese.**
+```
+
+- [ ] **Step 3: 업로드 키 서명을 조건부로 넣는다**
+
+`android/app/build.gradle.kts` 최종본. 바뀌는 곳은 맨 위 `import` 두 줄, `key.properties` 읽기, `signingConfigs` 블록, `buildTypes` 블록이다. `buildTypes`에 있던 Flutter 템플릿 TODO 주석 두 줄은 이 변경이 해소하므로 지운다. `defaultConfig`의 TODO는 이 작업과 무관하니 그대로 둔다.
+
+```kotlin
+import java.io.FileInputStream
+import java.util.Properties
+
+plugins {
+    id("com.android.application")
+    id("kotlin-android")
+    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
+    id("dev.flutter.flutter-gradle-plugin")
+}
+
+// Play 업로드 키 — CI가 GitHub Secrets로 android/key.properties를 만든다(docs/deployment.md §3).
+// 파일이 없으면 debug 키로 서명해 로컬 `flutter run --release`가 키 없이도 돌게 한다.
+// 그 대체 경로가 CI에서 조용히 타지 않도록 release.yml이 결과물의 서명을 검사한다.
+val keystorePropertiesFile = rootProject.file("key.properties")
+val keystoreProperties = Properties()
+if (keystorePropertiesFile.exists()) {
+    FileInputStream(keystorePropertiesFile).use { keystoreProperties.load(it) }
+}
+
+android {
+    namespace = "com.hyunwook.beanprofile"
+    compileSdk = flutter.compileSdkVersion
+    ndkVersion = flutter.ndkVersion
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+
+    kotlinOptions {
+        jvmTarget = JavaVersion.VERSION_11.toString()
+    }
+
+    defaultConfig {
+        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
+        applicationId = "com.hyunwook.beanprofile"
+        // You can update the following values to match your application needs.
+        // For more information, see: https://flutter.dev/to/review-gradle-config.
+        minSdk = flutter.minSdkVersion
+        targetSdk = flutter.targetSdkVersion
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
+    }
+
+    signingConfigs {
+        if (keystorePropertiesFile.exists()) {
+            create("release") {
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig = if (keystorePropertiesFile.exists()) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
+        }
+    }
+}
+
+flutter {
+    source = "../.."
+}
+
+dependencies {
+    implementation("com.google.mlkit:text-recognition-korean:16.0.1")
+}
+```
+
+- [ ] **Step 4: 런처 라벨을 고친다**
+
+`android/app/src/main/AndroidManifest.xml` 4행:
+
+```xml
+        android:label="BeanProfile"
+```
+
+(기존 `android:label="beanprofile"`. iOS 표시 이름과 맞춘다.)
+
+- [ ] **Step 5: 키 없이 빌드한다 — 성공해야 한다(debug 대체 경로) (GREEN)**
+
+```bash
+cd /c/BeanProfile
+flutter build appbundle --release 2>&1 | tail -5
+ls -la build/app/outputs/bundle/release/app-release.aab build/app/outputs/mapping/release/mapping.txt
+find build/app/intermediates -name AndroidManifest.xml -path '*release*' -exec grep -oh 'android:label="[^"]*"' {} + | sort -u
+```
+
+Expected: `Built build…app-release.aab`, 두 파일 존재, 마지막 명령은 정확히 한 줄 `android:label="BeanProfile"`. 새로운 `Missing class`가 나오면 `-dontwarn`을 넓히지 말고 멈추고 보고한다 — 어떤 클래스가 런타임에 필요한지는 판단이 필요하다.
+
+- [ ] **Step 6: 서명 검사 스크립트를 쓰고, debug·무서명·없는 파일을 전부 거부하는지 본다**
+
+`scripts/verify_aab_signature.py`:
+
+```python
+"""AAB가 debug 키가 아닌 업로드 키로 서명됐는지 확인한다.
+
+android/app/build.gradle.kts는 android/key.properties가 없으면 release를 debug 키로
+서명한다(로컬 `flutter run --release`를 위해). CI에서 키 복원이 조용히 어긋나도 빌드는
+성공하므로, 결과물의 인증서를 직접 읽어 확인한다. Play는 처음 올린 AAB에 서명한 키를
+업로드 키로 등록하므로 debug 서명 AAB는 업로드 전에 막아야 한다.
+
+사용: python scripts/verify_aab_signature.py <app-release.aab>
+keytool은 KEYTOOL 환경 변수 → PATH → JAVA_HOME/bin 순으로 찾는다.
+"""
+
+import os
+import pathlib
+import shutil
+import subprocess
+import sys
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
+DEBUG_SUBJECT = "CN=Android Debug"
+
+
+def find_keytool():
+    explicit = os.environ.get("KEYTOOL")
+    if explicit:
+        return explicit
+    on_path = shutil.which("keytool")
+    if on_path:
+        return on_path
+    java_home = os.environ.get("JAVA_HOME")
+    if java_home:
+        for name in ("keytool", "keytool.exe"):
+            candidate = pathlib.Path(java_home) / "bin" / name
+            if candidate.is_file():
+                return str(candidate)
+    return None
+
+
+def main(argv):
+    if len(argv) != 2:
+        print("사용: python scripts/verify_aab_signature.py <app-release.aab>")
+        return 2
+    aab = pathlib.Path(argv[1])
+    if not aab.is_file():
+        print(f"::error::{aab} 가 없습니다")
+        return 1
+    keytool = find_keytool()
+    if keytool is None:
+        print("::error::keytool을 찾지 못했습니다 — KEYTOOL·PATH·JAVA_HOME을 확인하세요")
+        return 1
+
+    # keytool은 로케일에 따라 '소유자:'/'Owner:'로 찍지만 DN은 ASCII라 CN= 이후만 본다.
+    result = subprocess.run(
+        [keytool, "-printcert", "-jarfile", str(aab)],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    output = result.stdout + result.stderr
+    subjects = sorted(
+        {line[line.index("CN="):].strip() for line in output.splitlines() if "CN=" in line}
+    )
+
+    if not subjects:
+        print(f"::error::서명 인증서가 없습니다 — 서명되지 않은 AAB입니다: {aab}")
+        return 1
+    if any(subject.startswith(DEBUG_SUBJECT) for subject in subjects):
+        print("::error::debug 키로 서명된 AAB입니다 — android/key.properties가 빌드에 쓰이지 않았습니다")
+        return 1
+    print("업로드 키 서명 확인:")
+    for subject in subjects:
+        print(f"  {subject}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
+```
+
+이어서 실행한다(Step 5의 AAB는 debug 키로 서명돼 있다):
+
+```bash
+cd /c/BeanProfile
+export KEYTOOL="C:/Program Files/Android/Android Studio/jbr/bin/keytool.exe"
+S="C:/Users/hyunw/AppData/Local/Temp/claude/C--BeanProfile/b0fc6519-49e9-4f0e-9531-634e4e90b937/scratchpad/android-t1"
+mkdir -p "$S"
+python scripts/verify_aab_signature.py build/app/outputs/bundle/release/app-release.aab; echo "exit=$?"
+python -c "import zipfile,sys; zipfile.ZipFile(sys.argv[1],'w').writestr('a.txt','x')" "$S/unsigned.aab"
+python scripts/verify_aab_signature.py "$S/unsigned.aab"; echo "exit=$?"
+python scripts/verify_aab_signature.py "$S/missing.aab"; echo "exit=$?"
+python scripts/verify_aab_signature.py; echo "exit=$?"
+```
+
+Expected(순서대로):
+
+1. `::error::debug 키로 서명된 AAB입니다 …` / `exit=1`
+2. `::error::서명 인증서가 없습니다 …` / `exit=1`
+3. `::error::…missing.aab 가 없습니다` / `exit=1`
+4. `사용: …` / `exit=2`
+
+1번이 `exit=0`이면 스크립트가 눈이 먼 것이다 — 멈추고 `keytool` 원출력을 보고한다.
+
+- [ ] **Step 7: 테스트 전용 키로 빌드한다 — 서명 검사가 통과해야 한다**
+
+```bash
+cd /c/BeanProfile
+export KEYTOOL="C:/Program Files/Android/Android Studio/jbr/bin/keytool.exe"
+S="C:/Users/hyunw/AppData/Local/Temp/claude/C--BeanProfile/b0fc6519-49e9-4f0e-9531-634e4e90b937/scratchpad/android-t1"
+"$KEYTOOL" -genkeypair -keystore "$S/test-upload.p12" -storetype PKCS12 \
+  -keyalg RSA -keysize 2048 -validity 1 -alias upload \
+  -dname "CN=BeanProfile Test" -storepass test-only-pass -noprompt
+cat > android/key.properties <<EOF
+storeFile=$S/test-upload.p12
+storePassword=test-only-pass
+keyPassword=test-only-pass
+keyAlias=upload
+EOF
+flutter build appbundle --release 2>&1 | tail -3
+python scripts/verify_aab_signature.py build/app/outputs/bundle/release/app-release.aab; echo "exit=$?"
+```
+
+Expected: 빌드 성공, `업로드 키 서명 확인:` 다음 줄 `  CN=BeanProfile Test`, `exit=0`.
+
+- [ ] **Step 8: 테스트 키를 지우고 흔적이 없는지 확인한다** (Step 7이 실패해도 반드시 실행)
+
+```bash
+cd /c/BeanProfile
+S="C:/Users/hyunw/AppData/Local/Temp/claude/C--BeanProfile/b0fc6519-49e9-4f0e-9531-634e4e90b937/scratchpad/android-t1"
+rm -f android/key.properties
+rm -rf "$S"
+test ! -e android/key.properties && echo "key.properties gone"
+git check-ignore -v android/key.properties upload-keystore.p12
+git status --short
+```
+
+Expected: `key.properties gone`. `check-ignore`가 두 경로 모두 `.gitignore` 규칙(`**/android/key.properties`, `*.p12`)을 찍는다. `git status`에는 이 태스크의 네 파일과 기존 untracked `AGENTS.md`·`data/`만 보인다. `.p12`나 `key.properties`가 보이면 커밋하지 말고 멈춘다.
+
+- [ ] **Step 9: Dart 무수정 확인 · 분석 · 테스트**
+
+```bash
+cd /c/BeanProfile
+git diff --stat main -- lib/ test/ pubspec.yaml pubspec.lock
+flutter analyze
+flutter test 2>&1 | tail -3
+```
+
+Expected: 첫 명령 출력 없음, `No issues found!`, 마지막 줄에 `+455` 와 `All tests passed!`.
+
+- [ ] **Step 10: 커밋**
+
+```bash
+cd /c/BeanProfile
+git add android/app/proguard-rules.pro android/app/build.gradle.kts android/app/src/main/AndroidManifest.xml scripts/verify_aab_signature.py
+git commit -m "$(cat <<'EOF'
+build(android): sign release with the Play upload key and fix R8
+
+The release build failed in R8 because the ML Kit plugin references the
+Chinese, Devanagari and Japanese option classes while the app ships only
+the Korean model; -dontwarn those three packages. Release now signs with
+android/key.properties when present and falls back to the debug key so
+local release runs keep working; scripts/verify_aab_signature.py rejects
+debug-signed or unsigned bundles so the fallback cannot reach Play.
+The launcher label becomes BeanProfile, matching iOS.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01RSnfDi7WDeKq9sg1LWJLec
+EOF
+)"
+```
+
+---
+
+## Task 2: release 스모크 — 공유 기대값 · 진입점 · 판정 스크립트 · 로컬 에뮬레이터
+
+**Files:**
+- Create: `integration_test/support/bundled_card_checks.dart`
+- Modify: `integration_test/ocr_probe_test.dart` (머리 주석 1줄, import 정리, 기대값 묶음 5곳 → 공유 함수 호출)
+- Create: `integration_test/release_smoke.dart`
+- Create: `scripts/release_smoke.py`
+
+**Interfaces:**
+- Consumes (Task 1): release 빌드가 R8을 통과한다. `key.properties`가 없으면 debug 키로 서명되므로 로컬 스모크 APK는 debug 서명이다.
+- Produces (Task 3·5가 쓴다):
+  - 공유 함수 5개 — 반환 `List<String>`(빈 목록 = 통과): `koreanCardFailures(List<OcrLine> lines, OcrDraft draft)` · `originalCardFailures(List<OcrLine> lines, OcrDraft draft)` · `brightBlendFailures(OcrDraft draft)` · `darkBlendFailures(OcrPipelineResult result)` · `badQualityFailures(OcrPipelineResult result)`
+  - 스모크 빌드 명령 — `flutter build apk --release --target-platform android-x64 -t integration_test/release_smoke.dart --dart-define=ENABLE_OCR_DIAGNOSTICS=false` → `build/app/outputs/flutter-apk/app-release.apk`
+  - logcat 규약(태그 `flutter`) — 검사마다 `BEANPROFILE_SMOKE CHECK <이름> PASS` 또는 `BEANPROFILE_SMOKE CHECK <이름> FAIL <사유 | 사유>`, 끝에 `BEANPROFILE_SMOKE DONE <통과>/<전체>`. 진입점 자체가 죽으면 `BEANPROFILE_SMOKE FATAL <오류>`. 검사 이름 6개: `ocr_card_ko` · `ocr_card_orig` · `ocr_blend_en` · `ocr_dark_blend_en` · `ocr_bad_quality_en` · `sqlite`
+  - `python scripts/release_smoke.py [--apk 경로] [--serial emulator-NNNN] [--timeout 초]` — 기본 APK `build/app/outputs/flutter-apk/app-release.apk`, 기본 시간 240초. exit 0 전부 통과 · 1 실패·크래시·시간 초과·설치 실패 · 2 사용법·환경 오류(adb 없음 · 에뮬레이터 없음 · 실기기 serial · APK 없음 · logcat 못 비움). 빌드는 하지 않는다.
+
+- [ ] **Step 1: 에뮬레이터를 띄운다**
+
+```bash
+cd /c/BeanProfile
+ADB="$LOCALAPPDATA/Android/Sdk/platform-tools/adb.exe"
+"$ADB" devices
+"$LOCALAPPDATA/Android/Sdk/emulator/emulator.exe" -avd flutter_emulator -no-snapshot-save -no-boot-anim
+```
+
+마지막 명령은 끝나지 않는 프로세스다 — **백그라운드로** 띄운다(이미 `emulator-5554`가 떠 있으면 건너뛴다). 그다음 부팅이 끝날 때까지 기다린다(셸이 foreground 대기를 막으면 백그라운드로 돌린다):
+
+```bash
+"$ADB" -s emulator-5554 wait-for-device shell 'while [ "$(getprop sys.boot_completed)" != 1 ]; do sleep 2; done; echo booted'
+"$ADB" -s emulator-5554 shell getprop ro.boot.qemu
+"$ADB" -s emulator-5554 shell getprop ro.kernel.qemu
+```
+
+Expected: `booted`, 그리고 두 `getprop` 중 하나 이상이 `1`. serial이 `emulator-5554`가 아니면 이후 명령의 serial을 `devices` 출력대로 바꾼다.
+
+- [ ] **Step 2: 공유 기대값 모듈을 쓴다**
+
+`integration_test/support/bundled_card_checks.dart` — 기대값은 현재 `ocr_probe_test.dart`의 `expect`들과 하나하나 같다:
+
+```dart
+// 번들 테스트 카드 5장(assets/test/)의 기대값 — 이 파일 한 곳에만 둔다.
+// debug 프로브(ocr_probe_test.dart)와 release 스모크(release_smoke.dart)가 같은 기대값으로
+// 검사해야 "release 빌드에서만 깨짐"을 가려낼 수 있다. release 스모크는 flutter_test 없이
+// 돌므로 expect 대신 실패 사유 목록을 돌려준다 — 빈 목록이면 통과.
+import 'package:beanprofile/data/enums.dart';
+import 'package:beanprofile/features/beans/ocr/ocr_draft.dart';
+import 'package:beanprofile/features/beans/ocr/ocr_pipeline.dart';
+import 'package:beanprofile/services/ocr_service.dart';
+import 'package:flutter/foundation.dart';
+
+List<String> _eq(String field, Object? actual, Object? expected) =>
+    actual == expected ? const [] : ['$field: $actual != $expected'];
+
+List<String> _eqList(
+  String field,
+  List<Object?> actual,
+  List<Object?> expected,
+) =>
+    listEquals(actual, expected) ? const [] : ['$field: $actual != $expected'];
+
+/// 콜론 라벨 카드(ocr_card_ko.png) — 파서가 8개 필드를 모두 채운다.
+List<String> koreanCardFailures(List<OcrLine> lines, OcrDraft draft) {
+  final components = draft.components;
+  final component = components.length == 1 ? components.single : null;
+  return [
+    if (lines.isEmpty) 'lines: empty',
+    if (component == null) 'components: ${components.length} != 1',
+    ..._eq('name', draft.name, '예가체프 코체레'),
+    ..._eq('roaster', draft.roaster, '아우어사이드'),
+    if (component != null) ...[
+      ..._eq('country', component.country, 'Ethiopia'),
+      ..._eq('region', component.region, '예가체프 코체레'),
+      ..._eq('process', component.process, Process.washed),
+    ],
+    ..._eq('roastLevel', draft.roastLevel, RoastLevel.lightMedium),
+    ..._eq('roastDate', draft.roastDate, DateTime(2026, 7, 10)),
+    ..._eqList('cupNotes', draft.cupNotes, const ['블루베리', '자스민', '홍차']),
+  ];
+}
+
+/// 콜론 없는 2열 카드(ocr_card_orig.png) — 지역·컵노트·제품명·로스터리는 좌표 기반으로 채운다.
+/// 로스터리는 자간 오독('베이스캠프 로스 터스')을 허용한다.
+List<String> originalCardFailures(List<OcrLine> lines, OcrDraft draft) {
+  final components = draft.components;
+  final component = components.length == 1 ? components.single : null;
+  final roaster = draft.roaster;
+  return [
+    if (lines.isEmpty) 'lines: empty',
+    if (component == null) 'components: ${components.length} != 1',
+    if (component != null) ...[
+      ..._eq('country', component.country, 'Colombia'),
+      ..._eq('process', component.process, Process.natural),
+      ..._eq('region', component.region, '후일라'),
+    ],
+    ..._eq('roastLevel', draft.roastLevel, RoastLevel.medium),
+    ..._eq('roastDate', draft.roastDate, DateTime(2026, 7, 5)),
+    ..._eqList('cupNotes', draft.cupNotes, const ['딸기', '복숭아', '레드와인']),
+    ..._eq('name', draft.name, '콜롬비아 핑크버번 내추럴'),
+    if (roaster == null || !roaster.contains('베이스캠프'))
+      'roaster: $roaster !~ 베이스캠프',
+  ];
+}
+
+/// 밝은 블렌드 카드(ocr_blend_en.png) — 블렌드 확정, 성분 둘(60/40).
+List<String> brightBlendFailures(OcrDraft draft) => [
+      ..._eq('typeDecision', draft.typeDecision, OcrTypeDecision.certainBlend),
+      ..._eqList(
+        'countries',
+        draft.components.map((c) => c.country).toList(),
+        const ['Brazil', 'Ethiopia'],
+      ),
+      ..._eqList(
+        'ratios',
+        draft.components.map((c) => c.ratioPercent).toList(),
+        const [60, 40],
+      ),
+    ];
+
+/// 어두운 블렌드 카드(ocr_dark_blend_en.png) — 보정본 후보가 골라져 필수 데이터를 되찾는다.
+List<String> darkBlendFailures(OcrPipelineResult result) {
+  final withCountry =
+      result.draft.components.where((c) => c.country != null).length;
+  return [
+    ..._eq('usedEnhanced', result.usedEnhanced, true),
+    if (result.draft.name == null) 'name: null',
+    ..._eq('componentsWithCountry', withCountry, 2),
+  ];
+}
+
+/// 흐림·반사 카드(ocr_bad_quality_en.png) — 막지 않는 품질 경고가 뜬다.
+List<String> badQualityFailures(OcrPipelineResult result) => [
+      ..._eq('quality.hasIssues', result.quality.hasIssues, true),
+      ..._eq('shouldWarnQuality', result.shouldWarnQuality, true),
+    ];
+```
+
+- [ ] **Step 3: 프로브의 기대값을 공유 모듈로 옮긴다**
+
+`integration_test/ocr_probe_test.dart`에 아래 여섯 군데만 바꾼다. `print` 출력 줄과 `_copyAssetToTemp`는 그대로다.
+
+(가) 머리와 import. 기존:
+
+```dart
+// OCR 프로브: 실제 ML Kit가 테스트 카드를 뭐라고 읽는지 + 파서 결과를 출력한다.
+// 실행: flutter test integration_test/ocr_probe_test.dart -d <android-emulator>
+import 'dart:io';
+
+import 'package:beanprofile/data/enums.dart';
+import 'package:beanprofile/features/beans/ocr/ocr_draft.dart';
+import 'package:beanprofile/features/beans/ocr/ocr_parser.dart';
+```
+
+새:
+
+```dart
+// OCR 프로브: 실제 ML Kit가 테스트 카드를 뭐라고 읽는지 + 파서 결과를 출력한다.
+// 실행: flutter test integration_test/ocr_probe_test.dart -d <android-emulator>
+// 기대값은 support/bundled_card_checks.dart 한 곳에 있다 — release 스모크와 공유한다.
+import 'dart:io';
+
+import 'package:beanprofile/features/beans/ocr/ocr_parser.dart';
+```
+
+그리고 `import 'package:path_provider/path_provider.dart';` 다음에 빈 줄 하나와 이 줄을 더한다:
+
+```dart
+import 'support/bundled_card_checks.dart';
+```
+
+(나) 첫 테스트. 기존:
+
+```dart
+    // 실제 ML Kit OCR → 파서가 8개 필드를 모두 채우는지(회귀 가드).
+    expect(lines, isNotEmpty);
+    expect(d.name, '예가체프 코체레');
+    expect(d.roaster, '아우어사이드');
+    expect(component.country, 'Ethiopia');
+    expect(component.region, '예가체프 코체레');
+    expect(component.process, Process.washed);
+    expect(d.roastLevel, RoastLevel.lightMedium);
+    expect(d.roastDate, DateTime(2026, 7, 10));
+    expect(d.cupNotes, ['블루베리', '자스민', '홍차']);
+```
+
+새:
+
+```dart
+    // 실제 ML Kit OCR → 파서가 8개 필드를 모두 채우는지(회귀 가드).
+    expect(koreanCardFailures(lines, d), isEmpty);
+```
+
+(다) 둘째 테스트. 기존:
+
+```dart
+    // 실제 ML Kit OCR → 스타일 카드(콜론 없음) 8개 필드(그중 지역·컵노트·제품명·로스터리가 좌표 기반).
+    expect(lines, isNotEmpty);
+    expect(component.country, 'Colombia');
+    expect(component.process, Process.natural);
+    expect(d.roastLevel, RoastLevel.medium);
+    expect(d.roastDate, DateTime(2026, 7, 5));
+    expect(component.region, '후일라');
+    expect(d.cupNotes, ['딸기', '복숭아', '레드와인']);
+    expect(d.name, '콜롬비아 핑크버번 내추럴');
+    expect(d.roaster, contains('베이스캠프')); // '베이스캠프 로스 터스'(자간 오독 허용)
+```
+
+새:
+
+```dart
+    // 실제 ML Kit OCR → 스타일 카드(콜론 없음) 8개 필드(그중 지역·컵노트·제품명·로스터리가 좌표 기반).
+    expect(originalCardFailures(lines, d), isEmpty);
+```
+
+(라) 셋째 테스트. 기존:
+
+```dart
+    expect(draft.typeDecision, OcrTypeDecision.certainBlend);
+    expect(draft.components, hasLength(2));
+    expect(draft.components.map((c) => c.country), ['Brazil', 'Ethiopia']);
+    expect(draft.components.map((c) => c.ratioPercent), [60, 40]);
+```
+
+새:
+
+```dart
+    expect(brightBlendFailures(draft), isEmpty);
+```
+
+(마) 넷째 테스트. 기존:
+
+```dart
+    expect(result.usedEnhanced, isTrue);
+    expect(result.draft.name, isNotNull);
+    expect(
+      result.draft.components.where((c) => c.country != null),
+      hasLength(2),
+    );
+```
+
+새:
+
+```dart
+    expect(darkBlendFailures(result), isEmpty);
+```
+
+(바) 다섯째 테스트. 기존:
+
+```dart
+    expect(result.quality.hasIssues, isTrue);
+    expect(result.shouldWarnQuality, isTrue);
+```
+
+새:
+
+```dart
+    expect(badQualityFailures(result), isEmpty);
+```
+
+첫째·둘째 테스트의 `final component = d.components.single;`은 `print`가 계속 쓰므로 남긴다.
+
+- [ ] **Step 4: 프로브가 debug에서 그대로 통과하고, 공유 기대값이 실제로 판정하는지 본다**
+
+```bash
+cd /c/BeanProfile
+flutter analyze integration_test/
+flutter test integration_test/ocr_probe_test.dart -d emulator-5554 2>&1 | tail -3
+S="C:/Users/hyunw/AppData/Local/Temp/claude/C--BeanProfile/b0fc6519-49e9-4f0e-9531-634e4e90b937/scratchpad/android-t2"
+mkdir -p "$S"
+cp integration_test/support/bundled_card_checks.dart "$S/checks.bak"
+sed -i "s/'아우어사이드'/'아우어사이드X'/" integration_test/support/bundled_card_checks.dart
+flutter test integration_test/ocr_probe_test.dart -d emulator-5554 2>&1 | grep -E "아우어사이드X|Some tests failed|All tests passed"
+cp "$S/checks.bak" integration_test/support/bundled_card_checks.dart
+cmp "$S/checks.bak" integration_test/support/bundled_card_checks.dart && echo restored
+```
+
+Expected: `No issues found!`. 첫 프로브 실행 마지막에 `All tests passed!`(5개). 변이 실행은 `roaster: 아우어사이드 != 아우어사이드X`가 들어간 줄과 `Some tests failed`. 마지막 `restored`. 변이에서 통과하면 프로브가 공유 기대값을 쓰지 않는 것이다 — 멈추고 고친다.
+
+- [ ] **Step 5: release 스모크 진입점을 쓴다**
+
+`integration_test/release_smoke.dart` — 각 카드는 프로브와 같은 호출(카드 1–3은 `recognize` → `parseOcr`, 4–5는 파이프라인)로 읽는다:
+
+```dart
+// release 스모크 — R8을 거친 release 빌드에서 ML Kit OCR·파서·sqlite가 실제로 도는지 확인하는
+// 테스트 전용 진입점이다. flutter drive는 release 모드를 거부하고 profile 빌드는 R8을 돌리지
+// 않으므로, 배포 빌드와 같은 Gradle·R8 설정에 진입점만 이 파일로 바꾼 APK를 에뮬레이터에서 돌린다.
+// 기대값은 debug 프로브와 공유한다(support/bundled_card_checks.dart).
+//
+// 빌드: flutter build apk --release --target-platform android-x64 \
+//         -t integration_test/release_smoke.dart --dart-define=ENABLE_OCR_DIAGNOSTICS=false
+// 판정: python scripts/release_smoke.py (docs/deployment.md §6-H)
+import 'dart:io';
+
+import 'package:beanprofile/data/database.dart';
+import 'package:beanprofile/data/enums.dart';
+import 'package:beanprofile/features/beans/ocr/ocr_parser.dart';
+import 'package:beanprofile/features/beans/ocr/ocr_pipeline.dart';
+import 'package:beanprofile/services/image_quality_analyzer.dart';
+import 'package:beanprofile/services/ocr_image_preprocessor.dart';
+import 'package:beanprofile/services/ocr_service.dart';
+import 'package:drift/native.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
+import 'package:path_provider/path_provider.dart';
+
+import 'support/bundled_card_checks.dart';
+
+/// scripts/release_smoke.py는 logcat에서 이 머리말로 시작하는 줄만 읽는다.
+const _marker = 'BEANPROFILE_SMOKE';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await _runChecks();
+  } catch (error) {
+    // ignore: avoid_print
+    print('$_marker FATAL $error');
+  }
+}
+
+Future<void> _runChecks() async {
+  final temp = await getTemporaryDirectory();
+  final work = await Directory('${temp.path}/beanprofile_release_smoke')
+      .create(recursive: true);
+
+  Future<String> asset(String path) async {
+    final bytes = await rootBundle.load(path);
+    final file = File('${work.path}/${path.split('/').last}');
+    await file.writeAsBytes(bytes.buffer.asUint8List());
+    return file.path;
+  }
+
+  final ocr = MlkitOcrService();
+  final pipeline = DefaultOcrPipeline(
+    ocr: ocr,
+    qualityAnalyzer: DartImageQualityAnalyzer(),
+    preprocessor: DartOcrImagePreprocessor(),
+  );
+
+  final checks = <String, Future<List<String>> Function()>{
+    'ocr_card_ko': () async {
+      final lines =
+          await ocr.recognize(await asset('assets/test/ocr_card_ko.png'));
+      return koreanCardFailures(lines, parseOcr(lines));
+    },
+    'ocr_card_orig': () async {
+      final lines =
+          await ocr.recognize(await asset('assets/test/ocr_card_orig.png'));
+      return originalCardFailures(lines, parseOcr(lines));
+    },
+    'ocr_blend_en': () async {
+      final lines =
+          await ocr.recognize(await asset('assets/test/ocr_blend_en.png'));
+      return brightBlendFailures(parseOcr(lines));
+    },
+    'ocr_dark_blend_en': () async => darkBlendFailures(
+          await pipeline
+              .analyze(await asset('assets/test/ocr_dark_blend_en.png')),
+        ),
+    'ocr_bad_quality_en': () async => badQualityFailures(
+          await pipeline
+              .analyze(await asset('assets/test/ocr_bad_quality_en.png')),
+        ),
+    'sqlite': () => _sqliteFailures(work),
+  };
+
+  var passed = 0;
+  for (final entry in checks.entries) {
+    List<String> failures;
+    try {
+      failures = await entry.value();
+    } catch (error) {
+      failures = ['exception: $error'];
+    }
+    if (failures.isEmpty) passed++;
+    final verdict = failures.isEmpty ? 'PASS' : 'FAIL ${failures.join(' | ')}';
+    // ignore: avoid_print
+    print('$_marker CHECK ${entry.key} $verdict');
+  }
+  // ignore: avoid_print
+  print('$_marker DONE $passed/${checks.length}');
+  await work.delete(recursive: true);
+}
+
+/// 배포 앱처럼 백그라운드 isolate에서 파일 DB를 열어 쓰고 읽는다(drift_flutter도 이 방식이다).
+/// 임시 폴더의 별도 파일이라 앱의 실제 DB(에뮬레이터의 개발용 기록)는 건드리지 않는다.
+Future<List<String>> _sqliteFailures(Directory work) async {
+  final db = AppDatabase.forTesting(
+    NativeDatabase.createInBackground(File('${work.path}/smoke.sqlite')),
+  );
+  try {
+    final now = DateTime(2026, 10, 5);
+    final beanId = await db.into(db.beans).insert(
+          BeansCompanion.insert(
+            name: 'release smoke',
+            type: BeanType.singleOrigin,
+            createdAt: now,
+          ),
+        );
+    await db.into(db.tastings).insert(
+          TastingsCompanion.insert(
+            beanId: beanId,
+            date: now,
+            acidity: 3,
+            sweetness: 4,
+            body: 3,
+            bitterness: 2,
+            overall: 4,
+            createdAt: now,
+          ),
+        );
+    final beans = await db.select(db.beans).get();
+    final tastings = await db.select(db.tastings).get();
+    return [
+      if (beans.length != 1 || beans.single.name != 'release smoke')
+        'beans: ${beans.map((b) => b.name).toList()}',
+      if (tastings.length != 1 || tastings.single.beanId != beanId)
+        'tastings: ${tastings.map((t) => t.beanId).toList()}',
+    ];
+  } finally {
+    await db.close();
+  }
+}
+```
+
+- [ ] **Step 6: 판정 스크립트를 쓴다**
+
+`scripts/release_smoke.py`:
+
+```python
+"""release 스모크 — 진입점만 바꾼 release APK를 에뮬레이터에서 돌려 판정한다.
+
+flutter drive는 release 모드를 거부하고 profile 빌드는 R8을 돌리지 않는다. 그래서 배포 빌드와
+같은 Gradle·R8 설정에 진입점만 integration_test/release_smoke.dart로 바꾼 APK를 설치해 실행하고,
+앱이 logcat에 남기는 BEANPROFILE_SMOKE 줄을 읽어 판정한다(docs/deployment.md §6-H).
+
+실기기에는 설치하지 않는다. 스모크 APK는 배포 앱과 applicationId가 같아서, Play로 설치한 폰에서는
+서명이 충돌하고 그걸 풀려고 앱을 지우면 시음 기록이 사라진다(docs/deployment.md §6-A).
+
+먼저 빌드한다:
+  flutter build apk --release --target-platform android-x64 \
+    -t integration_test/release_smoke.dart --dart-define=ENABLE_OCR_DIAGNOSTICS=false
+사용: python scripts/release_smoke.py [--apk 경로] [--serial emulator-5554] [--timeout 초]
+종료 코드: 0 전부 통과 · 1 실패·크래시·시간 초과·설치 실패 · 2 사용법·환경 오류
+"""
+
+import argparse
+import os
+import pathlib
+import shutil
+import subprocess
+import sys
+import time
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
+PACKAGE = "com.hyunwook.beanprofile"
+ACTIVITY = f"{PACKAGE}/.MainActivity"
+MARKER = "BEANPROFILE_SMOKE"
+DEFAULT_APK = "build/app/outputs/flutter-apk/app-release.apk"
+
+
+def find_adb():
+    explicit = os.environ.get("ADB")
+    if explicit:
+        return explicit
+    on_path = shutil.which("adb")
+    if on_path:
+        return on_path
+    roots = [os.environ.get("ANDROID_HOME"), os.environ.get("ANDROID_SDK_ROOT")]
+    local = os.environ.get("LOCALAPPDATA")
+    if local:
+        roots.append(str(pathlib.Path(local) / "Android" / "Sdk"))
+    for root in filter(None, roots):
+        for name in ("adb", "adb.exe"):
+            candidate = pathlib.Path(root) / "platform-tools" / name
+            if candidate.is_file():
+                return str(candidate)
+    return None
+
+
+def run_adb(adb, serial, *args, timeout=120):
+    command = [adb] + (["-s", serial] if serial else []) + list(args)
+    return subprocess.run(
+        command,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=timeout,
+    )
+
+
+def pick_emulator(adb, requested):
+    """에뮬레이터 serial 하나를 고른다. 고르지 못하면 (None, 이유)."""
+    # serial 모양으로 먼저 거른다 — 실기기에는 adb 명령을 하나도 보내지 않는다.
+    if requested and not requested.startswith("emulator-"):
+        return None, f"{requested}는 에뮬레이터가 아니다 — 실기기에는 설치하지 않는다"
+    listed = run_adb(adb, None, "devices").stdout.splitlines()[1:]
+    online = [line.split("\t")[0] for line in listed if line.strip().endswith("\tdevice")]
+    emulators = [serial for serial in online if serial.startswith("emulator-")]
+    if requested:
+        if requested not in online:
+            return None, f"{requested}가 연결돼 있지 않다 (연결됨: {', '.join(online) or '없음'})"
+        serial = requested
+    elif len(emulators) == 1:
+        serial = emulators[0]
+    else:
+        return None, (
+            "에뮬레이터를 하나만 띄우거나 --serial로 고른다 "
+            f"(연결된 에뮬레이터: {', '.join(emulators) or '없음'})"
+        )
+    props = {
+        run_adb(adb, serial, "shell", "getprop", key).stdout.strip()
+        for key in ("ro.kernel.qemu", "ro.boot.qemu")
+    }
+    if "1" not in props:
+        return None, f"{serial}가 에뮬레이터로 확인되지 않는다(ro.*.qemu) — 실기기에는 설치하지 않는다"
+    return serial, None
+
+
+def smoke_lines(adb, serial):
+    log = run_adb(adb, serial, "logcat", "-d", "-v", "raw", "-s", "flutter:I").stdout
+    return [line.strip() for line in log.splitlines() if line.strip().startswith(MARKER)]
+
+
+def word(line, index):
+    parts = line.split()
+    return parts[index] if len(parts) > index else ""
+
+
+def main(argv):
+    parser = argparse.ArgumentParser(description="release 스모크 APK를 에뮬레이터에서 돌려 판정한다")
+    parser.add_argument("--apk", default=DEFAULT_APK)
+    parser.add_argument("--serial")
+    parser.add_argument("--timeout", type=int, default=240)
+    args = parser.parse_args(argv[1:])
+
+    adb = find_adb()
+    if adb is None:
+        print("::error::adb를 찾지 못했다 — ADB·PATH·ANDROID_HOME을 확인한다")
+        return 2
+    serial, reason = pick_emulator(adb, args.serial)
+    if serial is None:
+        print(f"::error::{reason}")
+        return 2
+    apk = pathlib.Path(args.apk)
+    if not apk.is_file():
+        print(f"::error::{apk}가 없다 — 먼저 스모크 진입점으로 빌드한다(-t integration_test/release_smoke.dart)")
+        return 2
+
+    install = run_adb(adb, serial, "install", "-r", str(apk), timeout=300)
+    output = (install.stdout + install.stderr).strip()
+    if install.returncode != 0 or "Success" not in output:
+        print(f"::error::설치 실패 — {output}")
+        if "INSTALL_FAILED_UPDATE_INCOMPATIBLE" in output:
+            print(
+                "에뮬레이터에 서명이 다른 같은 앱이 있다. 에뮬레이터라면 "
+                f"`adb -s {serial} uninstall {PACKAGE}` 뒤 다시 실행한다."
+            )
+        return 1
+
+    run_adb(adb, serial, "shell", "am", "force-stop", PACKAGE)
+    run_adb(adb, serial, "logcat", "-c")
+    # 지난 실행의 DONE 줄이 남아 있으면 거짓 통과가 된다 — 비워졌는지 확인하고 시작한다.
+    if smoke_lines(adb, serial):
+        print("::error::logcat을 비우지 못했다 — 지난 실행의 결과가 남아 있다")
+        return 2
+    run_adb(adb, serial, "shell", "am", "start", "-W", "-n", ACTIVITY)
+
+    deadline = time.monotonic() + args.timeout
+    try:
+        while True:
+            lines = smoke_lines(adb, serial)
+            if any(word(line, 1) in ("DONE", "FATAL") for line in lines):
+                break
+            if not run_adb(adb, serial, "shell", "pidof", PACKAGE).stdout.strip():
+                print("::error::결과 전에 앱 프로세스가 끝났다")
+                for line in lines:
+                    print(f"  {line}")
+                crash = run_adb(adb, serial, "logcat", "-d", "-b", "crash").stdout.strip()
+                print(crash[-3000:] or "(crash 버퍼 비어 있음)")
+                return 1
+            if time.monotonic() > deadline:
+                print(f"::error::시간 초과 — {args.timeout}초 안에 {MARKER} DONE이 없다")
+                for line in lines:
+                    print(f"  {line}")
+                return 1
+            time.sleep(2)
+    finally:
+        run_adb(adb, serial, "shell", "am", "force-stop", PACKAGE)
+
+    for line in lines:
+        print(line)
+    done = next((line for line in lines if word(line, 1) == "DONE"), None)
+    failed = [line for line in lines if word(line, 1) == "FATAL" or word(line, 3) == "FAIL"]
+    score = word(done, 2) if done else ""
+    passed, _, total = score.partition("/")
+    if failed or done is None or passed != total:
+        print("::error::release 스모크 실패")
+        return 1
+    print(f"release 스모크 통과 — {score}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
+```
+
+- [ ] **Step 7: 스크립트가 실기기 serial과 빠진 APK를 거부하는지 본다 (Review Focus 1)**
+
+```bash
+cd /c/BeanProfile
+S="C:/Users/hyunw/AppData/Local/Temp/claude/C--BeanProfile/b0fc6519-49e9-4f0e-9531-634e4e90b937/scratchpad/android-t2"
+python scripts/release_smoke.py --serial R5CT21ABCDE; echo "exit=$?"
+python scripts/release_smoke.py --apk "$S/missing.apk"; echo "exit=$?"
+```
+
+Expected: 1) `::error::R5CT21ABCDE는 에뮬레이터가 아니다 — 실기기에는 설치하지 않는다` / `exit=2` 2) `::error::…missing.apk가 없다 …` / `exit=2`.
+
+- [ ] **Step 8: 스모크 APK를 빌드해 돌린다 (GREEN)**
+
+```bash
+cd /c/BeanProfile
+test ! -e android/key.properties && echo "no key.properties"
+flutter build apk --release --target-platform android-x64 \
+  -t integration_test/release_smoke.dart --dart-define=ENABLE_OCR_DIAGNOSTICS=false 2>&1 | tail -3
+python scripts/release_smoke.py; echo "exit=$?"
+```
+
+Expected: 빌드 성공(`Built build…app-release.apk`). `BEANPROFILE_SMOKE CHECK … PASS` 6줄, `BEANPROFILE_SMOKE DONE 6/6`, `release 스모크 통과 — 6/6`, `exit=0`.
+
+`시간 초과`인데 출력된 줄이 하나도 없으면 `"$ADB" -s emulator-5554 logcat -d -v raw -s flutter:I`로 확인한다. release 빌드의 `print`가 logcat에 안 나온다면 설계 전제가 깨진 것이니 멈추고 보고한다.
+
+- [ ] **Step 9: 변이 셋 — 판정이 눈멀지 않았는지 본다 (Review Focus 3)**
+
+각 변이는 사본을 떠 두고 → 바꾸고 → 다시 빌드해 돌리고 → 되돌린 뒤 `cmp`로 원상복구를 확인한다. 빌드 명령은 Step 8과 같다(`BUILD`로 줄여 쓴다).
+
+```bash
+cd /c/BeanProfile
+S="C:/Users/hyunw/AppData/Local/Temp/claude/C--BeanProfile/b0fc6519-49e9-4f0e-9531-634e4e90b937/scratchpad/android-t2"
+BUILD() { flutter build apk --release --target-platform android-x64 -t integration_test/release_smoke.dart --dart-define=ENABLE_OCR_DIAGNOSTICS=false 2>&1 | tail -1; }
+
+# M1 기대값 틀림
+cp integration_test/support/bundled_card_checks.dart "$S/checks.bak"
+sed -i "s/'아우어사이드'/'아우어사이드X'/" integration_test/support/bundled_card_checks.dart
+BUILD; python scripts/release_smoke.py; echo "exit=$?"
+cp "$S/checks.bak" integration_test/support/bundled_card_checks.dart
+cmp "$S/checks.bak" integration_test/support/bundled_card_checks.dart && echo "M1 restored"
+
+# M2 결과 전에 프로세스 종료
+cp integration_test/release_smoke.dart "$S/smoke.bak"
+sed -i 's/^  WidgetsFlutterBinding.ensureInitialized();$/  WidgetsFlutterBinding.ensureInitialized();\n  exit(3);/' integration_test/release_smoke.dart
+grep -c "exit(3);" integration_test/release_smoke.dart
+BUILD; python scripts/release_smoke.py --timeout 60; echo "exit=$?"
+cp "$S/smoke.bak" integration_test/release_smoke.dart
+cmp "$S/smoke.bak" integration_test/release_smoke.dart && echo "M2 restored"
+
+# M3 멈춤
+sed -i 's/^  WidgetsFlutterBinding.ensureInitialized();$/  WidgetsFlutterBinding.ensureInitialized();\n  await Future<void>.delayed(const Duration(days: 1));/' integration_test/release_smoke.dart
+grep -c "Duration(days: 1)" integration_test/release_smoke.dart
+BUILD; python scripts/release_smoke.py --timeout 45; echo "exit=$?"
+cp "$S/smoke.bak" integration_test/release_smoke.dart
+cmp "$S/smoke.bak" integration_test/release_smoke.dart && echo "M3 restored"
+```
+
+Expected:
+
+1. M1 — `CHECK ocr_card_ko FAIL roaster: 아우어사이드 != 아우어사이드X`, `DONE 5/6`, `::error::release 스모크 실패`, `exit=1`, `M1 restored`
+2. M2 — `grep`이 `1`, `::error::결과 전에 앱 프로세스가 끝났다`, `exit=1`, `M2 restored`
+3. M3 — `grep`이 `1`, `::error::시간 초과 — 45초 안에 BEANPROFILE_SMOKE DONE이 없다`, `exit=1`, `M3 restored`
+
+하나라도 `exit=0`이면 그 실패 경로를 판정이 못 보는 것이다 — 스크립트를 고치고 그 변이를 다시 돌린다.
+
+- [ ] **Step 10: 원상태로 다시 빌드해 통과를 확인하고 에뮬레이터를 끈다**
+
+```bash
+cd /c/BeanProfile
+flutter build apk --release --target-platform android-x64 \
+  -t integration_test/release_smoke.dart --dart-define=ENABLE_OCR_DIAGNOSTICS=false 2>&1 | tail -1
+python scripts/release_smoke.py; echo "exit=$?"
+"$LOCALAPPDATA/Android/Sdk/platform-tools/adb.exe" -s emulator-5554 emu kill
+rm -rf "C:/Users/hyunw/AppData/Local/Temp/claude/C--BeanProfile/b0fc6519-49e9-4f0e-9531-634e4e90b937/scratchpad/android-t2"
+```
+
+Expected: `DONE 6/6`, `exit=0`. 에뮬레이터가 꺼진다(`adb devices`에서 사라짐).
+
+- [ ] **Step 11: `lib/` 무수정 · 분석 · 테스트**
+
+```bash
+cd /c/BeanProfile
+git diff --stat main -- lib/ test/ pubspec.yaml pubspec.lock
+flutter analyze
+flutter test 2>&1 | tail -3
+git status --short
+```
+
+Expected: 첫 명령 출력 없음, `No issues found!`, `+455`와 `All tests passed!`. `git status`에는 이 태스크의 네 파일(`M integration_test/ocr_probe_test.dart`, 새 파일 셋)과 기존 untracked `AGENTS.md`·`data/`만.
+
+- [ ] **Step 12: 커밋**
+
+```bash
+cd /c/BeanProfile
+git add integration_test/support/bundled_card_checks.dart integration_test/ocr_probe_test.dart integration_test/release_smoke.dart scripts/release_smoke.py
+git commit -m "$(cat <<'EOF'
+test(android): add a release smoke that runs the R8 build on an emulator
+
+flutter drive refuses release mode and profile builds skip R8, so no test
+saw the build that ships. release_smoke.dart is a test-only entry point
+compiled into a real release APK: it runs ML Kit on the five bundled
+cards and opens drift on a background isolate, logging one line per
+check. scripts/release_smoke.py installs it on an emulator, refuses real
+devices, and fails on a mismatch, a dead process or a timeout. The card
+expectations move to a shared module so the debug probe and the release
+smoke cannot drift apart.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01RSnfDi7WDeKq9sg1LWJLec
+EOF
+)"
+```
+
+---
+
+## Task 3: CI — `android-gate` · `android-smoke` · `android` 잡
+
+**Files:**
+- Modify: `.github/workflows/release.yml` (머리 주석 3–9행, 입력 설명 17행, 파일 끝에 잡 셋 추가)
+
+**Interfaces:**
+- Consumes: Task 1 — `android/key.properties`의 키 이름 4개, `scripts/verify_aab_signature.py`, AAB·매핑 경로. Task 2 — 스모크 빌드 명령, `scripts/release_smoke.py --apk … --timeout …`.
+- Produces (Task 5·6이 이 이름을 문서와 셋업에서 쓴다):
+  - 시크릿 4개 — `ANDROID_UPLOAD_KEYSTORE_BASE64` · `ANDROID_UPLOAD_KEYSTORE_PASSWORD` · `ANDROID_UPLOAD_KEY_ALIAS` · `PLAY_SERVICE_ACCOUNT_JSON`
+  - 잡 `android-gate`(출력 `sign_ready`·`play_ready`, 값은 문자열 `true`/`false`), 잡 `android-smoke`(시크릿 무관, 태그·수동 실행마다), 잡 `android`(`android-smoke` 성공 + `sign_ready`)
+  - 아티팩트 `beanprofile-aab-<run_number>`(AAB + `mapping.txt`, 7일 보관) — 수동 실행이거나 `play_ready`가 아닐 때만
+  - Play 업로드 — 태그 실행 + `play_ready`일 때만. 트랙 `internal`, `status: completed`
+
+- [ ] **Step 1: 워크플로 검사 스크립트를 스크래치에 쓴다 (테스트 먼저 — 커밋하지 않는다)**
+
+`$S/check_release_yml.py` (`S=…/scratchpad/android-t3`):
+
+```python
+"""release.yml의 Android 잡 구조와 android-gate 셸 로직을 검사한다(일회용, 커밋하지 않음).
+
+사용: python check_release_yml.py [워크플로 경로]   (저장소 루트에서 실행)
+"""
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+
+import yaml
+
+# Windows 콘솔(cp949)은 '—' 같은 문자를 못 찍는다 — 단언이 다 통과하고도 마지막 print에서 죽지 않게.
+for stream in (sys.stdout, sys.stderr):
+    if hasattr(stream, "reconfigure"):
+        stream.reconfigure(encoding="utf-8", errors="replace")
+
+WF = sys.argv[1] if len(sys.argv) > 1 else ".github/workflows/release.yml"
+text = open(WF, encoding="utf-8").read()
+jobs = yaml.safe_load(text)["jobs"]
+
+# 1) 잡 구성 — 기존 네 잡은 그대로, 셋이 더해진다
+assert set(jobs) == {
+    "test", "ios", "appstore-gate", "appstore", "android-gate", "android-smoke", "android",
+}, sorted(jobs)
+gate, smoke, android = jobs["android-gate"], jobs["android-smoke"], jobs["android"]
+assert gate["needs"] == "test", gate.get("needs")
+assert "if" not in gate, "android-gate는 태그·수동 실행 모두에서 돌아야 한다"
+assert set(gate["outputs"]) == {"sign_ready", "play_ready"}, gate["outputs"]
+assert smoke["needs"] == "test", smoke.get("needs")
+assert "if" not in smoke, "android-smoke는 시크릿과 무관하게 태그·수동 실행마다 돌아야 한다"
+assert android["needs"] == ["test", "android-gate", "android-smoke"], android["needs"]
+assert android["if"] == "needs.android-gate.outputs.sign_ready == 'true'", android["if"]
+
+# 2) 시크릿 이름 — 오타가 나면 게이트가 영원히 false다
+assert gate["steps"][0]["env"] == {
+    "KEYSTORE_B64": "${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}",
+    "KEYSTORE_PASSWORD": "${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}",
+    "KEY_ALIAS": "${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}",
+    "PLAY_JSON": "${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}",
+}, gate["steps"][0]["env"]
+
+
+def index_of(steps, name):
+    hits = [i for i, s in enumerate(steps) if s.get("name") == name]
+    assert len(hits) == 1, (name, [s.get("name") for s in steps])
+    return hits[0]
+
+
+def java17(steps):
+    java = [s for s in steps if s.get("uses") == "actions/setup-java@v5"]
+    assert len(java) == 1 and str(java[0]["with"]["java-version"]) == "17", java
+
+
+# 3) 스모크 — 시크릿 없이, 빌드 → KVM → 에뮬레이터 순서, Play 빌드와 같은 진단 플래그
+ssteps = smoke["steps"]
+assert "secrets." not in yaml.safe_dump(smoke), "android-smoke는 시크릿을 쓰지 않는다"
+java17(ssteps)
+s_build = index_of(ssteps, "스모크 APK 빌드")
+s_kvm = index_of(ssteps, "KVM 사용 설정")
+s_emu = index_of(ssteps, "release 스모크 (에뮬레이터)")
+assert s_build < s_kvm < s_emu, [s.get("name") for s in ssteps]
+sbuild = ssteps[s_build]["run"]
+assert "flutter build apk --release" in sbuild
+assert "-t integration_test/release_smoke.dart" in sbuild
+assert "--dart-define=ENABLE_OCR_DIAGNOSTICS=false" in sbuild
+emu = ssteps[s_emu]
+assert emu["uses"] == "reactivecircus/android-emulator-runner@v2"
+assert str(emu["with"]["api-level"]) == "36" and emu["with"]["arch"] == "x86_64", emu["with"]
+assert "scripts/release_smoke.py --apk build/app/outputs/flutter-apk/app-release.apk" in emu["with"]["script"]
+
+# 4) android — 서명 확인이 아티팩트·업로드보다 먼저
+steps = android["steps"]
+java17(steps)
+i_restore = index_of(steps, "업로드 키 복원")
+i_build = index_of(steps, "서명된 .aab 빌드")
+i_verify = index_of(steps, "서명 확인")
+i_artifact = index_of(steps, "AAB 아티팩트 (Play 수동 업로드용)")
+i_upload = index_of(steps, "Play 내부 테스트 업로드")
+assert i_restore < i_build < i_verify < i_artifact < i_upload, [s.get("name") for s in steps]
+assert steps[i_restore]["env"] == {
+    "KEYSTORE_B64": "${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}",
+    "KEYSTORE_PASSWORD": "${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}",
+    "KEY_ALIAS": "${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}",
+}, steps[i_restore]["env"]
+build = steps[i_build]["run"]
+assert "flutter build appbundle --release" in build
+assert "--dart-define=ENABLE_OCR_DIAGNOSTICS=false" in build
+assert "$OCR_DIAGNOSTICS" not in build
+assert "verify_aab_signature.py build/app/outputs/bundle/release/app-release.aab" in steps[i_verify]["run"]
+
+art = steps[i_artifact]
+assert art["uses"] == "actions/upload-artifact@v6"
+assert art["if"] == "github.event_name != 'push' || needs.android-gate.outputs.play_ready != 'true'", art["if"]
+assert "app-release.aab" in art["with"]["path"] and "mapping.txt" in art["with"]["path"]
+
+up = steps[i_upload]
+assert up["uses"] == "r0adkll/upload-google-play@v1"
+assert up["if"] == "github.event_name == 'push' && needs.android-gate.outputs.play_ready == 'true'", up["if"]
+assert up["with"]["serviceAccountJsonPlainText"] == "${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}"
+assert up["with"]["packageName"] == "com.hyunwook.beanprofile"
+assert up["with"]["track"] == "internal" and up["with"]["status"] == "completed"
+assert up["with"]["mappingFile"] == "build/app/outputs/mapping/release/mapping.txt"
+
+# 5) 비밀 누출 패턴 없음
+for bad in ("set -x", "cat android/key.properties", 'echo "$KEYSTORE_PASSWORD"', "echo $KEYSTORE_PASSWORD"):
+    assert bad not in text, bad
+
+# 6) 게이트 셸 로직 — 시크릿 조합 6가지
+bash = shutil.which("bash")
+assert bash and "system32" not in bash.lower(), f"Git Bash의 bash가 아니다: {bash}"
+script = gate["steps"][0]["run"]
+FULL = {"KEYSTORE_B64": "eA==", "KEYSTORE_PASSWORD": "p", "KEY_ALIAS": "upload", "PLAY_JSON": "{}"}
+SIGN = {k: FULL[k] for k in ("KEYSTORE_B64", "KEYSTORE_PASSWORD", "KEY_ALIAS")}
+cases = [
+    ({}, "false", "false"),
+    ({"KEYSTORE_B64": "eA=="}, "false", "false"),
+    ({"KEYSTORE_B64": "eA==", "KEYSTORE_PASSWORD": "p"}, "false", "false"),
+    (SIGN, "true", "false"),
+    (FULL, "true", "true"),
+    ({"PLAY_JSON": "{}"}, "false", "true"),
+]
+for given, sign, play in cases:
+    fd, out = tempfile.mkstemp()
+    os.close(fd)
+    env = {k: v for k, v in os.environ.items() if k not in FULL}
+    env.update(given)
+    env["GITHUB_OUTPUT"] = out.replace("\\", "/")
+    subprocess.run([bash, "-e", "-c", script], env=env, check=True, capture_output=True)
+    with open(out, encoding="utf-8") as f:
+        got = dict(line.strip().split("=", 1) for line in f if "=" in line)
+    os.remove(out)
+    assert got == {"sign_ready": sign, "play_ready": play}, (sorted(given), got)
+
+print("release.yml OK — gate cases:", len(cases))
+```
+
+- [ ] **Step 2: 검사를 돌려 실패를 확인한다 (RED)**
+
+```bash
+cd /c/BeanProfile
+S="C:/Users/hyunw/AppData/Local/Temp/claude/C--BeanProfile/b0fc6519-49e9-4f0e-9531-634e4e90b937/scratchpad/android-t3"
+python "$S/check_release_yml.py"; echo "exit=$?"
+```
+
+Expected: `AssertionError: ['appstore', 'appstore-gate', 'ios', 'test']`, `exit=1`.
+
+- [ ] **Step 3: 머리 주석과 입력 설명을 고친다**
+
+3–9행을 아래로 바꾼다(기존 "두 경로" → "세 경로", `android` 줄과 설계 문서 참조 추가):
+
+```yaml
+# BeanProfile 배포 파이프라인 — v* 태그 push 또는 수동 빌드 시 실행.
+#
+# 세 경로가 나란히 돈다:
+#  - ios      : "미서명" .ipa → GitHub Release. 서명·설치는 로컬 AltStore가 담당.
+#  - appstore : 서명된 .ipa → App Store Connect 업로드. 서명 시크릿이 있을 때만 실행.
+#  - android  : 업로드 키로 서명한 .aab → Play 내부 테스트. 에뮬레이터 release 스모크(android-smoke)를
+#               통과해야 돈다. 수동 실행은 업로드 대신 아티팩트로 남긴다.
+# App Store 심사를 통과하기 전까지 AltStore 경로가 유일한 설치 수단이므로 함께 유지한다.
+# 규약: docs/deployment.md · 계획: docs/plans/milestone-0-delivery.md · docs/plans/android-play-release-design.md
+```
+
+17행:
+
+```yaml
+        description: '빌드 버전 (예: 1.0.3) — 진단 IPA와 Play 첫 업로드용 AAB에 쓴다'
+```
+
+- [ ] **Step 4: 잡 셋을 파일 끝(`appstore` 잡 뒤)에 붙인다**
+
+앞에 빈 줄 하나를 두고 이어 붙인다:
+
+```yaml
+  # 업로드 키·Play 서비스 계정 시크릿 유무를 출력으로 넘긴다(appstore-gate와 같은 이유).
+  # 태그와 수동 실행 모두에서 돈다 — 수동 실행이 Play 첫 업로드용 AAB를 만든다.
+  # 서명 시크릿 셋 중 하나라도 비면 빌드하지 않는다 — 빈 비밀번호로 서명을 시도하지 않게.
+  android-gate:
+    needs: test
+    runs-on: ubuntu-latest
+    outputs:
+      sign_ready: ${{ steps.check.outputs.sign_ready }}
+      play_ready: ${{ steps.check.outputs.play_ready }}
+    steps:
+      - id: check
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          PLAY_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ] && [ -n "$KEYSTORE_PASSWORD" ] && [ -n "$KEY_ALIAS" ]; then
+            echo "sign_ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "sign_ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Android 업로드 키 시크릿이 없어 AAB 빌드를 건너뜁니다(docs/deployment.md §3-3)."
+          fi
+          if [ -n "$PLAY_JSON" ]; then
+            echo "play_ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "play_ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Play 서비스 계정 시크릿이 없어 자동 업로드를 건너뜁니다. AAB는 실행 아티팩트로 남깁니다(docs/deployment.md §3-6)."
+          fi
+
+  # release 스모크 — 진입점만 바꾼 release APK를 에뮬레이터에서 돌려 R8을 거친 빌드의
+  # ML Kit OCR·sqlite를 확인한다(flutter drive는 release를 거부하고 profile은 R8을 안 돈다).
+  # 업로드 키가 필요 없어 시크릿과 무관하게 돌고, android가 이 잡에 걸려 있어 실패하면 Play로 가지 않는다.
+  android-smoke:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      # 러너 이미지의 기본 JDK가 바뀌어도 빌드가 흔들리지 않게 고정한다.
+      # Gradle 8.12는 JDK 24 이상에서 돌지 않고, AGP 8.9는 17 이상을 요구한다.
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      # 에뮬레이터가 부팅하기 전에 빌드해 둔다 — 빌드와 에뮬레이터가 CPU·메모리를 다투지 않게.
+      - name: 스모크 APK 빌드
+        run: |
+          flutter build apk --release --target-platform android-x64 \
+            -t integration_test/release_smoke.dart \
+            --dart-define=ENABLE_OCR_DIAGNOSTICS=false
+      # 에뮬레이터 하드웨어 가속 — 없으면 부팅이 수십 분 걸린다.
+      - name: KVM 사용 설정
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: release 스모크 (에뮬레이터)
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          script: python3 scripts/release_smoke.py --apk build/app/outputs/flutter-apk/app-release.apk --timeout 300
+
+  android:
+    needs: [test, android-gate, android-smoke]
+    if: needs.android-gate.outputs.sign_ready == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      # android-smoke와 같은 이유로 JDK를 고정한다.
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+
+      # 키스토어는 작업 트리 밖(러너 임시 폴더)에 풀고, Gradle이 읽는 key.properties만 android/에 둔다.
+      # 비밀번호는 env로만 받아 파일로 쓰고 로그에 찍지 않는다.
+      - name: 업로드 키 복원
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+        run: |
+          keystore="$RUNNER_TEMP/upload-keystore.p12"
+          echo "$KEYSTORE_B64" | base64 -d > "$keystore"
+          {
+            echo "storeFile=$keystore"
+            echo "storePassword=$KEYSTORE_PASSWORD"
+            echo "keyPassword=$KEYSTORE_PASSWORD"
+            echo "keyAlias=$KEY_ALIAS"
+          } > android/key.properties
+
+      # 진단 기능은 Play로 갈 수 있는 빌드에 절대 실리면 안 되므로 수동 실행이어도 false로 못박는다.
+      - name: 서명된 .aab 빌드
+        env:
+          MANUAL_BUILD_NAME: ${{ inputs.build_name }}
+        run: |
+          BUILD_NAME="${GITHUB_REF_NAME#v}"
+          if [ -n "$MANUAL_BUILD_NAME" ]; then
+            BUILD_NAME="$MANUAL_BUILD_NAME"
+          fi
+          flutter build appbundle --release \
+            --build-name="$BUILD_NAME" \
+            --build-number="${{ github.run_number }}" \
+            --dart-define=APP_VERSION="$BUILD_NAME" \
+            --dart-define=ENABLE_OCR_DIAGNOSTICS=false
+
+      # key.properties가 없거나 깨지면 Gradle이 조용히 debug 키로 서명한다(build.gradle.kts).
+      # Play는 처음 올린 AAB의 키를 업로드 키로 등록하므로, 업로드·아티팩트보다 먼저 막는다.
+      - name: 서명 확인
+        run: python3 scripts/verify_aab_signature.py build/app/outputs/bundle/release/app-release.aab
+
+      # 수동 실행(첫 수동 업로드용)이거나 서비스 계정이 아직 없으면 AAB를 버리지 않고 남긴다.
+      # 매핑 파일은 R8이 난독화한 크래시 스택을 풀 때 쓴다.
+      - name: AAB 아티팩트 (Play 수동 업로드용)
+        if: github.event_name != 'push' || needs.android-gate.outputs.play_ready != 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: beanprofile-aab-${{ github.run_number }}
+          path: |
+            build/app/outputs/bundle/release/app-release.aab
+            build/app/outputs/mapping/release/mapping.txt
+          retention-days: 7
+
+      # 앱이 아직 '초안'(첫 출시 전)이면 Play API가
+      # "Only releases with status draft may be created on draft app"으로 거부한다.
+      # 첫 AAB는 Console에서 손으로 올린다(docs/deployment.md §3-4).
+      - name: Play 내부 테스트 업로드
+        if: github.event_name == 'push' && needs.android-gate.outputs.play_ready == 'true'
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.hyunwook.beanprofile
+          releaseFiles: build/app/outputs/bundle/release/app-release.aab
+          track: internal
+          status: completed
+          releaseName: ${{ github.ref_name }}
+          mappingFile: build/app/outputs/mapping/release/mapping.txt
+```
+
+- [ ] **Step 5: 검사를 다시 돌리고(GREEN), 검사가 눈멀지 않았는지 변이 넷으로 확인한다**
+
+```bash
+cd /c/BeanProfile
+S="C:/Users/hyunw/AppData/Local/Temp/claude/C--BeanProfile/b0fc6519-49e9-4f0e-9531-634e4e90b937/scratchpad/android-t3"
+WF=.github/workflows/release.yml
+python "$S/check_release_yml.py"; echo "exit=$?"
+sed 's/ && \[ -n "\$KEY_ALIAS" \]//' "$WF" > "$S/mut1.yml"
+python "$S/check_release_yml.py" "$S/mut1.yml" 2>&1 | tail -1; echo "exit=${PIPESTATUS[0]}"
+sed '/- name: 서명 확인/,/verify_aab_signature.py/d' "$WF" > "$S/mut2.yml"
+python "$S/check_release_yml.py" "$S/mut2.yml" 2>&1 | tail -1; echo "exit=${PIPESTATUS[0]}"
+sed "s/if: github.event_name == 'push' && needs.android-gate.outputs.play_ready == 'true'/if: needs.android-gate.outputs.play_ready == 'true'/" "$WF" > "$S/mut3.yml"
+python "$S/check_release_yml.py" "$S/mut3.yml" 2>&1 | tail -1; echo "exit=${PIPESTATUS[0]}"
+sed 's/needs: \[test, android-gate, android-smoke\]/needs: [test, android-gate]/' "$WF" > "$S/mut4.yml"
+python "$S/check_release_yml.py" "$S/mut4.yml" 2>&1 | tail -1; echo "exit=${PIPESTATUS[0]}"
+git diff --stat
+```
+
+Expected:
+
+1. 원본 — `release.yml OK — gate cases: 6`, `exit=0`
+2. mut1(별칭 검사 빠짐) — 게이트 조합 3번에서 `AssertionError: (['KEYSTORE_B64', 'KEYSTORE_PASSWORD'], {'sign_ready': 'true', …})`, `exit=1`
+3. mut2(서명 확인 단계 없음) — `AssertionError: ('서명 확인', …)`, `exit=1`
+4. mut3(수동 실행도 업로드) — 업로드 `if` 단언에서 `AssertionError`, `exit=1`
+5. mut4(스모크 게이트 빠짐) — `android` `needs` 단언에서 `AssertionError: ['test', 'android-gate']`, `exit=1`
+6. `git diff --stat`에는 `release.yml` 한 파일만 — 변이는 스크래치 사본에만 했다
+
+변이 하나라도 `exit=0`이면 그 단언이 눈먼 것이다. 고치고 다시 확인한다.
+
+- [ ] **Step 6: 워크플로의 복원 스크립트로 `key.properties`를 만들어 빌드한다 — 서명 검사 통과 (Review Focus 4)**
+
+```bash
+cd /c/BeanProfile
+export KEYTOOL="C:/Program Files/Android/Android Studio/jbr/bin/keytool.exe"
+S="C:/Users/hyunw/AppData/Local/Temp/claude/C--BeanProfile/b0fc6519-49e9-4f0e-9531-634e4e90b937/scratchpad/android-t3"
+mkdir -p "$S/runner-temp"
+"$KEYTOOL" -genkeypair -keystore "$S/ci-sim.p12" -storetype PKCS12 \
+  -keyalg RSA -keysize 2048 -validity 1 -alias upload \
+  -dname "CN=BeanProfile CI Sim" -storepass ci-sim-pass -noprompt
+python - "$S" <<'EOF'
+import base64, os, shutil, subprocess, sys
+import yaml
+s = sys.argv[1]
+jobs = yaml.safe_load(open(".github/workflows/release.yml", encoding="utf-8"))["jobs"]
+step = next(x for x in jobs["android"]["steps"] if x.get("name") == "업로드 키 복원")
+env = dict(os.environ)
+env["KEYSTORE_B64"] = base64.b64encode(open(f"{s}/ci-sim.p12", "rb").read()).decode()
+env["KEYSTORE_PASSWORD"] = "ci-sim-pass"
+env["KEY_ALIAS"] = "upload"
+env["RUNNER_TEMP"] = f"{s}/runner-temp"
+bash = shutil.which("bash")
+assert bash and "system32" not in bash.lower(), bash
+subprocess.run([bash, "-e", "-c", step["run"]], env=env, check=True)
+print(open("android/key.properties", encoding="utf-8").read().replace("ci-sim-pass", "***"))
+EOF
+flutter build appbundle --release 2>&1 | tail -3
+python scripts/verify_aab_signature.py build/app/outputs/bundle/release/app-release.aab; echo "exit=$?"
+```
+
+Expected: 출력된 `key.properties`가 `storeFile=<S>/runner-temp/upload-keystore.p12` · `storePassword=***` · `keyPassword=***` · `keyAlias=upload` 네 줄. 빌드 성공. `  CN=BeanProfile CI Sim`, `exit=0`.
+
+- [ ] **Step 7: 흔적을 정리한다** (Step 6이 실패해도 반드시 실행)
+
+```bash
+cd /c/BeanProfile
+S="C:/Users/hyunw/AppData/Local/Temp/claude/C--BeanProfile/b0fc6519-49e9-4f0e-9531-634e4e90b937/scratchpad/android-t3"
+rm -f android/key.properties
+rm -rf "$S"
+test ! -e android/key.properties && echo "key.properties gone"
+git status --short
+```
+
+Expected: `key.properties gone`. `git status`에는 `M .github/workflows/release.yml`과 기존 untracked `AGENTS.md`·`data/`만 보인다.
+
+- [ ] **Step 8: 커밋**
+
+```bash
+cd /c/BeanProfile
+git add .github/workflows/release.yml
+git commit -m "$(cat <<'EOF'
+ci(android): gate the signed AAB on an emulator smoke, then ship to Play
+
+android-smoke builds the release smoke APK and runs it on a KVM emulator
+on every tag and manual run, with no secrets needed. android-gate passes
+secret presence as outputs, like appstore-gate. android needs both: it
+restores the upload key into key.properties, builds the AAB with OCR
+diagnostics off, rejects a debug or unsigned bundle, then uploads to the
+internal track on tags. Manual runs, and tags without the service
+account, keep the AAB and its R8 mapping as an artifact for the first
+upload by hand.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01RSnfDi7WDeKq9sg1LWJLec
+EOF
+)"
+```
+
+- [ ] **Step 9 (controller — 태스크 리뷰 통과 뒤): 브랜치 push + 수동 실행 1회**
+
+GitHub가 워크플로를 받아들이는지, **CI 에뮬레이터 스모크가 실제로 통과하는지**, 시크릿이 없을 때 `android`가 건너뛰는지 본다. 깨진 `release.yml`이 `main`에 들어가면 다음 태그의 iOS 배포까지 멈추므로, 병합 전에 GitHub에서 한 번 돌린다.
+
+```bash
+cd /c/BeanProfile
+git push -u origin android-play-release
+gh workflow run release.yml --ref android-play-release -f build_name=1.0.3
+gh run list --workflow release.yml --branch android-play-release --limit 1 --json databaseId,status
+```
+
+그 실행 ID로 `gh run watch <ID> --exit-status`를 백그라운드로 끝까지 기다린 뒤(`ios` 잡 때문에 20분 남짓):
+
+```bash
+gh run view <ID> --json jobs --jq '.jobs[] | "\(.name): \(.conclusion)"'
+SMOKE=$(gh run view <ID> --json jobs --jq '.jobs[] | select(.name == "android-smoke") | .databaseId')
+gh run view <ID> --log --job "$SMOKE" | grep -E 'BEANPROFILE_SMOKE (CHECK|DONE)|release 스모크'
+gh run view <ID>
+```
+
+Expected: `test: success` · `ios: success` · `appstore-gate: skipped` · `appstore: skipped` · `android-gate: success` · `android-smoke: success` · `android: skipped`. 스모크 로그에 `CHECK … PASS` 6줄과 `DONE 6/6`. 마지막 명령의 ANNOTATIONS에 `android-gate`의 notice 두 줄(업로드 키 · 서비스 계정). 이 실행의 `ios` 잡이 만든 진단 IPA 아티팩트는 쓰지 않는다.
+
+`android-smoke`가 에뮬레이터 부팅이나 KVM에서 실패하면 병합하지 않는다 — 로그로 원인을 찾아 이 태스크에서 고치고 다시 돌린다.
+
+---
+
+## Task 4: 개인정보 고지 정정 — ML Kit 진단 데이터
+
+**Files:**
+- Modify: `docs/privacy.md` (전체 교체 — 아래 최종본)
+- Modify: `docs/store-listing.md` (설명 73행 · 개인정보 절 156–160행 교체 + Play 데이터 보안 절 신설 · 심사 메모 173행)
+- Regenerate: `docs/privacy.html`, `docs/store-listing.html`
+
+**Interfaces:**
+- Consumes: 없음
+- Produces: `docs/store-listing.md`의 `## Google Play 데이터 보안 (Data safety)` 절 — Task 5의 §3-5 셋업 안내가 이 제목으로 가리킨다. 개인정보처리방침 URL `https://hyunwookyoo.github.io/BeanProfile/privacy.html`(GitHub Pages, `main`의 `/docs`)은 바뀌지 않는다.
+
+사실의 출처(2026-10-04 원문 확인): ML Kit [Android 공개 안내](https://developers.google.com/ml-kit/android-data-disclosure)와 [iOS 공개 안내](https://developers.google.com/ml-kit/ios-data-disclosure)의 "Data collected in all features" 표, Android 안내의 "encrypts the data in transit using HTTPS" · "does not transfer this data to third-parties", ML Kit 소개 페이지의 "can be used for processing images and text that need to remain on the device". 앱은 번들 모델(`com.google.mlkit:text-recognition-korean`)을 쓰므로 식별자는 "Per-installation identifiers that are not intended to uniquely identify a user or physical device"에 해당한다.
+
+- [ ] **Step 1: 틀린 문구가 지금 있는지 확인한다 (RED)**
+
+```bash
+cd /c/BeanProfile
+grep -nE 'BeanProfile은 어떤 개인정보도 수집하지 않습니다|네트워크 통신 기능 자체가 들어 있지 않습니다|보낼 수 있는 통로를 갖고 있지 않습니다|이 앱은 누구의 개인정보도 수집하지 않으며|BeanProfile does not collect any personal data|no networking code at all|The app collects no personal data from anyone|서버로 보내는 데이터가 없으며 광고나 분석 도구를 쓰지 않습니다|"이 앱은 데이터를 수집하지 않습니다"|No data leaves the device\. There is no server, no analytics|분석·추적|advertising, analytics' docs/privacy.md docs/store-listing.md
+```
+
+Expected: `docs/privacy.md` 7·13·23·51·67·69·81행과 `docs/store-listing.md` 73·158·173행이 걸린다(10줄).
+
+- [ ] **Step 2: `docs/privacy.md`를 아래 최종본으로 통째로 바꾼다**
+
+```markdown
+# BeanProfile 개인정보처리방침
+
+시행일: 2026년 10월 4일
+
+## 한 줄 요약
+
+**BeanProfile은 사진과 기록을 기기 밖으로 보내지 않습니다.** 기록한 내용은 전부 사용자의 기기 안에만 저장되며, 개발자를 포함한 누구에게도 전송되지 않습니다. 개발자는 어떤 개인정보도 수집하지 않습니다.
+
+한 가지 알려 드릴 것이 있습니다. 글자 인식에 쓰는 Google ML Kit이 기기·앱 정보와 성능 진단 정보를 Google로 보냅니다. 사진과 인식된 글자는 여기에 들어가지 않습니다(아래 「Google ML Kit이 보내는 진단 정보」).
+
+## 개발자가 수집하는 정보
+
+없습니다.
+
+이 앱에는 계정이 없고, 개발자가 운영하는 서버도 없습니다. 광고·추적·크래시 리포팅 도구를 쓰지 않습니다.
+
+## Google ML Kit이 보내는 진단 정보
+
+글자 인식에는 Google의 ML Kit을 씁니다. 인식은 기기 안에서 이루어지며, 사진과 인식된 글자는 Google로 전송되지 않습니다.
+
+다만 ML Kit 자체가 진단과 사용 통계를 위해 다음 정보를 Google로 보냅니다.
+
+- 기기 정보 — 제조사, 모델, 운영체제 버전과 빌드, 사용 가능한 머신러닝 하드웨어 가속기
+- 앱 정보 — 패키지 이름(iOS는 번들 ID)과 앱 버전
+- 설치 단위 식별자 — 앱 설치마다 만들어지며, 사용자나 실제 기기를 고유하게 식별하려는 용도가 아닙니다
+- 성능 지표(처리 지연 시간 등)와 API 설정(이미지 형식·해상도 등). Android에서는 입력·출력 크기와 기능 버전도 함께 보냅니다
+- 이벤트 종류(기능 초기화, 모델 다운로드, 인식, 자원 해제 등)와 그 오류 코드
+
+Google은 이 정보를 HTTPS로 암호화해 전송하고 제3자에게 넘기지 않는다고 밝히고 있습니다(Android 공개 안내). 개발자는 이 정보를 받지도, 볼 수도 없습니다. 앱 안에서 이 전송을 끄는 설정은 없습니다.
+
+자세한 내용은 Google의 ML Kit 데이터 공개 안내([Android](https://developers.google.com/ml-kit/android-data-disclosure) · [iOS](https://developers.google.com/ml-kit/ios-data-disclosure))를 참고해 주세요.
+
+## 기기에 저장되는 것
+
+앱을 쓰면서 직접 입력하신 내용이 기기 안의 저장 공간에 보관됩니다.
+
+- 원두 정보 — 이름, 로스터리, 원산지, 가공 방식, 로스팅 날짜, 컵노트, 메모
+- 시음 기록 — 날짜, 산미·단맛·바디·쓴맛 강도, 종합 평점, 코멘트
+- 원두 봉투나 정보 카드를 촬영·선택한 사진
+
+이 데이터는 기기를 벗어나지 않습니다. 앱은 이 데이터를 어디로도 전송하지 않습니다.
+
+## 카메라와 사진 접근 권한
+
+원두 봉투나 정보 카드에 적힌 글자를 자동으로 읽어 입력을 줄이는 데에만 사용합니다.
+
+**문자 인식은 전적으로 기기 안에서 이루어집니다.** 사진도, 인식된 글자도 외부 서버로 전송되지 않습니다. 선택하신 사진은 앱의 저장 공간에 복사되어 해당 원두의 기록으로만 쓰입니다.
+
+권한을 허용하지 않아도 앱의 모든 기능을 직접 입력으로 사용할 수 있습니다.
+
+## 백업 내보내기
+
+설정 화면에서 기록을 JSON 파일로 내보낼 수 있습니다. 이 동작은 **사용자가 직접 실행할 때만** 일어나며, 파일을 어디에 저장하거나 누구에게 보낼지도 사용자가 고릅니다.
+
+내보낸 파일에는 시음 기록과 사진이 함께 들어 있습니다. 기기를 떠난 뒤의 그 파일은 사용자의 관리 아래에 있으며, 개발자는 접근할 수 없습니다.
+
+## 제3자 제공
+
+개발자는 데이터를 판매하거나 누구와도 공유하지 않습니다. 위의 ML Kit 진단 정보는 Google이 직접 받으며, 사진·기록·인식된 글자는 들어 있지 않습니다.
+
+## 데이터 삭제
+
+앱 안에서 개별 원두와 시음 기록을 언제든 삭제할 수 있습니다. 앱을 기기에서 삭제하면 저장된 모든 데이터가 함께 사라집니다.
+
+> 데이터가 기기에만 있으므로 **삭제하면 복구할 수 없습니다.** 기록을 남기고 싶다면 삭제 전에 백업을 내보내 주세요.
+
+## 아동의 개인정보
+
+이 앱은 아동을 대상으로 만들지 않았습니다. 개발자는 아동을 포함해 누구의 개인정보도 수집하지 않습니다.
+
+## 방침 변경
+
+이 방침이 바뀌면 이 페이지를 갱신하고 시행일을 함께 고칩니다.
+
+## 문의
+
+[GitHub 저장소 이슈](https://github.com/HyunwookYoo/BeanProfile/issues)로 문의해 주세요.
+
+---
+
+# Privacy Policy (English)
+
+Effective: October 4, 2026
+
+**BeanProfile never sends your photos or records off your device.** Everything you record stays on your device and is never transmitted to anyone, including the developer. The developer collects no personal data.
+
+One thing to know: Google ML Kit, which the app uses for text recognition, sends device and app information and performance diagnostics to Google. Your photos and recognized text are not part of it (see "Google ML Kit diagnostics" below).
+
+**What the developer collects.** Nothing. The app has no accounts and no developer-run server. It uses no advertising, tracking, or crash-reporting SDKs.
+
+**Google ML Kit diagnostics.** Text recognition uses Google's ML Kit and runs on the device; neither the photo nor the recognized text is sent to Google. ML Kit itself sends the following to Google for diagnostics and usage analytics: device information (manufacturer, model, OS version and build, available ML hardware accelerators); app information (package name or bundle ID, and app version); per-installation identifiers that are not intended to uniquely identify a user or physical device; performance metrics (such as latency) and API configuration (such as image format and resolution), plus input and output size and feature version on Android; and event types (such as feature initializations, model downloads, detection, and resource releases) with their error codes. Google states that this data is encrypted in transit using HTTPS and is not transferred to third parties (Android disclosure). The developer does not receive or see it, and the app has no setting to turn it off. See Google's ML Kit data disclosure for [Android](https://developers.google.com/ml-kit/android-data-disclosure) and [iOS](https://developers.google.com/ml-kit/ios-data-disclosure).
+
+**Stored on your device.** Coffee bean details (name, roaster, origin, process, roast date, cup notes, memo), tasting records (date, acidity/sweetness/body/bitterness intensities, overall rating, comments), and any photos you take or choose. This data never leaves the device.
+
+**Camera and photo access.** Used only to read text printed on coffee bags and information cards so you type less. Text recognition runs entirely on the device — neither the photo nor the recognized text is sent to any server. Photos you select are copied into the app's own storage and used only for that bean's record. The app is fully usable by manual entry if you decline these permissions.
+
+**Backup export.** You can export your records to a JSON file from the Settings screen. This happens only when you initiate it, and you choose where the file goes. The exported file contains your tasting records and photos; once it leaves the device it is under your control, and the developer has no access to it.
+
+**No third-party sharing.** The developer never sells or shares your data. The ML Kit diagnostics above go directly to Google and contain none of your photos, records, or recognized text.
+
+**Deletion.** You can delete individual beans and tastings at any time. Deleting the app removes all stored data. Because the data exists only on your device, deletion is permanent — export a backup first if you want to keep your records.
+
+**Children.** The app is not directed at children. The developer collects no personal data from anyone, including children.
+
+**Changes.** If this policy changes, this page and its effective date will be updated.
+
+**Contact.** Please reach out via [GitHub Issues](https://github.com/HyunwookYoo/BeanProfile/issues).
+```
+
+- [ ] **Step 3: `docs/store-listing.md` — 설명 문구(73행)**
+
+설명 블록 안의 이 문장을:
+
+```
+계정을 만들 필요가 없고, 로그인 화면도 없습니다. 서버로 보내는 데이터가 없으며 광고나 분석 도구를 쓰지 않습니다. 비행기 안에서도, 지하에서도 그대로 동작합니다.
+```
+
+이렇게 바꾼다(앞뒤 문단은 그대로):
+
+```
+계정을 만들 필요가 없고, 로그인 화면도 없습니다. 사진과 기록은 기기 밖으로 나가지 않으며 광고도 없습니다. 비행기 안에서도, 지하에서도 그대로 동작합니다.
+```
+
+- [ ] **Step 4: `docs/store-listing.md` — 개인정보 절 교체 + Play 데이터 보안 절 신설(156–160행)**
+
+`## 개인정보 보호 (App Privacy)` 제목부터 `## 심사 메모 (App Review Notes)` 바로 앞까지(지금은 156–160행 + 빈 줄)를 아래로 바꾼다:
+
+```markdown
+## 개인정보 보호 (App Privacy)
+
+**"예, 이 앱에서 데이터를 수집합니다"** 를 고르고 아래 네 유형을 신고한다. 개발자는 아무것도 받지 않지만, 문자 인식에 쓰는 Google ML Kit이 진단 데이터를 Google로 보내고, Apple은 앱에 들어간 SDK가 보내는 데이터도 앱의 수집으로 본다. 무엇을 보내는지는 [`privacy.md`](privacy.md)의 「Google ML Kit이 보내는 진단 정보」에 있다.
+
+| 데이터 유형 | 목적 | 사용자에게 연결됨 | 추적 |
+|---|---|---|---|
+| 식별자 › 기기 ID (Identifiers › Device ID) | 분석 | 아니요 | 아니요 |
+| 사용 데이터 › 제품 상호 작용 (Usage Data › Product Interaction) | 분석 | 아니요 | 아니요 |
+| 진단 › 성능 데이터 (Diagnostics › Performance Data) | 분석 | 아니요 | 아니요 |
+| 진단 › 기타 진단 데이터 (Diagnostics › Other Diagnostic Data) | 분석 | 아니요 | 아니요 |
+
+Google의 [ML Kit iOS 데이터 공개 안내](https://developers.google.com/ml-kit/ios-data-disclosure)는 보내는 데이터만 나열하고 Apple 범주는 정해주지 않는다(2026-10-04 원문 확인). 위 매핑은 우리 판단이다 — 설치 단위 식별자는 기기 ID, 지연 시간은 성능 데이터, 기기·앱 정보와 API 설정·오류 코드는 기타 진단 데이터, 기능 이벤트(초기화·인식)는 제품 상호 작용. **애매하면 넓게 신고한다** — 적게 신고한 라벨은 정책 위반이지만 넓게 신고한 라벨은 아니다. 사진과 입력 내용은 여전히 기기를 벗어나지 않으므로 사진·사용자 콘텐츠 유형은 신고하지 않는다.
+
+라벨은 App Store Connect → 앱 개인정보 보호에서 **새 버전 제출 없이** 고칠 수 있다.
+
+## Google Play 데이터 보안 (Data safety)
+
+Play Console → 정책 및 프로그램 → 앱 콘텐츠 → 데이터 보안. 근거는 바로 위 App Store 라벨과 같고, 범주도 같은 원칙으로 맞췄다 — 두 스토어가 같은 사실을 같은 넓이로 신고한다. 출처: [ML Kit Android 데이터 공개 안내](https://developers.google.com/ml-kit/android-data-disclosure)(전송 중 HTTPS 암호화, 제3자 이전 없음).
+
+| 질문 | 답 |
+|---|---|
+| 앱에서 필수 사용자 데이터 유형을 수집하거나 공유하나요? | 예 |
+| 앱에서 수집하는 모든 사용자 데이터가 전송 중에 암호화되나요? | 예 — ML Kit은 HTTPS로 보내고, 앱 자체는 아무것도 보내지 않는다 |
+| 사용자가 데이터 삭제를 요청할 방법을 제공하나요? | 아니요 — 개발자가 받는 데이터가 없다 |
+
+수집하는 데이터 유형 — 세 유형 모두 답이 같다.
+
+| 데이터 유형 | 수집 / 공유 | 일시적으로 처리 | 수집 필수 여부 | 목적 |
+|---|---|---|---|---|
+| 기기 또는 기타 ID (Device or other IDs) | 수집함 / 공유 안 함 | 아니요 | 필수(사용자가 끌 수 없음) | 분석 |
+| 앱 활동 › 앱 상호작용 (App interactions) | 수집함 / 공유 안 함 | 아니요 | 필수 | 분석 |
+| 앱 정보 및 성능 › 진단 (Diagnostics) | 수집함 / 공유 안 함 | 아니요 | 필수 | 분석 |
+
+사진·기록·인식된 글자는 기기를 벗어나지 않으므로 사진 및 동영상, 파일 및 문서 같은 유형은 신고하지 않는다.
+```
+
+- [ ] **Step 5: `docs/store-listing.md` — 심사 메모 마지막 줄(173행)**
+
+```
+No data leaves the device. There is no server, no analytics, and no third-party tracking.
+```
+
+을 다음으로 바꾼다:
+
+```
+Photos, records, and recognized text never leave the device. There is no account, no developer-run server, no advertising, and no tracking. Google ML Kit itself sends technical diagnostics (device and app information, performance metrics) to Google; this is declared in the app's privacy label.
+```
+
+- [ ] **Step 6: 틀린 문구가 사라졌고 새 사실이 들어갔는지 확인한다 (GREEN)**
+
+```bash
+cd /c/BeanProfile
+grep -nE 'BeanProfile은 어떤 개인정보도 수집하지 않습니다|네트워크 통신 기능 자체가 들어 있지 않습니다|보낼 수 있는 통로를 갖고 있지 않습니다|이 앱은 누구의 개인정보도 수집하지 않으며|BeanProfile does not collect any personal data|no networking code at all|The app collects no personal data from anyone|서버로 보내는 데이터가 없으며 광고나 분석 도구를 쓰지 않습니다|"이 앱은 데이터를 수집하지 않습니다"|No data leaves the device\. There is no server, no analytics|분석·추적|advertising, analytics' docs/privacy.md docs/store-listing.md; echo "matches_exit=$?"
+grep -c 'ML Kit' docs/privacy.md
+grep -n '시행일: 2026년 10월 4일\|Effective: October 4, 2026\|## Google ML Kit이 보내는 진단 정보\|Google ML Kit diagnostics\.' docs/privacy.md
+grep -n '## Google Play 데이터 보안 (Data safety)\|식별자 › 기기 ID\|앱 활동 › 앱 상호작용' docs/store-listing.md
+python scripts/check_store_listing.py
+```
+
+Expected: 첫 grep은 출력 없이 `matches_exit=1`. `ML Kit` 개수 6 이상. 넷째 명령 4줄, 다섯째 명령 3줄. 글자 수 검사는 전 항목 `[OK ]`.
+
+- [ ] **Step 7: HTML로 렌더한다**
+
+```bash
+cd /c/BeanProfile
+timeout 60 python scripts/md2html.py docs/privacy.md; echo "exit=$?"
+timeout 60 python scripts/md2html.py docs/store-listing.md; echo "exit=$?"
+grep -c 'Google ML Kit' docs/privacy.html
+git status --short docs/
+```
+
+Expected: 둘 다 `exit=0`(124면 md2html이 멈춘 것 — 펜스 모양을 확인한다). `privacy.html`에 `Google ML Kit` 1회 이상. `git status`는 네 파일(`privacy.md/.html`, `store-listing.md/.html`)만 `M`.
+
+- [ ] **Step 8: 커밋**
+
+```bash
+cd /c/BeanProfile
+git add docs/privacy.md docs/privacy.html docs/store-listing.md docs/store-listing.html
+git commit -m "$(cat <<'EOF'
+docs(privacy): disclose the diagnostics Google ML Kit sends
+
+ML Kit keeps photos and recognized text on the device, but the SDK itself
+sends device and app info, per-installation identifiers, performance
+metrics and feature event codes to Google on both platforms. The policy,
+store description and review note claimed no data left the device at all.
+Narrow the claim to photos, records and recognized text, describe the
+ML Kit diagnostics, and record the App Store label and Play Data safety
+answers, mapped broadly because Google publishes no store categories.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01RSnfDi7WDeKq9sg1LWJLec
+EOF
+)"
+```
+
+---
+
+## Task 5: 배포 문서 — `deployment.md` · `CLAUDE.md`
+
+**Files:**
+- Modify: `docs/deployment.md` — §1 표 17행 · 인용 22행, §2 그림(펜스 내용 32–41행)과 글머리 44–45행, §2 "OCR 개발자 진단 빌드" 끝, §3 전체(82–94행), §5 시크릿 표 158–161행, §6-A 전체(185–193행), §6-H 신설(295행 뒤), §8 머리(319행 제목 뒤)에 인용 1개, §9 체크리스트 2줄
+- Modify: `CLAUDE.md` — 30행(배포 규약 문장), "Deployment constraints"의 Android 키스토어 항목
+- Regenerate: `docs/deployment.html`
+
+**Interfaces:**
+- Consumes: Task 2의 스모크 빌드·판정 명령, Task 3의 시크릿 이름 4개 · 잡 이름 · 아티팩트 `beanprofile-aab-<run_number>`, Task 4의 `store-listing.md` 「Google Play 데이터 보안 (Data safety)」 절, 개인정보처리방침 URL.
+- Produces: `deployment.md` §3-1~§3-7 셋업 안내와 §6-H 스모크 안내 — Task 6이 이 번호로 사용자를 안내한다.
+
+행 번호는 이 계획을 쓸 때(`c4eaa96`) 기준이다. 편집 전에 `sed -n`으로 해당 줄이 아래 "기존" 문장과 같은지 확인한다. 위에서부터 고치면 아래 행 번호가 밀리므로 **아래(§9)부터 위로** 고치거나, 행 번호 대신 기존 문장으로 찾는다.
+
+- [ ] **Step 1: 낡은 Android 서술이 있는지 확인한다 (RED)**
+
+```bash
+cd /c/BeanProfile
+awk '/^## 8\./{skip=1} /^## 9\./{skip=0} !skip' docs/deployment.md | grep -nE 'APK|ANDROID_KEYSTORE_|ANDROID_KEY_PASSWORD|ANDROID_KEY_ALIAS|beanprofile\.jks|스토어 출시 안 함'
+grep -n 'Android APK via GitHub Release\|The Android keystore guards' CLAUDE.md
+grep -c 'android-smoke\|release_smoke' docs/deployment.md
+```
+
+Expected: 첫 명령은 여러 줄(§1 표, §2 그림, §3 셋업, §5 시크릿, §9 체크리스트), 둘째 명령은 2줄, 셋째 `0`. §8(역사 기록 — 그대로 둔다)은 첫 명령에서 제외된다.
+
+- [ ] **Step 2: §1 — 전제 표 한 줄과 인용 한 줄**
+
+17행 기존:
+
+```
+| **스토어 출시 안 함** | Play Store/App Store 심사 없음. 사이드로드 APK + TestFlight 내부 테스트 |
+```
+
+새:
+
+```
+| **스토어 배포 범위** | Android는 Play **내부 테스트**(심사 없음, 본인 기기). iOS는 TestFlight + AltStore 사이드로드. Play 프로덕션은 개인 계정의 테스터 12명 × 14일 요건 때문에 별도 작업(`plans/android-play-release-design.md` §7) |
+```
+
+22행 기존:
+
+```
+> 안드로이드는 Windows에서 `flutter build apk` 후 USB로 넣으면 그만이다.
+```
+
+새:
+
+```
+> 안드로이드는 Windows에서도 빌드된다(단, Play로 설치한 폰에는 로컬 빌드를 넣지 않는다 — §6-A).
+```
+
+- [ ] **Step 3: §2 — 파이프라인 그림, 글머리, 진단 빌드 문단**
+
+31행에서 열고 42행에서 닫는 펜스 블록의 **내용**(32–41행)을 아래로 바꾼다(여는·닫는 펜스 줄은 그대로):
+
+```
+git tag v1.0.3 && git push origin v1.0.3
+        │
+        ▼
+   test (ubuntu) ─── analyze + flutter test       ← 게이트
+        │ 통과해야만
+        ├── ios (macos) ─────────────────────── 미서명 .ipa → GitHub Release (AltStore)
+        ├── appstore-gate ── appstore (macos) ── 서명 .ipa → TestFlight
+        ├── android-gate ──┐
+        └── android-smoke ─┴─ android (ubuntu) ─ 서명 .aab → Play 내부 테스트
+              (에뮬레이터 release 스모크 — 실패하면 android가 돌지 않는다)
+```
+
+44–45행(글머리 두 개)을 아래 넷으로 바꾼다:
+
+```markdown
+- **테스트 게이트를 앞에 둔다.** 태그가 가리키는 커밋의 테스트가 통과했다는 보장이 없다. Linux 잡이라 공짜고 ~3분이다. 깨진 빌드를 폰에 올리는 것보다 압도적으로 싸다.
+- **세 경로는 병렬이고 독립이다.** iOS 서명이 터져도 Android AAB는 정상 업로드되고, 그 반대도 같다.
+- **`android-smoke`가 Play로 가는 문을 지킨다.** 에뮬레이터에서 release 빌드를 돌려 보고(§6-H) 실패하면 `android`가 아예 돌지 않는다 — 업로드도 아티팩트도 없다.
+- **게이트 잡이 시크릿 유무를 출력으로 넘긴다.** `secrets`는 잡 수준 `if`에서 못 읽기 때문이다. 시크릿이 없으면 그 경로만 건너뛰고 `::notice::`를 남긴다 — 셋업 도중에 태그를 밀어도 나머지 경로는 돈다.
+```
+
+"OCR 개발자 진단 빌드" 절의 마지막 문장(`진단 IPA를 일반 릴리스 자산으로 게시하지 않는다.`) 뒤에 빈 줄을 두고 문단 하나를 더한다:
+
+```markdown
+같은 수동 실행이 Android AAB도 만든다. 진단 기능은 **꺼진 채로**(Play로 갈 수 있는 빌드이므로) `beanprofile-aab-<실행 번호>` 아티팩트로 남는다. 첫 Play 업로드(§3-4)가 이 경로를 쓴다.
+```
+
+- [ ] **Step 4: §3 — Play 셋업 안내로 통째로 교체**
+
+82행(`## 3. 1회성 셋업 — Android (~10분)`)부터 94행(`**키스토어와 비밀번호는 최소 2곳에 백업한다. 이유는 §6.**`)까지를 아래 블록 1–9를 순서대로 이어 붙인 것으로 바꾼다. `markdown` 블록은 내용 그대로 넣고, `bash` 블록은 대상 파일에서도 언어 표시가 `bash`인 코드 펜스로 감싸 넣는다(펜스는 0열). 블록 사이에는 빈 줄 하나. 그 뒤의 빈 줄과 `---`는 그대로 둔다.
+
+블록 1 (markdown):
+
+```markdown
+## 3. 1회성 셋업 — Android / Google Play
+
+> 이 문서의 셸 명령은 **Git Bash**(Git for Windows 동봉) 기준이다. `base64`는 Git Bash에 들어 있고, `keytool`은 PATH에 없으므로 Android Studio 내장 JDK의 것을 경로째 쓴다.
+
+순서가 중요하다. **첫 AAB는 Play Console에서 손으로 올린다** — Play Developer API는 업로드가 한 번도 없는 앱에 올리지 못한다. **서비스 계정 시크릿은 맨 마지막에 넣는다** — 그 시크릿이 들어가는 순간부터 태그가 자동 업로드를 시도하는데, 앱이 아직 '초안'이면 `Only releases with status draft may be created on draft app`으로 거부된다.
+
+### 3-1. Play Console 개인 계정
+
+play.google.com/console에서 **개인** 계정으로 가입한다(등록비 $25). 신원 확인이 끝나야 앱을 만들 수 있다(수일). Play Console 앱으로 Android 기기 접근 확인을 요구할 수 있다.
+
+### 3-2. 앱 만들기
+
+앱 이름 `BeanProfile` · 기본 언어 한국어 · 앱 · 무료. 패키지 이름은 첫 AAB가 정한다 — `com.hyunwook.beanprofile`(영구값, §4 하단).
+
+### 3-3. 업로드 키 → 시크릿 3개
+
+키는 **저장소 밖**에 만든다. `.gitignore`가 `*.p12`를 막지만 거기에 기대지 않는다.
+```
+
+블록 2 (bash):
+
+```bash
+KEYTOOL="C:/Program Files/Android/Android Studio/jbr/bin/keytool.exe"
+mkdir -p ~/beanprofile-keys && cd ~/beanprofile-keys
+"$KEYTOOL" -genkeypair -v -keystore upload-keystore.p12 -storetype PKCS12 \
+  -keyalg RSA -keysize 2048 -validity 10000 -alias upload \
+  -dname "CN=BeanProfile Upload"
+# 비밀번호를 두 번 묻는다. PKCS12는 키 비밀번호가 저장소 비밀번호와 같다.
+```
+
+블록 3 (markdown):
+
+```markdown
+비밀번호에 `\`를 쓰지 않는다 — CI가 만드는 `key.properties`는 Java properties 형식이라 `\`를 이스케이프로 읽는다.
+
+시크릿 세 개를 등록한다. 비밀번호는 `gh`가 프롬프트로 받으므로 셸 기록에 남지 않는다.
+```
+
+블록 4 (bash):
+
+```bash
+cd ~/beanprofile-keys
+base64 -w 0 upload-keystore.p12 | gh secret set ANDROID_UPLOAD_KEYSTORE_BASE64 -R HyunwookYoo/BeanProfile
+gh secret set ANDROID_UPLOAD_KEYSTORE_PASSWORD -R HyunwookYoo/BeanProfile
+gh secret set ANDROID_UPLOAD_KEY_ALIAS -R HyunwookYoo/BeanProfile --body upload
+```
+
+블록 5 (markdown):
+
+```markdown
+`upload-keystore.p12`와 비밀번호를 **최소 2곳**에 백업한다(비밀번호 관리자 + 외장/클라우드). 잃어도 기록은 무사하지만(§6-A) Play 지원팀의 업로드 키 재설정(수일)을 기다리는 동안 업데이트가 멈춘다.
+
+### 3-4. 첫 AAB — 수동 실행 → Console 내부 테스트
+
+`build_name`에는 다음 태그로 낼 버전을 넣는다. 아티팩트의 AAB는 에뮬레이터 스모크(§6-H)와 서명 검사를 통과한 것이다. 같은 폴더에 R8 매핑 파일(`mapping.txt`)도 함께 내려받아진다 — 크래시 스택을 풀 때 쓴다.
+
+> ⚠️ **로컬에서 만든 AAB를 올리지 않는다.** 처음 올린 AAB에 서명한 키가 그대로 업로드 키로 등록된다. 로컬 빌드는 `key.properties`가 없으면 debug 키로 서명되고, Play는 debug 서명을 받지 않는다.
+```
+
+블록 6 (bash):
+
+```bash
+cd /c/BeanProfile
+gh workflow run release.yml --ref main -f build_name=1.0.3
+gh run list --workflow release.yml --limit 1        # 실행 ID 확인
+gh run watch <실행 ID> --exit-status
+gh run download <실행 ID> --pattern 'beanprofile-aab-*' --dir build/play-first-upload
+find build/play-first-upload -name '*.aab'
+```
+
+블록 7 (markdown):
+
+```markdown
+1. Play Console → 테스트 및 출시 → 테스트 → **내부 테스트** → 새 버전 만들기
+2. 앱 서명 키 선택이 나오면 **Google에서 생성한 키**(기본값)를 고른다 — Play 앱 서명
+3. 위에서 찾은 `app-release.aab`를 올린다 → 출시 노트 → 다음 → 저장 → **내부 테스트로 출시 시작**
+4. 테스터 탭 → 이메일 목록 만들기 → 폰에 로그인된 본인 Google 계정 추가 → 저장
+5. 테스터 탭의 **참여 링크**를 폰에서 열어 테스터로 참여 → Play 스토어에서 설치
+
+### 3-5. 앱 콘텐츠 선언
+
+Play Console → 정책 및 프로그램 → 앱 콘텐츠. 대시보드의 '앱 설정' 할 일이 남아 있으면 앱이 '초안'에서 벗어나지 못한다.
+
+| 항목 | 답 |
+|---|---|
+| 개인정보처리방침 | `https://hyunwookyoo.github.io/BeanProfile/privacy.html` |
+| 광고 | 광고 없음 |
+| 앱 액세스 | 제한 없이 모든 기능 사용 가능(로그인 없음) |
+| 콘텐츠 등급 | IARC 설문 — 폭력·성적 콘텐츠·약물·도박·사용자 간 상호작용 전부 "아니요" |
+| 타겟층 | 13세 이상 연령대만 선택(13세 미만을 고르면 가족 정책 대상이 된다) |
+| 데이터 보안 | [`store-listing.md`](store-listing.md) 「Google Play 데이터 보안 (Data safety)」 표 그대로 |
+| 그 밖의 선언(정부 앱·금융 기능·건강 등) | 해당 없음 |
+
+### 3-6. 서비스 계정 → 시크릿 `PLAY_SERVICE_ACCOUNT_JSON` (마지막)
+
+1. Google Cloud Console → 새 프로젝트(예: `beanprofile-play`) → API 및 서비스 → 라이브러리 → **Google Play Android Developer API** 사용 설정
+2. IAM 및 관리자 → 서비스 계정 → 만들기(역할 부여 없이) → 만든 계정 → 키 → 키 추가 → **JSON** → 내려받기
+3. Play Console → 사용자 및 권한 → 새 사용자 초대 → 서비스 계정 이메일 → 앱 권한에 BeanProfile 추가 → **테스트 트랙에 앱 출시** 권한 → 초대
+4. 아래 명령으로 시크릿을 등록한 뒤 내려받은 JSON을 지운다 — GitHub Secret에만 남긴다. 다시 필요하면 키를 새로 만든다.
+```
+
+블록 8 (bash):
+
+```bash
+gh secret set PLAY_SERVICE_ACCOUNT_JSON -R HyunwookYoo/BeanProfile < ~/Downloads/<내려받은-키>.json
+```
+
+블록 9 (markdown):
+
+```markdown
+권한이 반영되기까지 시간이 걸릴 수 있다. 첫 태그가 권한 오류로 실패하면 몇 시간 뒤 **태그를 올려서** 다시 민다(re-run 금지 — §2 함정).
+
+### 3-7. 이후
+
+`v*` 태그 → `android-smoke`가 통과하면 `android` 잡이 내부 테스트에 바로 출시한다(`status: completed`). 폰의 Play 스토어가 업데이트를 받는다. 태그 실행이 `Only releases with status draft may be created on draft app`으로 실패하면 앱이 아직 '초안'이다 — 3-4의 출시가 끝났는지, 3-5의 할 일이 남았는지 확인하고 태그를 올려 다시 민다.
+```
+
+- [ ] **Step 5: §5 시크릿 · §6-A 위험 · §6-H 스모크 · §8 머리 · §9 체크리스트**
+
+§5 표의 158–161행(기존 Android 네 줄):
+
+```
+| `ANDROID_KEYSTORE_BASE64` | `.jks`의 base64 |
+| `ANDROID_KEYSTORE_PASSWORD` | 키스토어 비밀번호 |
+| `ANDROID_KEY_ALIAS` | 키 별칭 (`beanprofile`) |
+| `ANDROID_KEY_PASSWORD` | 키 비밀번호 |
+```
+
+을 다음 네 줄로 바꾼다:
+
+```
+| `ANDROID_UPLOAD_KEYSTORE_BASE64` | 업로드 키 `upload-keystore.p12`의 base64 |
+| `ANDROID_UPLOAD_KEYSTORE_PASSWORD` | 키스토어 비밀번호(PKCS12라 키 비밀번호도 같다) |
+| `ANDROID_UPLOAD_KEY_ALIAS` | 키 별칭 (`upload`) |
+| `PLAY_SERVICE_ACCOUNT_JSON` | Play 서비스 계정 JSON 키 **내용 전체** |
+```
+
+§6-A — 185행(`### A. 키스토어가 곧 시음 기록이다 🔑`)부터 193행(`- **재판단(M2):** …`)까지를 아래로 바꾼다:
+
+```markdown
+### A. Play로 설치한 폰에 다른 서명의 빌드를 넣으면 기록이 지워진다 🔑
+
+안드로이드는 **서명이 다른 빌드를 기존 앱 위에 설치하지 못한다.** 설치하려면 앱을 지워야 하고, **지우는 순간 로컬 전용 DB와 사진이 사라진다.**
+
+Play 앱 서명(2026-10 도입) 이후 폰의 앱은 **Google이 보관하는 앱 서명 키**로 서명돼 있어서 위험의 모양이 바뀌었다.
+
+- **업로드 키를 잃어도 기록은 무사하다.** Play 지원팀에 업로드 키 재설정을 요청하면 되고(수일), 그동안 업데이트만 멈춘다. 그래도 키 파일과 비밀번호는 2곳에 백업한다(§3-3).
+- **진짜 위험은 로컬 빌드다.** Windows에서 만든 빌드는 `key.properties`가 없으면 debug 키로 서명된다. 그걸 Play 설치본이 있는 폰에 넣으면 — `flutter install`은 **항상 기존 앱을 먼저 지우고**, `flutter run`은 설치가 거부되면 **묻지 않고 지운 뒤 다시 깐다**(`Uninstalling old version...`). 시음 기록이 경고 없이 사라진다. release 스모크 APK(§6-H)도 같은 applicationId라 같은 위험이 있어서, 스모크 스크립트는 에뮬레이터가 아니면 설치를 거부한다.
+
+> **Play로 설치한 폰에는 `flutter run`·`flutter install`을 하지 않는다.** 개발·검증은 에뮬레이터에서 한다. 폰을 꼭 써야 하면 먼저 설정 → 백업 내보내기로 JSON을 받아 둔다(M5).
+```
+
+§6-H — 295행(§6-G의 마지막 문단 `여기서만 프로파일 **이름**을 하드코딩한다…`) 뒤, 297행 `---` 앞에 빈 줄을 두고 아래 블록 셋을 이어 넣는다(가운데 `bash` 블록은 0열 bash 펜스로 감싼다).
+
+```markdown
+### H. release 빌드는 에뮬레이터 스모크로만 자동 검증된다 🧪
+
+Play로 가는 건 R8을 거친 release 빌드다. `flutter drive`는 release 모드를 거부하고 profile 빌드는 R8을 돌리지 않아서, 기존 통합 테스트(`ocr_probe_test` 등)로는 이 빌드를 볼 수 없다. 그래서 진입점만 바꾼 release APK(`integration_test/release_smoke.dart`)를 에뮬레이터에서 돌린다 — Gradle·R8 설정은 배포 빌드와 같다. 번들 테스트 카드 5장을 실제 ML Kit으로 읽고 drift를 백그라운드 isolate로 열어 쓰고 읽는다.
+
+- **CI** — `android-smoke` 잡이 태그·수동 실행마다 돈다. 실패하면 `android` 잡이 돌지 않아 Play 업로드도 아티팩트도 없다. 에뮬레이터 부팅이 흔들려 실패했다면 그 실행의 **실패한 잡만 다시 실행**해도 된다 — Android 쪽은 아무것도 올리지 않았으므로 그 `versionCode`는 처음 쓰이고, 이미 성공한 iOS 잡은 다시 돌지 않는다.
+- **로컬** — 에뮬레이터(`flutter_emulator`)를 띄운 뒤 아래를 돌린다. 스크립트는 **에뮬레이터가 아니면 설치를 거부한다**(§6-A). 스모크 APK는 applicationId가 같아 에뮬레이터의 개발용 앱을 덮어쓴다 — 다음 `flutter run`이 되돌린다.
+```
+
+```bash
+flutter build apk --release --target-platform android-x64 \
+  -t integration_test/release_smoke.dart --dart-define=ENABLE_OCR_DIAGNOSTICS=false
+python scripts/release_smoke.py
+```
+
+```markdown
+카드 5장의 기대값은 `integration_test/support/bundled_card_checks.dart` 한 곳에 있다. 파서를 고쳐 이 카드들의 결과가 바뀌면 거기만 고친다 — debug 프로브와 release 스모크가 함께 따라간다. 카메라·사진 선택기·화면 흐름은 자동화하지 않는다(폰에서 확인).
+```
+
+§8 — 319행 제목 줄(`## 8.`로 시작) 다음 빈 줄 뒤, 321행의 기존 인용(`아직 저장소에 넣지 않는다`) **앞에** 인용 하나와 빈 줄을 더한다:
+
+```markdown
+> 📜 **역사 기록이다.** 실제 파이프라인은 `.github/workflows/release.yml`이고 구조는 §2에 있다. 아래의 Android APK → GitHub Release 잡은 만들지 않았고, Android는 Play 내부 테스트 경로(§3)로 대체됐다.
+```
+
+§9 — 두 줄을 바꾼다. 기존:
+
+```
+- [ ] Actions에서 `test` → `android`/`ios` 초록불 확인
+- [ ] 안드로이드: GitHub Release에서 APK 받아 설치
+```
+
+새:
+
+```
+- [ ] Actions에서 `test` → `ios`·`appstore`·`android-smoke`·`android` 초록불 확인
+- [ ] 안드로이드: 폰의 Play 스토어에서 업데이트 확인(내부 테스트, 수 분). **폰에 로컬 빌드를 넣지 않는다**(§6-A)
+```
+
+- [ ] **Step 6: `CLAUDE.md` 두 곳**
+
+30행 기존:
+
+```
+Deployment convention (`v*` tag push → Android APK via GitHub Release + iOS via TestFlight) lives in **`docs/deployment.md`**; it also holds the one-time Android/Apple signing setup runbook.
+```
+
+새:
+
+```
+Deployment convention (`v*` tag push → Android AAB to Play internal testing, gated by an emulator release smoke + iOS via TestFlight, plus an unsigned `.ipa` on GitHub Release for AltStore) lives in **`docs/deployment.md`**; it also holds the one-time Google Play/Apple setup runbook.
+```
+
+"Deployment constraints"의 항목 기존:
+
+```
+- **The Android keystore guards the user's data.** Signature mismatch forces uninstall → wipes the local-only DB. Back it up in ≥2 places.
+```
+
+새:
+
+```
+- **Never install a local build on the phone that has the Play build.** Play App Signing means the installed app carries Google's app-signing key; a local build (or the release smoke APK) is debug-signed, `flutter install` always uninstalls first, and `flutter run` silently uninstalls on signature mismatch → wipes the local-only DB. Develop and smoke-test on the emulator. Losing the upload key only pauses updates (Play support reset) — still back it up in ≥2 places.
+```
+
+- [ ] **Step 7: 확인한다 (GREEN · Review Focus 1)**
+
+```bash
+cd /c/BeanProfile
+awk '/^## 8\./{skip=1} /^## 9\./{skip=0} !skip' docs/deployment.md | grep -nE 'APK|ANDROID_KEYSTORE_|ANDROID_KEY_PASSWORD|ANDROID_KEY_ALIAS|beanprofile\.jks|스토어 출시 안 함'; echo "stale_exit=$?"
+grep -c 'ANDROID_UPLOAD_KEYSTORE_BASE64\|PLAY_SERVICE_ACCOUNT_JSON' docs/deployment.md
+grep -c 'Only releases with status draft' docs/deployment.md
+grep -n 'Uninstalling old version' docs/deployment.md
+grep -c '로컬 빌드' docs/deployment.md
+grep -n '^### H\. release 빌드는' docs/deployment.md
+grep -c 'android-smoke' docs/deployment.md
+grep -c 'release_smoke' docs/deployment.md
+grep -n 'Never install a local build' CLAUDE.md
+grep -n 'Android APK via GitHub Release\|The Android keystore guards' CLAUDE.md; echo "claude_stale_exit=$?"
+```
+
+Expected: `stale_exit=1`(출력 없음). 둘째 4 이상(§3 블록 4·8, §5 표 둘). 셋째 2(§3 블록 1·9). 넷째 1줄(§6-A). 다섯째 4 이상(§1 인용, §3-4 경고, §6-A, §9). 여섯째 1줄. 일곱째 4 이상(§2 그림·글머리, §3-7, §6-H, §9). 여덟째 2 이상(§6-H). 아홉째 1줄. 마지막 `claude_stale_exit=1`.
+
+- [ ] **Step 8: HTML로 렌더한다**
+
+```bash
+cd /c/BeanProfile
+timeout 60 python scripts/md2html.py docs/deployment.md; echo "exit=$?"
+grep -c 'beanprofile-aab' docs/deployment.html
+git status --short
+```
+
+Expected: `exit=0`(124면 md2html이 멈춘 것 — §3·§6-H의 펜스가 0열인지 확인한다). `beanprofile-aab` 2 이상. `git status`에는 `M CLAUDE.md`, `M docs/deployment.md`, `M docs/deployment.html`과 기존 untracked 둘만.
+
+- [ ] **Step 9: 커밋**
+
+```bash
+cd /c/BeanProfile
+git add docs/deployment.md docs/deployment.html CLAUDE.md
+git commit -m "$(cat <<'EOF'
+docs(deploy): replace the never-built APK path with Play internal testing
+
+The deployment doc described an Android APK job that never existed. Write
+the one-time Play setup in the order it has to happen: first AAB by hand,
+service account last. Document the emulator release smoke that gates the
+upload. Rewrite the signing risk: with Play App Signing a lost upload key
+only pauses updates, while a local flutter install or run on the phone
+with the Play build silently uninstalls it and wipes the local-only
+database. Mirror both in CLAUDE.md.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01RSnfDi7WDeKq9sg1LWJLec
+EOF
+)"
+```
+
+---
+
+## Task 6: 1회성 셋업과 DoD — 사용자가 하고 controller가 확인
+
+서브에이전트에게 맡기지 않는다. 사용자의 계정·기기·결제가 걸린 단계이고, controller는 각 단계 뒤에 확인 명령을 돌린다. 스펙 §6의 DoD 번호를 괄호에 적었다.
+
+- [ ] **Step 1: 최종 리뷰 → `main` 병합 → push** (사용자 선택 — finishing-a-development-branch)
+
+병합하면 GitHub Pages가 개정된 개인정보처리방침을 내보낸다(수 분).
+
+```bash
+curl -s https://hyunwookyoo.github.io/BeanProfile/privacy.html | grep -c 'Google ML Kit'
+```
+
+Expected: 1 이상.
+
+- [ ] **Step 2: 사용자 — `deployment.md` §3-1 ~ §3-3** (계정 · 앱 · 업로드 키 · 시크릿 3개)
+
+controller 확인(값은 보이지 않는다):
+
+```bash
+gh secret list -R HyunwookYoo/BeanProfile
+```
+
+Expected: `ANDROID_UPLOAD_KEYSTORE_BASE64` · `ANDROID_UPLOAD_KEYSTORE_PASSWORD` · `ANDROID_UPLOAD_KEY_ALIAS`가 보인다.
+
+- [ ] **Step 3: controller — `main`에서 수동 실행 → 스모크 통과 → 서명된 AAB 아티팩트** (DoD 3)
+
+```bash
+cd /c/BeanProfile
+gh workflow run release.yml --ref main -f build_name=1.0.3
+gh run list --workflow release.yml --branch main --limit 1 --json databaseId,number,status
+```
+
+`gh run watch <ID> --exit-status`(백그라운드)로 기다린 뒤:
+
+```bash
+gh run view <ID> --json jobs --jq '.jobs[] | "\(.name): \(.conclusion)"'
+JOB=$(gh run view <ID> --json jobs --jq '.jobs[] | select(.name == "android") | .databaseId')
+gh run view <ID> --log --job "$JOB" | grep -A2 '업로드 키 서명 확인'
+gh api repos/HyunwookYoo/BeanProfile/actions/runs/<ID>/artifacts --jq '.artifacts[].name'
+gh run download <ID> --pattern 'beanprofile-aab-*' --dir build/play-first-upload
+python scripts/verify_aab_signature.py "$(find build/play-first-upload -name '*.aab' | head -1)"
+```
+
+Expected: `android-gate: success`, `android-smoke: success`, `android: success`(`appstore-gate`·`appstore`는 수동 실행이라 `skipped`). 로그에 `CN=BeanProfile Upload`가 있고 `Android Debug`는 없다. 아티팩트 `beanprofile-aab-<number>`. 로컬 재검사도 `CN=BeanProfile Upload`, exit 0.
+
+- [ ] **Step 4: 사용자 — §3-4** (Console 내부 테스트에 그 AAB 업로드 · Play 앱 서명 · 테스터 등록 · 참여 링크 · 설치)
+
+- [ ] **Step 5: 사용자 — 온디바이스 확인** (DoD 4 · Review Focus 3)
+
+1. 폰 런처의 앱 이름이 `BeanProfile`이다.
+2. 설정 화면의 버전이 `1.0.3`이다(`dev`가 아니다).
+3. 원두 추가 → 촬영 또는 갤러리 → 실제 원두 카드 한 장 → OCR 칩이 나오고 필드가 자동으로 채워진다. R8 문제는 스모크가 먼저 잡지만, **카메라·사진 선택기·화면 흐름까지 release 빌드로 보는 건 이 단계뿐이다.**
+4. 저장 → 앱을 완전히 닫았다 다시 열어도 원두가 남아 있다.
+
+3이 실패하면(크래시·칩 없음): 폰을 USB로 연결해 `"$LOCALAPPDATA/Android/Sdk/platform-tools/adb.exe" logcat -d | grep -iE 'mlkit|FATAL|ClassNotFound|NoSuchMethod'`을 받는다. **`flutter run`·`flutter install`·스모크 스크립트를 폰에 쓰지 않는다**(§6-A — 기록이 지워진다). 스택은 아티팩트의 `mapping.txt`로 푼다. 고친 뒤에는 스모크가 그 실패를 잡도록 기대값이나 검사를 더하고 태그를 올린다.
+
+- [ ] **Step 6: 사용자 — §3-5 앱 콘텐츠 선언 + App Store 라벨 정정** (DoD 6)
+
+Play 데이터 보안은 `store-listing.md` 「Google Play 데이터 보안 (Data safety)」 표대로, App Store Connect의 앱 개인정보 보호는 같은 문서 「개인정보 보호 (App Privacy)」 표대로 고친다. controller는 확인할 수단이 없으므로 사용자의 완료 답을 기록한다.
+
+- [ ] **Step 7: 사용자 — §3-6 서비스 계정 → 시크릿 `PLAY_SERVICE_ACCOUNT_JSON`**
+
+```bash
+gh secret list -R HyunwookYoo/BeanProfile
+```
+
+Expected: `PLAY_SERVICE_ACCOUNT_JSON`이 더해졌다.
+
+- [ ] **Step 8: controller — 태그 `v1.0.3`** (사용자 승인 뒤 · DoD 5)
+
+```bash
+cd /c/BeanProfile
+git checkout main && git pull --ff-only
+git tag v1.0.3 && git push origin v1.0.3
+gh run list --workflow release.yml --limit 1 --json databaseId,event,headBranch
+```
+
+`gh run watch <ID> --exit-status`로 기다린 뒤:
+
+```bash
+gh run view <ID> --json jobs --jq '.jobs[] | "\(.name): \(.conclusion)"'
+gh release view v1.0.3 --json assets --jq '.assets[].name'
+```
+
+Expected: 일곱 잡 전부 `success` — `test` · `ios`(GitHub Release, `action-gh-release@v3` 첫 태그 검증) · `appstore-gate` · `appstore`(TestFlight, `import-codesign-certs@v6` 첫 태그 검증) · `android-gate` · `android-smoke` · `android`(Play 업로드, 아티팩트 없음). 릴리스 자산 `beanprofile-v1.0.3.ipa`. 사용자의 폰 Play 스토어에 업데이트가 뜬다. `android`가 `draft app`으로 실패하면 §3-7대로 처리한다.
+
+- [ ] **Step 9: 기록**
+
+1. `CLAUDE.md` Status에 한 문단 — 날짜, 태그, 실행 ID, DoD 결과, 남은 일(프로덕션 = 테스터 12명 × 14일, 스펙 §7). 사실만 적는다.
+2. 스펙 `docs/plans/android-play-release-design.md`의 상태 행 → 완료.
+3. agentmemory `memory_save` — 본문 앞에 `[BeanProfile]`, 개념 태그에 `BeanProfile`. 비자명한 교훈만: `flutter install`/`flutter run`의 자동 삭제, 첫 업로드 키 등록, `flutter drive`가 release를 거부하고 profile이 R8을 안 돌아서 release 스모크(진입점 교체 APK + logcat)를 만든 것, ML Kit 공개 문서에 스토어 범주가 없다는 점.
+4. 커밋(`git add CLAUDE.md docs/plans/android-play-release-design.md docs/plans/android-play-release-design.html`) — push는 사용자 승인 뒤.

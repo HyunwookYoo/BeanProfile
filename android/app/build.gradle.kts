@@ -8,7 +8,8 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
-// Play 업로드 키 — CI가 GitHub Secrets로 android/key.properties를 만든다(docs/deployment.md §3).
+// 앱 서명 키 — CI가 GitHub Secrets로 android/key.properties를 만든다(docs/deployment.md §3).
+// 폰에는 이 키로 서명한 APK를 직접 설치하므로 이 키가 곧 앱의 신원이다(§6-A).
 // 파일이 없으면 debug 키로 서명해 로컬 `flutter run --release`가 키 없이도 돌게 한다.
 // 그 대체 경로가 CI에서 조용히 타지 않도록 release.yml이 결과물의 서명을 검사한다.
 val keystorePropertiesFile = rootProject.file("key.properties")

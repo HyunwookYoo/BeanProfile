@@ -5,8 +5,8 @@ name: release
 # 세 경로가 나란히 돈다:
 #  - ios      : "미서명" .ipa → GitHub Release. 서명·설치는 로컬 AltStore가 담당.
 #  - appstore : 서명된 .ipa → App Store Connect 업로드. 서명 시크릿이 있을 때만 실행.
-#  - android  : 업로드 키로 서명한 .aab → Play 내부 테스트. 에뮬레이터 release 스모크(android-smoke)를
-#               통과해야 돈다. 수동 실행은 업로드 대신 아티팩트로 남긴다.
+#  - android  : 앱 서명 키로 서명한 .apk → GitHub Release(폰에서 받아 직접 설치). 에뮬레이터 release
+#               스모크(android-smoke)를 통과해야 돈다. 수동 실행은 진단 기능을 켠 APK를 아티팩트로 남긴다.
 # App Store 심사를 통과하기 전까지 AltStore 경로가 유일한 설치 수단이므로 함께 유지한다.
 # 규약: docs/deployment.md · 계획: docs/plans/milestone-0-delivery.md · docs/plans/android-play-release-design.md
 on:
@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
     inputs:
       build_name:
-        description: '빌드 버전 (예: 1.0.3) — 진단 IPA와 Play 첫 업로드용 AAB에 쓴다'
+        description: '빌드 버전 (예: 1.0.3) — 진단 IPA·진단 APK에 쓴다'
         required: true
         type: string
 
@@ -90,6 +90,9 @@ jobs:
             무료 Apple ID(AltStore) 경로용 **미서명** iOS 빌드.
             설치: 아이폰에서 이 .ipa를 내려받아 AltStore → My Apps → + 로 선택하면
             AltStore가 서명해 설치합니다. (PC에서 AltServer 실행 + 같은 WiFi 필요)
+
+            Android: 폰에서 이 .apk를 내려받아 설치합니다(처음 한 번 "출처를 알 수 없는 앱" 허용).
+            기존 앱 위에 그대로 덮어 설치하면 기록이 유지됩니다 — 앱을 지우고 다시 깔지 마세요.
           files: beanprofile-${{ github.ref_name }}.ipa
 
   # 서명 시크릿이 아직 없을 때 appstore 잡을 통째로 건너뛰기 위한 게이트.
@@ -188,9 +191,9 @@ jobs:
           api-key-id: ${{ secrets.APPSTORE_KEY_ID }}
           api-private-key: ${{ secrets.APPSTORE_PRIVATE_KEY }}
 
-  # 업로드 키·Play 서비스 계정 시크릿 유무를 출력으로 넘긴다(appstore-gate와 같은 이유).
-  # 태그와 수동 실행 모두에서 돈다 — 수동 실행이 Play 첫 업로드용 AAB를 만든다.
-  # 서명 시크릿 셋 중 하나라도 비면 빌드하지 않는다 — 빈 비밀번호로 서명을 시도하지 않게.
+  # 앱 서명 키 시크릿 유무를 출력으로 넘긴다(appstore-gate와 같은 이유).
+  # 태그와 수동 실행 모두에서 돈다 — 수동 실행이 진단 APK를 만든다.
+  # 시크릿 셋 중 하나라도 비면 빌드하지 않는다 — 빈 비밀번호로 서명을 시도하지 않게.
   android-gate:
     needs: test
     runs-on: ubuntu-latest
@@ -199,35 +202,23 @@ jobs:
       contents: read
     outputs:
       sign_ready: ${{ steps.check.outputs.sign_ready }}
-      play_ready: ${{ steps.check.outputs.play_ready }}
     steps:
       - id: check
         env:
-          KEYSTORE_B64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
-          PLAY_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
-          sign_ready=false
           if [ -n "$KEYSTORE_B64" ] && [ -n "$KEYSTORE_PASSWORD" ] && [ -n "$KEY_ALIAS" ]; then
-            sign_ready=true
+            echo "sign_ready=true" >> "$GITHUB_OUTPUT"
           else
-            echo "::notice::Android 업로드 키 시크릿이 없어 AAB 빌드를 건너뜁니다(docs/deployment.md §3-3)."
-          fi
-          echo "sign_ready=$sign_ready" >> "$GITHUB_OUTPUT"
-          if [ -n "$PLAY_JSON" ]; then
-            echo "play_ready=true" >> "$GITHUB_OUTPUT"
-          elif [ "$sign_ready" = true ]; then
-            echo "play_ready=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Play 서비스 계정 시크릿이 없어 자동 업로드를 건너뜁니다. AAB는 실행 아티팩트로 남깁니다(docs/deployment.md §3-6)."
-          else
-            echo "play_ready=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Play 서비스 계정 시크릿도 없습니다 — 업로드 키(§3-3)를 먼저, 서비스 계정(§3-6)은 마지막에 등록합니다(docs/deployment.md)."
+            echo "sign_ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Android 앱 서명 키 시크릿이 없어 APK 빌드를 건너뜁니다(docs/deployment.md §3-2)."
           fi
 
   # release 스모크 — 진입점만 바꾼 release APK를 에뮬레이터에서 돌려 R8을 거친 빌드의
   # ML Kit OCR·sqlite를 확인한다(flutter drive는 release를 거부하고 profile은 R8을 안 돈다).
-  # 업로드 키가 필요 없어 시크릿과 무관하게 돌고, android가 이 잡에 걸려 있어 실패하면 Play로 가지 않는다.
+  # 서명 키가 필요 없어 시크릿과 무관하게 돌고, android가 이 잡에 걸려 있어 실패하면 APK가 나가지 않는다.
   android-smoke:
     needs: test
     runs-on: ubuntu-latest
@@ -276,8 +267,8 @@ jobs:
     needs: [test, android-gate, android-smoke]
     if: needs.android-gate.outputs.sign_ready == 'true'
     runs-on: ubuntu-latest
-    # 업로드 키와 Play 서비스 계정을 다루는 잡이라 저장소 쓰기 토큰을 곁에 두지 않는다
-    # (contents: write는 ios 잡의 GitHub Release용이다).
+    # 앱 서명 키가 디스크에 풀리는 잡이라 저장소 쓰기 토큰을 곁에 두지 않는다.
+    # Release에 붙이는 일은 키가 없는 android-release 잡이 한다.
     permissions:
       contents: read
     steps:
@@ -296,13 +287,13 @@ jobs:
 
       # 키스토어는 작업 트리 밖(러너 임시 폴더)에 풀고, Gradle이 읽는 key.properties만 android/에 둔다.
       # 비밀번호는 env로만 받아 파일로 쓰고 로그에 찍지 않는다.
-      - name: 업로드 키 복원
+      - name: 앱 서명 키 복원
         env:
-          KEYSTORE_B64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
-          keystore="$RUNNER_TEMP/upload-keystore.p12"
+          keystore="$RUNNER_TEMP/beanprofile-release.p12"
           echo "$KEYSTORE_B64" | base64 -d > "$keystore"
           {
             echo "storeFile=$keystore"
@@ -311,49 +302,64 @@ jobs:
             echo "keyAlias=$KEY_ALIAS"
           } > android/key.properties
 
-      # 진단 기능은 Play로 갈 수 있는 빌드에 절대 실리면 안 되므로 수동 실행이어도 false로 못박는다.
-      - name: 서명된 .aab 빌드
+      # 어느 폰에나 깔리는 universal APK 하나. 진단 기능은 태그 빌드에선 끄고 수동 실행(진단 빌드)에서만 켠다 —
+      # 같은 키로 서명되므로 진단 빌드를 폰에 덮어 깔아도 기록이 유지된다(iOS 수동 실행과 같은 규칙).
+      - name: 서명된 .apk 빌드
         env:
           MANUAL_BUILD_NAME: ${{ inputs.build_name }}
+          OCR_DIAGNOSTICS: ${{ github.event_name == 'workflow_dispatch' && 'true' || 'false' }}
         run: |
           BUILD_NAME="${GITHUB_REF_NAME#v}"
           if [ -n "$MANUAL_BUILD_NAME" ]; then
             BUILD_NAME="$MANUAL_BUILD_NAME"
           fi
-          flutter build appbundle --release \
+          flutter build apk --release \
             --build-name="$BUILD_NAME" \
             --build-number="${{ github.run_number }}" \
             --dart-define=APP_VERSION="$BUILD_NAME" \
-            --dart-define=ENABLE_OCR_DIAGNOSTICS=false
+            --dart-define=ENABLE_OCR_DIAGNOSTICS="$OCR_DIAGNOSTICS"
 
       # key.properties가 없거나 깨지면 Gradle이 조용히 debug 키로 서명한다(build.gradle.kts).
-      # Play는 처음 올린 AAB의 키를 업로드 키로 등록하므로, 업로드·아티팩트보다 먼저 막는다.
+      # 다른 키로 서명된 APK는 폰의 앱 위에 설치되지 않으므로, 내보내기 전에 막는다.
       - name: 서명 확인
-        run: python3 scripts/verify_aab_signature.py build/app/outputs/bundle/release/app-release.aab
+        run: python3 scripts/verify_apk_signature.py build/app/outputs/flutter-apk/app-release.apk
 
-      # 수동 실행(첫 수동 업로드용)이거나 서비스 계정이 아직 없으면 AAB를 버리지 않고 남긴다.
-      # 매핑 파일은 R8이 난독화한 크래시 스택을 풀 때 쓴다.
-      - name: AAB 아티팩트 (Play 수동 업로드용)
-        if: github.event_name != 'push' || needs.android-gate.outputs.play_ready != 'true'
+      # 태그는 Release에 붙일 이름으로, 수동 실행은 진단 빌드임이 드러나는 이름으로 남긴다.
+      # 매핑 파일은 R8이 난독화한 크래시 스택을 풀 때 쓴다 — 태그 빌드는 90일 보관.
+      - name: APK 이름 붙이기
+        env:
+          MANUAL_BUILD_NAME: ${{ inputs.build_name }}
+        run: |
+          mkdir -p dist
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            cp build/app/outputs/flutter-apk/app-release.apk "dist/beanprofile-${GITHUB_REF_NAME}.apk"
+          else
+            cp build/app/outputs/flutter-apk/app-release.apk "dist/beanprofile-diagnostic-${MANUAL_BUILD_NAME}-${GITHUB_RUN_NUMBER}.apk"
+          fi
+          cp build/app/outputs/mapping/release/mapping.txt dist/
+      - name: APK 아티팩트
         uses: actions/upload-artifact@v6
         with:
-          name: beanprofile-aab-${{ github.run_number }}
-          path: |
-            build/app/outputs/bundle/release/app-release.aab
-            build/app/outputs/mapping/release/mapping.txt
-          retention-days: 7
+          name: beanprofile-apk-${{ github.run_number }}
+          path: dist/
+          retention-days: ${{ github.event_name == 'push' && 90 || 7 }}
 
-      # 앱이 아직 '초안'(첫 출시 전)이면 Play API가
-      # "Only releases with status draft may be created on draft app"으로 거부한다.
-      # 첫 AAB는 Console에서 손으로 올린다(docs/deployment.md §3-4).
-      - name: Play 내부 테스트 업로드
-        if: github.event_name == 'push' && needs.android-gate.outputs.play_ready == 'true'
-        uses: r0adkll/upload-google-play@v1
+  # 태그 실행에서만 APK를 GitHub Release에 붙인다. 쓰기 토큰은 이 잡에만 주고, 서명 키는 여기 없다.
+  # ios 잡도 같은 Release를 만들지만 action-gh-release가 동시 생성 충돌을 스스로 재시도하므로 순서는 상관없다.
+  android-release:
+    needs: android
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
         with:
-          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: com.hyunwook.beanprofile
-          releaseFiles: build/app/outputs/bundle/release/app-release.aab
-          track: internal
-          status: completed
-          releaseName: ${{ github.ref_name }}
-          mappingFile: build/app/outputs/mapping/release/mapping.txt
+          name: beanprofile-apk-${{ github.run_number }}
+          path: dist
+      - name: GitHub Release에 .apk 붙이기
+        uses: softprops/action-gh-release@v3
+        with:
+          name: BeanProfile ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          files: dist/beanprofile-${{ github.ref_name }}.apk

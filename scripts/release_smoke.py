@@ -4,7 +4,7 @@ flutter drive는 release 모드를 거부하고 profile 빌드는 R8을 돌리�
 같은 Gradle·R8 설정에 진입점만 integration_test/release_smoke.dart로 바꾼 APK를 설치해 실행하고,
 앱이 logcat에 남기는 BEANPROFILE_SMOKE 줄을 읽어 판정한다(docs/deployment.md §6-H).
 
-실기기에는 설치하지 않는다. 스모크 APK는 배포 앱과 applicationId가 같아서, Play로 설치한 폰에서는
+실기기에는 설치하지 않는다. 스모크 APK는 배포 앱과 applicationId가 같아서, 릴리스 APK가 깔린 폰에서는
 서명이 충돌하고 그걸 풀려고 앱을 지우면 시음 기록이 사라진다(docs/deployment.md §6-A).
 
 먼저 빌드한다:

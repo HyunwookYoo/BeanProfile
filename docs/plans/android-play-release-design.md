@@ -3,7 +3,7 @@
 | 항목 | 내용 |
 |---|---|
 | 작성일 | 2026-10-04 |
-| 상태 | 설계 승인(브레인스토밍 2026-10-04) → 구현 계획 [`android-play-release-plan.md`](./android-play-release-plan.md) → **2026-10-07 Play 대신 APK 직접 설치로 전환(§10)** |
+| 상태 | 설계 승인(브레인스토밍 2026-10-04) → 구현 계획 [`android-play-release-plan.md`](./android-play-release-plan.md) → **2026-10-07 Play 대신 APK 직접 설치로 전환(§9)** |
 | 계기 | 사용자 — "android쪽도 출시를 해봐야 할 것 같아" |
 | 상위 문서 | [`deployment.md`](../deployment.md) · [`store-listing.md`](../store-listing.md) · [`privacy.md`](../privacy.md) |
 | 영향 범위 | Android 빌드 설정 · `release.yml` · release 스모크(테스트 전용 진입점 · 판정 스크립트) · 개인정보 고지 문서 · 배포 문서. **앱 Dart 코드(`lib/`) 무수정** |
@@ -215,20 +215,20 @@ App Store 개인정보 라벨은 **사용자가 App Store Connect에서 직접 �
 | `docs/deployment.md` / `.html` | §6 항목 |
 | `CLAUDE.md` | 배포 규약 문장 정정 |
 
-
-## 10. 2026-10-07 전환 — Play 대신 APK 직접 설치
+## 9. 2026-10-07 전환 — Play 대신 APK 직접 설치
 
 사용자 결정(2026-10-07): "Google Play에 게시가 아니라 apk 파일 받아서 설치". 개인용 앱(CLAUDE.md "personal use only")이라 Play 개발자 계정($25·신원 확인)·앱 콘텐츠 선언·서비스 계정 없이 가는 쪽을 택했다. 결정 3(Play 앱 서명)·4(태그 → Play 내부 테스트)·5(사이드로드 APK 안 만듦)는 아래로 대체된다. §4.1·§4.3·§4.5는 그 시점의 설계 기록으로 남긴다.
 
 | 바뀐 것 | 내용 |
 |---|---|
 | 배포 | `android` 잡이 universal APK를 빌드하고 `apksigner`로 서명을 검사한다(minSdk 24 APK에는 v2 서명만 있어 `keytool`로는 못 읽는다). 키가 없는 `android-release` 잡이 태그 Release에 붙인다 — 쓰기 토큰과 서명 키를 같은 잡에 두지 않는다 |
-| 키 | 업로드 키가 아니라 **앱 서명 키** — 시크릿 `ANDROID_KEYSTORE_BASE64`·`ANDROID_KEYSTORE_PASSWORD`·`ANDROID_KEY_ALIAS`, 별칭 `beanprofile`. 잃으면 업데이트가 끝난다(§4.1의 "잃어도 재설정"은 더 이상 참이 아니다) |
+| 키 | 업로드 키가 아니라 **앱 서명 키** — 시크릿 `ANDROID_KEYSTORE_BASE64`·`ANDROID_KEYSTORE_PASSWORD`·`ANDROID_KEY_ALIAS`, 별칭 `beanprofile`. 잃으면 업데이트가 끝난다(§4.1의 "잃어도 재설정"은 더 이상 참이 아니다). 백업 파일에서 계산한 인증서 지문을 저장소 변수 `ANDROID_CERT_SHA256`에 두고 CI가 APK 서명과 대조한다 — debug 키가 아니라는 것만으로는 시크릿에 백업과 다른 키가 들어가는 사고를 못 막는다(리뷰 지적) |
 | 진단 | 수동 실행 APK는 `ENABLE_OCR_DIAGNOSTICS=true`(iOS 수동 실행과 같은 규칙). 같은 키라 폰에 덮어 깔아도 기록이 유지된다 |
 | 그대로 | R8 규칙 · 조건부 서명 · release 스모크와 `android-smoke` 게이트 · Flutter 3.44.6 고정 · ML Kit 개인정보 고지 |
 | 보관 | Play 데이터 보안 답(`store-listing.md`)은 Play로 갈 때 쓴다. 그때는 이 키를 Play 앱 서명에 직접 올려(PEPK) 서명을 잇는다 |
 
 검증(2026-10-07, 에뮬레이터): 같은 키·높은 버전 코드 → 업데이트 성공(최초 설치 시각 유지) · debug 키 → `INSTALL_FAILED_UPDATE_INCOMPATIBLE` · 낮은 버전 코드 → `INSTALL_FAILED_VERSION_DOWNGRADE`. Google 개발자 인증 정책 전망은 `deployment.md` §6-I.
+
 ## 출처
 
 - [Target API level requirements for Google Play apps](https://support.google.com/googleplay/android-developer/answer/11926878?hl=en)

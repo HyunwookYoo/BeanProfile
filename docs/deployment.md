@@ -54,6 +54,8 @@ git tag v1.0.3 && git push origin v1.0.3
 
 빌드 번호는 **반드시 단조 증가**해야 한다. TestFlight는 중복 번호를 거부하고, Android `versionCode`도 역행할 수 없다. `run_number`는 워크플로 실행마다 증가하므로 조건을 만족한다.
 
+> ⚠️ **`release.yml`의 이름을 바꾸거나 새 워크플로 파일로 옮기지 않는다.** `run_number`는 워크플로 파일마다 따로 세서 1부터 다시 시작한다 — 그러면 그 뒤 APK가 전부 폰의 앱보다 낮은 버전이 돼 설치가 거부된다(§6-A). 꼭 옮겨야 하면 `--build-number`에 지금 번호만큼 오프셋을 더한다.
+
 > ⚠️ **함정:** 실패한 워크플로를 **re-run 하면 `run_number`가 유지**된다 → TestFlight가 중복으로 거부한다.
 > 실패했으면 re-run 하지 말고 **태그를 올려서**(`v0.0.2`) 다시 밀 것.
 
@@ -81,7 +83,13 @@ git tag v1.0.3 && git push origin v1.0.3
 일반 `v*` 태그 실행은 같은 플래그를 `false`로 고정한다(GitHub Release의 `.ipa`·`.apk`, TestFlight).
 진단 IPA를 일반 릴리스 자산으로 게시하지 않는다.
 
-같은 수동 실행이 Android **진단 APK**도 만든다(`beanprofile-apk-<실행 번호>` 아티팩트, 7일 보관). 태그 APK와 같은 키로 서명되므로 폰의 앱 위에 덮어 설치해도 기록이 유지된다 — 단 실행 번호가 더 낮은 빌드는 설치가 거부되므로(§6-A) 늘 가장 최근 실행을 쓴다. 태그 실행은 진단을 끈 APK를 Release에 붙인다.
+같은 수동 실행이 Android **진단 APK**도 만든다(아티팩트 `beanprofile-apk-<실행 번호>`, 7일 보관). 태그 APK와 같은 키로 서명되므로 폰의 앱 위에 덮어 설치해도 기록이 유지된다. 세 가지를 지킨다.
+
+- **`main`(또는 태그할 커밋)에서 돌린다.** DB 스키마가 더 새로운 브랜치의 빌드를 깐 뒤 그보다 오래된 커밋의 태그 APK가 업데이트로 깔리면 앱이 DB를 못 연다(§6-D).
+- **늘 가장 최근 실행을 쓴다.** 실행 번호가 더 낮은 빌드는 설치가 거부된다(§6-A).
+- 아티팩트는 zip이라 받으려면 GitHub 로그인이 필요하다 — PC에서 받아 압축을 풀고 `.apk`를 폰으로 옮기거나, 폰에서 받아 압축을 풀고 연다.
+
+태그 실행은 진단을 끈 APK를 Release에 붙인다.
 
 ---
 
@@ -89,7 +97,7 @@ git tag v1.0.3 && git push origin v1.0.3
 
 > 이 문서의 셸 명령은 **Git Bash**(Git for Windows 동봉) 기준이다. `base64`는 Git Bash에 들어 있고, `keytool`은 PATH에 없으므로 Android Studio 내장 JDK의 것을 경로째 쓴다.
 
-Play를 거치지 않는다(2026-10-07 결정 — `plans/android-play-release-design.md` §10). 태그를 밀면 CI가 **앱 서명 키**로 서명한 APK를 GitHub Release에 붙이고, 폰에서 그 APK를 받아 설치한다. **이 키가 곧 앱의 신원이다** — 같은 키로 서명한 APK만 기존 앱 위에 업데이트되고, 키를 잃으면 더는 업데이트할 수 없다(§6-A).
+Play를 거치지 않는다(2026-10-07 결정 — `plans/android-play-release-design.md` §9). 태그를 밀면 CI가 **앱 서명 키**로 서명한 APK를 GitHub Release에 붙이고, 폰에서 그 APK를 받아 설치한다. **이 키가 곧 앱의 신원이다** — 같은 키로 서명한 APK만 기존 앱 위에 업데이트되고, 키를 잃으면 더는 업데이트할 수 없다(§6-A).
 
 ### 3-1. 앱 서명 키 만들기
 
@@ -108,7 +116,7 @@ mkdir -p ~/beanprofile-keys && cd ~/beanprofile-keys
 
 **`beanprofile-release.p12`와 비밀번호를 최소 2곳에 백업한다**(비밀번호 관리자 + 외장/클라우드). 이 키를 잃으면 폰의 앱을 다시는 업데이트할 수 없고, 새 키로 깔려면 앱을 지워야 해서 기록이 사라진다(§6-A).
 
-### 3-2. 시크릿 3개
+### 3-2. 시크릿 3개 + 인증서 지문 변수
 
 비밀번호는 `gh`가 프롬프트로 받으므로 셸 기록에 남지 않는다(mintty에서 프롬프트가 안 뜨면 앞에 `winpty`를 붙인다).
 
@@ -119,18 +127,37 @@ gh secret set ANDROID_KEYSTORE_PASSWORD -R HyunwookYoo/BeanProfile
 gh secret set ANDROID_KEY_ALIAS -R HyunwookYoo/BeanProfile --body beanprofile
 ```
 
+그리고 **같은 키 파일**에서 인증서 SHA-256 지문을 읽어 저장소 변수로 등록한다. CI는 만든 APK의 서명 지문을 이 값과 대조해서, 시크릿에 백업과 다른 키가 들어가 있으면 APK를 내보내지 않는다 — 처음 설치한 APK의 키가 폰의 신원으로 굳기 때문이다. 지문은 공개값(모든 APK에 들어 있다)이라 Secret이 아니라 Variable이다.
+
+```bash
+cd ~/beanprofile-keys
+"$KEYTOOL" -list -v -keystore beanprofile-release.p12 -alias beanprofile
+# 비밀번호를 묻는다. 출력의 인증서 지문 중 SHA256: 뒤의 값(42:7A:… 형태)을 아래에 그대로 넣는다.
+gh variable set ANDROID_CERT_SHA256 -R HyunwookYoo/BeanProfile --body "<SHA256 값>"
+```
+
+`KEYTOOL`은 3-1에서 정한 경로다(새 셸이면 다시 정한다). 콜론·대소문자는 상관없다. 나중에 시크릿을 다시 만들 일이 생겨도 이 변수는 그대로 둔다 — 그때 넣은 키가 백업과 다르면 CI가 막아 준다.
+
 ### 3-3. 처음 설치
 
-1. 태그를 민다(§9). `android-smoke` → `android` → `android-release`가 통과하면 GitHub Release에 `beanprofile-vX.Y.Z.apk`가 붙는다.
+1. 태그를 민다(§9). `android-smoke` → `android` → `android-release`가 통과하면 GitHub Release에 `beanprofile-vX.Y.Z.apk`가 붙는다. `android`의 `서명 확인` 단계가 APK 서명 지문이 `ANDROID_CERT_SHA256`과 같은지 대조한다.
 2. 폰 브라우저로 저장소의 Releases 페이지를 열어 그 `.apk`를 받는다.
 3. 받은 파일을 연다. 처음 한 번 그 브라우저(또는 파일 앱)에 "출처를 알 수 없는 앱 설치"를 허용한다.
 4. 설치 → 실행. Play 프로텍트가 확인되지 않은 앱이라고 경고할 수 있다 — 직접 만든 앱이니 그대로 설치한다.
 
-태그 전에 미리 깔아 보고 싶으면 수동 실행(§2 "OCR 개발자 진단 빌드")의 진단 APK를 아티팩트에서 받아 같은 방법으로 설치해도 된다. 같은 키라 나중 태그 APK가 그 위로 업데이트된다.
+태그 전에 미리 깔아 보고 싶으면 `main`에서 수동 실행(§2 "OCR 개발자 진단 빌드")을 돌려 진단 APK를 아티팩트(zip)에서 꺼내 설치해도 된다. 같은 키라 나중 태그 APK가 그 위로 업데이트된다.
 
 ### 3-4. 업데이트
 
 새 태그의 `.apk`를 받아 **기존 앱 위에 그대로 설치**한다. 같은 키 + 더 높은 버전 코드라 업데이트로 깔리고 기록이 유지된다. 앱을 먼저 지우지 않는다.
+
+**설치가 거부되면("앱이 설치되지 않았습니다"·패키지 충돌) 앱을 지우지 말고 멈춘다.** 지우는 순간 기록이 사라지고, Android에선 백업으로도 되돌릴 수 없다(§6-A). 원인은 셋 중 하나다.
+
+- 폰의 앱이 로컬 빌드다 — 설정 화면 버전이 `dev`로 보인다
+- 받은 APK가 폰의 앱보다 이전 실행에서 나왔다 — 더 최근 실행의 APK를 쓴다
+- 다른 키로 서명됐다 — CI의 지문 대조를 통과한 APK(태그 Release나 수동 실행 아티팩트)인지 확인한다
+
+판단이 안 서면 그대로 둔 채 원인부터 확인한다.
 
 업데이트를 자동으로 확인하고 싶으면 [Obtainium](https://github.com/ImranR98/Obtainium)에 이 저장소의 Releases를 등록한다(선택).
 
@@ -203,6 +230,7 @@ base64 -w 0 dist.p12 > dist.p12.base64
 | `ANDROID_KEYSTORE_BASE64` | 앱 서명 키 `beanprofile-release.p12`의 base64 |
 | `ANDROID_KEYSTORE_PASSWORD` | 키스토어 비밀번호(PKCS12라 키 비밀번호도 같다) |
 | `ANDROID_KEY_ALIAS` | 키 별칭 (`beanprofile`) |
+| `ANDROID_CERT_SHA256` (Variable — Secret 아님) | 앱 서명 인증서 SHA-256 지문. CI가 APK 서명과 대조한다(§3-2) |
 | `IOS_DIST_CERT_P12_BASE64` | `.p12`의 base64 |
 | `IOS_DIST_CERT_PASSWORD` | `.p12` export 시 지정한 암호 |
 | `IOS_PROVISIONING_PROFILE_BASE64` | `.mobileprovision`의 base64 |
@@ -232,7 +260,7 @@ android/key.properties
 
 폰의 앱은 §3-1의 **앱 서명 키**로 서명돼 있다. 그래서 —
 
-- **키를 잃으면 업데이트가 끝난다.** 다른 키로는 기존 앱 위에 깔 수 없고, 지우고 깔면 기록이 사라진다. 키 파일과 비밀번호를 **최소 2곳**에 백업한다(§3-1). 서명 검사(`scripts/verify_apk_signature.py`)가 찍는 SHA-256 지문을 함께 적어 두면 백업이 같은 키인지 대조할 수 있다.
+- **키를 잃으면 업데이트가 끝난다.** 다른 키로는 기존 앱 위에 깔 수 없고, 지우고 깔면 기록이 사라진다. 키 파일과 비밀번호를 **최소 2곳**에 백업한다(§3-1). CI는 APK 서명 지문을 백업 파일에서 계산한 변수 `ANDROID_CERT_SHA256`과 대조하므로(§3-2), 시크릿에 다른 키가 들어가면 APK가 나가지 않는다.
 - **로컬 빌드를 폰에 넣지 않는다.** Windows에서 만든 빌드는 `key.properties`가 없으면 debug 키로 서명된다. 그걸 폰에 넣으면 — `flutter install`은 **항상 기존 앱을 먼저 지우고**, `flutter run`은 설치가 거부되면 **묻지 않고 지운 뒤 다시 깐다**(`Uninstalling old version...`). 시음 기록이 경고 없이 사라진다. release 스모크 APK(§6-H)도 같은 applicationId라 같은 위험이 있어서, 스모크 스크립트는 에뮬레이터가 아니면 설치를 거부한다.
 - **낮은 버전은 깔리지 않는다**(`INSTALL_FAILED_VERSION_DOWNGRADE`). 버전 코드는 실행 번호라 나중 실행의 APK가 언제나 높다. 예전 APK로 되돌리려면 앱을 지워야 한다 — 하지 않는다.
 
@@ -268,6 +296,8 @@ TestFlight 빌드는 **업로드 90일 후 만료**되고, 만료되면 아이�
 `v0.8.0`부터 `Tastings`에 이 프로젝트 첫 drift 마이그레이션(`schemaVersion` 1→2)이 들어갔다. 한 번 v2로 연 폰에 **그보다 오래된 빌드**(마이그레이션이 없는 버전)를 다시 설치하면, drift가 자신이 모르는 스키마 버전을 만나 "마이그레이션 전략이 없다"는 예외를 던지며 **DB 자체를 못 연다** — 앱이 뜨지 않는다.
 
 AltStore 사이드로드는 "일단 이전 빌드로 되돌려보자"가 흔한 트러블슈팅이라 특히 걸리기 쉽다. **해결책은 v0.8.0 이상 빌드를 다시 설치하는 것** — 실패한 다운그레이드 자체가 데이터를 지우진 않는다(DB 파일은 그대로 남고, 여는 데만 실패한다).
+
+Android도 같다. DB 스키마가 더 새로운 브랜치에서 만든 진단 APK를 깐 뒤, 그보다 오래된 커밋의 APK가 업데이트로 깔리면(버전 코드는 실행 순서라 설치 자체는 된다) 앱이 DB를 못 연다. **앱을 지우지 말고** 그 브랜치에서 수동 실행을 한 번 더 돌려 더 높은 실행 번호의 APK를 깐다. 진단 APK를 `main`에서 만드는 이유다(§2).
 
 ### E. iOS를 빌드하는 잡은 SPM을 꺼야 한다 📦
 
@@ -364,9 +394,10 @@ Google은 인증된 개발자로 등록된 앱만 설치되게 바꾸고 있다.
 
 - 학생·취미 개발자용 **무료 제한 배포 계정**(이메일만, 신분증·비용 없음, 기기 20대까지)에 앱을 등록한다
 - 등록되지 않은 앱을 까는 **고급 설치 절차**(advanced flow)를 쓴다
-- PC에서 **ADB**로 설치한다(`adb install -r` — 서명·버전 규칙은 §6-A 그대로)
+- PC에서 **ADB**로 설치한다(`adb install -r` — 서명·버전 규칙은 §6-A 그대로). 끝나면 폰의 USB·무선 디버깅을 끈다 — 켜 둔 채로 `flutter run`을 하면 폰이 대상이 돼 앱이 지워질 수 있다(§6-A). `flutter run`은 늘 `-d emulator-5554`처럼 대상을 정해서 쓴다.
 
 한국 시행 일정이 나오면 무료 계정 등록을 먼저 검토한다. 출처: [Android Developers Blog (2026-03)](https://android-developers.googleblog.com/2026/03/android-developer-verification-rolling-out-to-all-developers.html).
+
 ---
 
 ## 7. 로드맵 편입 — M0 신설

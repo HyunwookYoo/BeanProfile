@@ -145,6 +145,7 @@ ul.tasklist li.task.done::before{content:"\2713";background:var(--accent);color:
 <p>Google의 <a href="https://developers.google.com/ml-kit/ios-data-disclosure">ML Kit iOS 데이터 공개 안내</a>는 보내는 데이터만 나열하고 Apple 범주는 정해주지 않는다(2026-10-04 원문 확인). 위 매핑은 우리 판단이다 — 설치 단위 식별자는 기기 ID, 지연 시간은 성능 데이터, 기기·앱 정보와 API 설정·오류 코드는 기타 진단 데이터, 기능 이벤트(초기화·인식)는 제품 상호 작용. <strong>애매하면 넓게 신고한다</strong> — 적게 신고한 라벨은 정책 위반이지만 넓게 신고한 라벨은 아니다. 사진과 입력 내용은 여전히 기기를 벗어나지 않으므로 사진·사용자 콘텐츠 유형은 신고하지 않는다.</p>
 <p>라벨은 App Store Connect → 앱 개인정보 보호에서 <strong>새 버전 제출 없이</strong> 고칠 수 있다.</p>
 <h2>Google Play 데이터 보안 (Data safety)</h2>
+<blockquote>2026-10-07 — Android는 GitHub Release의 APK를 직접 설치하는 방식으로 바꿨다. 이 절은 나중에 Play로 출시할 때 쓴다.</blockquote>
 <p>Play Console → 정책 및 프로그램 → 앱 콘텐츠 → 데이터 보안. 근거는 바로 위 App Store 라벨과 같고, 범주도 같은 원칙으로 맞췄다 — 두 스토어가 같은 사실을 같은 넓이로 신고한다. 출처: <a href="https://developers.google.com/ml-kit/android-data-disclosure">ML Kit Android 데이터 공개 안내</a>(전송 중 HTTPS 암호화, 제3자 이전 없음).</p>
 <div class="tablewrap"><table><thead><tr><th>질문</th><th>답</th></tr></thead><tbody><tr><td>앱에서 필수 사용자 데이터 유형을 수집하거나 공유하나요?</td><td>예</td></tr><tr><td>앱에서 수집하는 모든 사용자 데이터가 전송 중에 암호화되나요?</td><td>예 — ML Kit은 HTTPS로 보내고, 앱 자체는 아무것도 보내지 않는다</td></tr><tr><td>사용자가 데이터 삭제를 요청할 방법을 제공하나요?</td><td>아니요 — 개발자가 받는 데이터가 없다</td></tr></tbody></table></div>
 <p>수집하는 데이터 유형 — 세 유형 모두 답이 같다.</p>

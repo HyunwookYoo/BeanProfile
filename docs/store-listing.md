@@ -170,6 +170,8 @@ Google의 [ML Kit iOS 데이터 공개 안내](https://developers.google.com/ml-
 
 ## Google Play 데이터 보안 (Data safety)
 
+> 2026-10-07 — Android는 GitHub Release의 APK를 직접 설치하는 방식으로 바꿨다. 이 절은 나중에 Play로 출시할 때 쓴다.
+
 Play Console → 정책 및 프로그램 → 앱 콘텐츠 → 데이터 보안. 근거는 바로 위 App Store 라벨과 같고, 범주도 같은 원칙으로 맞췄다 — 두 스토어가 같은 사실을 같은 넓이로 신고한다. 출처: [ML Kit Android 데이터 공개 안내](https://developers.google.com/ml-kit/android-data-disclosure)(전송 중 HTTPS 암호화, 제3자 이전 없음).
 
 | 질문 | 답 |

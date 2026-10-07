@@ -45,7 +45,7 @@ git tag v1.0.3 && git push origin v1.0.3
 - **세 경로는 병렬이고 독립이다.** iOS 서명이 터져도 Android APK는 정상으로 Release에 붙고, 그 반대도 같다. 두 경로가 같은 Release에 올려도 `action-gh-release`가 동시 생성 충돌을 재시도로 처리한다.
 - **`android-smoke`가 APK가 나가는 문을 지킨다.** 에뮬레이터에서 release 빌드를 돌려 보고(§6-H) 실패하면 `android`가 아예 돌지 않는다 — APK도 아티팩트도 없다.
 - **서명 키와 쓰기 토큰을 같은 잡에 두지 않는다.** `android`(키 복원·빌드·서명 확인, 읽기 전용 토큰)가 APK를 아티팩트로 넘기면, 키가 없는 `android-release`(쓰기 토큰)가 태그 Release에 붙인다.
-- **게이트 잡이 시크릿 유무를 출력으로 넘긴다.** `secrets`는 잡 수준 `if`에서 못 읽기 때문이다. 시크릿이 없으면 그 경로만 건너뛰고 `::notice::`를 남긴다 — 셋업 도중에 태그를 밀어도 나머지 경로는 돈다.
+- **게이트 잡이 시크릿(Android는 지문 변수 `ANDROID_CERT_SHA256`까지) 유무를 출력으로 넘긴다.** `secrets`는 잡 수준 `if`에서 못 읽기 때문이다. 시크릿이 없으면 그 경로만 건너뛰고 `::notice::`를 남긴다 — 셋업 도중에 태그를 밀어도 나머지 경로는 돈다.
 - **Android 잡은 Flutter를 3.44.6에 고정한다.** stable(3.47 이상)은 Gradle 8.14 미만을 거부하는데 이 프로젝트는 8.12다(2026-10-05 CI 실측). R8 빌드와 스모크를 로컬에서 검증한 버전과 같게 맞춘 것이다. `test`·iOS 잡은 stable 그대로다. **Flutter를 올리기 전에(로컬·CI 모두) Gradle·AGP·Kotlin 정비가 먼저다** — 정비가 끝나면 이 고정을 푼다.
 
 ### 버저닝
@@ -127,7 +127,7 @@ gh secret set ANDROID_KEYSTORE_PASSWORD -R HyunwookYoo/BeanProfile
 gh secret set ANDROID_KEY_ALIAS -R HyunwookYoo/BeanProfile --body beanprofile
 ```
 
-그리고 **같은 키 파일**에서 인증서 SHA-256 지문을 읽어 저장소 변수로 등록한다. CI는 만든 APK의 서명 지문을 이 값과 대조해서, 시크릿에 백업과 다른 키가 들어가 있으면 APK를 내보내지 않는다 — 처음 설치한 APK의 키가 폰의 신원으로 굳기 때문이다. 지문은 공개값(모든 APK에 들어 있다)이라 Secret이 아니라 Variable이다.
+그리고 **백업해 둔 `beanprofile-release.p12`(위에서 시크릿에 넣은 바로 그 파일)**에서 인증서 SHA-256 지문을 읽어 저장소 변수로 등록한다. CI는 만든 APK의 서명 지문을 이 값과 대조해서, 시크릿에 백업과 다른 키가 들어가 있으면 APK를 내보내지 않는다 — 처음 설치한 APK의 키가 폰의 신원으로 굳기 때문이다. 지문은 공개값(모든 APK에 들어 있다)이라 Secret이 아니라 Variable이다.
 
 ```bash
 cd ~/beanprofile-keys
@@ -151,7 +151,7 @@ gh variable set ANDROID_CERT_SHA256 -R HyunwookYoo/BeanProfile --body "<SHA256 �
 
 새 태그의 `.apk`를 받아 **기존 앱 위에 그대로 설치**한다. 같은 키 + 더 높은 버전 코드라 업데이트로 깔리고 기록이 유지된다. 앱을 먼저 지우지 않는다.
 
-**설치가 거부되면("앱이 설치되지 않았습니다"·패키지 충돌) 앱을 지우지 말고 멈춘다.** 지우는 순간 기록이 사라지고, Android에선 백업으로도 되돌릴 수 없다(§6-A). 원인은 셋 중 하나다.
+**설치가 거부되면("앱이 설치되지 않았습니다"·패키지 충돌) 앱을 지우지 말고 멈춘다.** 지우는 순간 기록이 사라지고, Android에선 백업으로도 되돌릴 수 없다(§6-A). 받다가 깨진 파일이면 다시 받으면 되고, 그 밖의 흔한 원인은 셋이다.
 
 - 폰의 앱이 로컬 빌드다 — 설정 화면 버전이 `dev`로 보인다
 - 받은 APK가 폰의 앱보다 이전 실행에서 나왔다 — 더 최근 실행의 APK를 쓴다

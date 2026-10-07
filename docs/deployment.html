@@ -71,7 +71,7 @@ ul.tasklist li.task.done::before{content:"\2713";background:var(--accent);color:
         ├── android-gate ──┐
         └── android-smoke ─┴─ android ── android-release ── 서명 .apk → GitHub Release (폰에 직접 설치)
               (에뮬레이터 release 스모크 — 실패하면 android가 돌지 않는다)</code></pre>
-<ul><li><strong>테스트 게이트를 앞에 둔다.</strong> 태그가 가리키는 커밋의 테스트가 통과했다는 보장이 없다. Linux 잡이라 공짜고 ~3분이다. 깨진 빌드를 폰에 올리는 것보다 압도적으로 싸다.</li><li><strong>세 경로는 병렬이고 독립이다.</strong> iOS 서명이 터져도 Android APK는 정상으로 Release에 붙고, 그 반대도 같다. 두 경로가 같은 Release에 올려도 <code class="ic">action-gh-release</code>가 동시 생성 충돌을 재시도로 처리한다.</li><li><strong><code class="ic">android-smoke</code>가 APK가 나가는 문을 지킨다.</strong> 에뮬레이터에서 release 빌드를 돌려 보고(§6-H) 실패하면 <code class="ic">android</code>가 아예 돌지 않는다 — APK도 아티팩트도 없다.</li><li><strong>서명 키와 쓰기 토큰을 같은 잡에 두지 않는다.</strong> <code class="ic">android</code>(키 복원·빌드·서명 확인, 읽기 전용 토큰)가 APK를 아티팩트로 넘기면, 키가 없는 <code class="ic">android-release</code>(쓰기 토큰)가 태그 Release에 붙인다.</li><li><strong>게이트 잡이 시크릿 유무를 출력으로 넘긴다.</strong> <code class="ic">secrets</code>는 잡 수준 <code class="ic">if</code>에서 못 읽기 때문이다. 시크릿이 없으면 그 경로만 건너뛰고 <code class="ic">::notice::</code>를 남긴다 — 셋업 도중에 태그를 밀어도 나머지 경로는 돈다.</li><li><strong>Android 잡은 Flutter를 3.44.6에 고정한다.</strong> stable(3.47 이상)은 Gradle 8.14 미만을 거부하는데 이 프로젝트는 8.12다(2026-10-05 CI 실측). R8 빌드와 스모크를 로컬에서 검증한 버전과 같게 맞춘 것이다. <code class="ic">test</code>·iOS 잡은 stable 그대로다. <strong>Flutter를 올리기 전에(로컬·CI 모두) Gradle·AGP·Kotlin 정비가 먼저다</strong> — 정비가 끝나면 이 고정을 푼다.</li></ul>
+<ul><li><strong>테스트 게이트를 앞에 둔다.</strong> 태그가 가리키는 커밋의 테스트가 통과했다는 보장이 없다. Linux 잡이라 공짜고 ~3분이다. 깨진 빌드를 폰에 올리는 것보다 압도적으로 싸다.</li><li><strong>세 경로는 병렬이고 독립이다.</strong> iOS 서명이 터져도 Android APK는 정상으로 Release에 붙고, 그 반대도 같다. 두 경로가 같은 Release에 올려도 <code class="ic">action-gh-release</code>가 동시 생성 충돌을 재시도로 처리한다.</li><li><strong><code class="ic">android-smoke</code>가 APK가 나가는 문을 지킨다.</strong> 에뮬레이터에서 release 빌드를 돌려 보고(§6-H) 실패하면 <code class="ic">android</code>가 아예 돌지 않는다 — APK도 아티팩트도 없다.</li><li><strong>서명 키와 쓰기 토큰을 같은 잡에 두지 않는다.</strong> <code class="ic">android</code>(키 복원·빌드·서명 확인, 읽기 전용 토큰)가 APK를 아티팩트로 넘기면, 키가 없는 <code class="ic">android-release</code>(쓰기 토큰)가 태그 Release에 붙인다.</li><li><strong>게이트 잡이 시크릿(Android는 지문 변수 <code class="ic">ANDROID_CERT_SHA256</code>까지) 유무를 출력으로 넘긴다.</strong> <code class="ic">secrets</code>는 잡 수준 <code class="ic">if</code>에서 못 읽기 때문이다. 시크릿이 없으면 그 경로만 건너뛰고 <code class="ic">::notice::</code>를 남긴다 — 셋업 도중에 태그를 밀어도 나머지 경로는 돈다.</li><li><strong>Android 잡은 Flutter를 3.44.6에 고정한다.</strong> stable(3.47 이상)은 Gradle 8.14 미만을 거부하는데 이 프로젝트는 8.12다(2026-10-05 CI 실측). R8 빌드와 스모크를 로컬에서 검증한 버전과 같게 맞춘 것이다. <code class="ic">test</code>·iOS 잡은 stable 그대로다. <strong>Flutter를 올리기 전에(로컬·CI 모두) Gradle·AGP·Kotlin 정비가 먼저다</strong> — 정비가 끝나면 이 고정을 푼다.</li></ul>
 <h3>버저닝</h3>
 <p>태그 <code class="ic">v1.2.3</code> → <code class="ic">--build-name=1.2.3</code>, <code class="ic">--build-number=&lt;github.run_number&gt;</code>.</p>
 <p>빌드 번호는 <strong>반드시 단조 증가</strong>해야 한다. TestFlight는 중복 번호를 거부하고, Android <code class="ic">versionCode</code>도 역행할 수 없다. <code class="ic">run_number</code>는 워크플로 실행마다 증가하므로 조건을 만족한다.</p>
@@ -106,7 +106,7 @@ mkdir -p ~/beanprofile-keys &amp;&amp; cd ~/beanprofile-keys
 base64 -w 0 beanprofile-release.p12 | gh secret set ANDROID_KEYSTORE_BASE64 -R HyunwookYoo/BeanProfile
 gh secret set ANDROID_KEYSTORE_PASSWORD -R HyunwookYoo/BeanProfile
 gh secret set ANDROID_KEY_ALIAS -R HyunwookYoo/BeanProfile --body beanprofile</code></pre>
-<p>그리고 <strong>같은 키 파일</strong>에서 인증서 SHA-256 지문을 읽어 저장소 변수로 등록한다. CI는 만든 APK의 서명 지문을 이 값과 대조해서, 시크릿에 백업과 다른 키가 들어가 있으면 APK를 내보내지 않는다 — 처음 설치한 APK의 키가 폰의 신원으로 굳기 때문이다. 지문은 공개값(모든 APK에 들어 있다)이라 Secret이 아니라 Variable이다.</p>
+<p>그리고 <strong>백업해 둔 <code class="ic">beanprofile-release.p12</code>(위에서 시크릿에 넣은 바로 그 파일)</strong>에서 인증서 SHA-256 지문을 읽어 저장소 변수로 등록한다. CI는 만든 APK의 서명 지문을 이 값과 대조해서, 시크릿에 백업과 다른 키가 들어가 있으면 APK를 내보내지 않는다 — 처음 설치한 APK의 키가 폰의 신원으로 굳기 때문이다. 지문은 공개값(모든 APK에 들어 있다)이라 Secret이 아니라 Variable이다.</p>
 <pre class="code" data-lang="bash"><code>cd ~/beanprofile-keys
 "$KEYTOOL" -list -v -keystore beanprofile-release.p12 -alias beanprofile
 # 비밀번호를 묻는다. 출력의 인증서 지문 중 SHA256: 뒤의 값(42:7A:… 형태)을 아래에 그대로 넣는다.
@@ -117,7 +117,7 @@ gh variable set ANDROID_CERT_SHA256 -R HyunwookYoo/BeanProfile --body "&lt;SHA25
 <p>태그 전에 미리 깔아 보고 싶으면 <code class="ic">main</code>에서 수동 실행(§2 "OCR 개발자 진단 빌드")을 돌려 진단 APK를 아티팩트(zip)에서 꺼내 설치해도 된다. 같은 키라 나중 태그 APK가 그 위로 업데이트된다.</p>
 <h3>3-4. 업데이트</h3>
 <p>새 태그의 <code class="ic">.apk</code>를 받아 <strong>기존 앱 위에 그대로 설치</strong>한다. 같은 키 + 더 높은 버전 코드라 업데이트로 깔리고 기록이 유지된다. 앱을 먼저 지우지 않는다.</p>
-<p><strong>설치가 거부되면("앱이 설치되지 않았습니다"·패키지 충돌) 앱을 지우지 말고 멈춘다.</strong> 지우는 순간 기록이 사라지고, Android에선 백업으로도 되돌릴 수 없다(§6-A). 원인은 셋 중 하나다.</p>
+<p><strong>설치가 거부되면("앱이 설치되지 않았습니다"·패키지 충돌) 앱을 지우지 말고 멈춘다.</strong> 지우는 순간 기록이 사라지고, Android에선 백업으로도 되돌릴 수 없다(§6-A). 받다가 깨진 파일이면 다시 받으면 되고, 그 밖의 흔한 원인은 셋이다.</p>
 <ul><li>폰의 앱이 로컬 빌드다 — 설정 화면 버전이 <code class="ic">dev</code>로 보인다</li><li>받은 APK가 폰의 앱보다 이전 실행에서 나왔다 — 더 최근 실행의 APK를 쓴다</li><li>다른 키로 서명됐다 — CI의 지문 대조를 통과한 APK(태그 Release나 수동 실행 아티팩트)인지 확인한다</li></ul>
 <p>판단이 안 서면 그대로 둔 채 원인부터 확인한다.</p>
 <p>업데이트를 자동으로 확인하고 싶으면 <a href="https://github.com/ImranR98/Obtainium">Obtainium</a>에 이 저장소의 Releases를 등록한다(선택).</p>

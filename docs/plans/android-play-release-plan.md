@@ -1,5 +1,7 @@
 # 🤖 BeanProfile — Android Play 출시 (내부 테스트) 구현 계획
 
+> ⚠️ **2026-10-07 — 이 계획의 Play 경로는 더 이상 쓰지 않는다.** Android는 GitHub Release의 APK를 폰에 직접 설치하는 방식으로 바뀌었다(설계 [`android-play-release-design.md`](./android-play-release-design.md) §9). Task 1~5의 R8·서명·스모크·CI·문서 작업은 그 뒤 APK용으로 고쳐 썼고, Task 6(Play 셋업)과 `ANDROID_UPLOAD_*`·`PLAY_SERVICE_ACCOUNT_JSON` 시크릿은 폐기됐다. 지금 셋업은 [`deployment.md`](../deployment.md) §3.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** `v*` 태그 하나로 업로드 키로 서명한 AAB가 Play 내부 테스트 트랙에 올라가게 한다. 올라가기 전에 R8을 거친 release 빌드를 에뮬레이터에서 자동으로 검증하고, ML Kit 진단 전송에 맞춰 개인정보 고지를 바로잡는다.

@@ -33,7 +33,9 @@ if hasattr(sys.stdout, "reconfigure"):
 
 # apksigner는 DN을 "C=US, O=Android, CN=Android Debug" 순서로 찍는다 — 앞머리가 아니라 포함 여부로 본다.
 DEBUG_CN = "CN=Android Debug"
-SIGNER_LINE = re.compile(r"Signer #(\d+) certificate (DN|SHA-256 digest): (.+)")
+# 서명자 머리는 build-tools마다 다르다: 36.x까지 "Signer #1 certificate DN: …", 37.0.0부터
+# "V2 Signer: certificate DN: …". CI는 가장 높은 build-tools를 쓰므로 둘 다 읽는다.
+SIGNER_LINE = re.compile(r"(.*?Signer[^:]*?):? certificate (DN|SHA-256 digest): (.+)")
 
 
 def _version_key(path):

@@ -20,6 +20,7 @@ import pathlib
 import shutil
 import subprocess
 import sys
+import threading
 import time
 
 if hasattr(sys.stdout, "reconfigure"):
@@ -104,6 +105,42 @@ def pick_emulator(adb, requested):
 def smoke_lines(adb, serial):
     log = run_adb(adb, serial, "logcat", "-d", "-v", "raw", "-s", "flutter:I").stdout
     return [line.strip() for line in log.splitlines() if line.strip().startswith(MARKER)]
+
+
+class SmokeLog:
+    """앱이 남기는 BEANPROFILE_SMOKE 줄을 실시간으로 모은다.
+
+    `logcat -d`로 버퍼를 다시 덤프하면, ML Kit 등이 로그를 많이 쓰는 동안 버퍼가 돌아 앞의
+    CHECK 줄이 밀려나 사라질 수 있다(v1.0.4 CI 실측: DONE 6/6인데 CHECK 3줄 유실). 스트림으로
+    읽으면 쓰이는 순간 받으므로 버퍼 크기와 상관없다.
+    """
+
+    def __init__(self, adb, serial):
+        self._lines = []
+        self._lock = threading.Lock()
+        self._process = subprocess.Popen(
+            [adb, "-s", serial, "logcat", "-v", "raw", "-s", "flutter:I"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        threading.Thread(target=self._read, daemon=True).start()
+
+    def _read(self):
+        for line in self._process.stdout:
+            if line.strip().startswith(MARKER):
+                with self._lock:
+                    self._lines.append(line.strip())
+
+    def lines(self):
+        with self._lock:
+            return list(self._lines)
+
+    def close(self):
+        self._process.kill()
+        self._process.wait()
 
 
 def word(line, index):
@@ -200,12 +237,13 @@ def main(argv):
     if smoke_lines(adb, serial):
         print("::error::logcat을 비우지 못했다 — 지난 실행의 결과가 남아 있다")
         return 2
+    log = SmokeLog(adb, serial)
     run_adb(adb, serial, "shell", "am", "start", "-W", "-n", ACTIVITY)
 
     deadline = time.monotonic() + args.timeout
     try:
         while True:
-            lines = smoke_lines(adb, serial)
+            lines = log.lines()
             if any(word(line, 1) in ("DONE", "FATAL") for line in lines):
                 break
             if not run_adb(adb, serial, "shell", "pidof", PACKAGE).stdout.strip():
@@ -223,6 +261,10 @@ def main(argv):
             time.sleep(2)
     finally:
         run_adb(adb, serial, "shell", "am", "force-stop", PACKAGE)
+        # DONE 줄과 같은 순간에 쓰인 줄이 아직 파이프에 남아 있을 수 있다 — 잠깐 기다렸다 닫는다.
+        time.sleep(1)
+        lines = log.lines()
+        log.close()
 
     for line in lines:
         print(line)
